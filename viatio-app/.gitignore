@@ -1,41 +1,83 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# dependencies
+# ============================================
+# DEPENDENCIAS
+# ============================================
+# Módulos de Node.js instalados por npm/yarn
 node_modules/
 
-# Expo
+# ============================================
+# EXPO & BUILD
+# ============================================
+# Archivos de caché y configuración temporal de Expo
 .expo/
 dist/
+build/
 web-build/
 expo-env.d.ts
 
-# Native
+# ============================================
+# NATIVE (iOS/Android)
+# ============================================
+# Carpetas generadas por prebuild (managed workflow)
+/ios
+/android
+
+# Archivos de build nativos
 .kotlin/
 *.orig.*
+
+# Certificados y keystores (NUNCA commitear)
 *.jks
+*.keystore
 *.p8
 *.p12
 *.key
 *.mobileprovision
+*.pem
 
-# Metro
+# Archivos de configuración de Firebase (contienen credenciales)
+google-services.json
+GoogleService-Info.plist
+
+# ============================================
+# METRO BUNDLER
+# ============================================
 .metro-health-check*
 
-# debug
+# ============================================
+# LOGS & DEBUG
+# ============================================
+*.log
 npm-debug.*
 yarn-debug.*
 yarn-error.*
 
+# ============================================
+# SISTEMA OPERATIVO
+# ============================================
 # macOS
 .DS_Store
-*.pem
 
-# local env files
+# ============================================
+# VARIABLES DE ENTORNO
+# ============================================
+# Archivos .env con credenciales sensibles
+.env
+.env.*
 .env*.local
+# Permitir template de ejemplo (sin credenciales reales)
+!.env.template
 
-# typescript
+# ============================================
+# IDE (VSCode)
+# ============================================
+# Excluir toda la carpeta .vscode/ excepto configuración compartida
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# ============================================
+# TYPESCRIPT
+# ============================================
 *.tsbuildinfo
-
-# generated native folders
-/ios
-/android
