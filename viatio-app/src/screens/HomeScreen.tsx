@@ -7,26 +7,28 @@
  * TODO: Implementar lista de viajes, búsqueda, filtros, etc.
  */
 
-import { View, Text, StyleSheet } from 'react-native';
+import { Text, StyleSheet, View } from 'react-native';
+import { ScreenContainer } from '@/components';
+import { theme } from '@/config';
 
 export default function HomeScreen() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.text}>Home</Text>
-    </View>
+    <ScreenContainer>
+      <View style={styles.content}>
+        <Text style={styles.title}>Home</Text>
+      </View>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  content: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
   },
-  text: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#1F2937',
+  title: {
+    ...theme.typography.h2,
+    color: theme.colors.text,
   },
 });

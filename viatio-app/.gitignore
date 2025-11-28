@@ -52,7 +52,6 @@ GoogleService-Info.plist
 npm-debug.*
 yarn-debug.*
 yarn-error.*
-nul
 
 # ============================================
 # SISTEMA OPERATIVO
