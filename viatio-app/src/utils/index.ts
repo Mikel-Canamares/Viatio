@@ -7,4 +7,14 @@
  * Ejemplos: formatDate, validateEmail, debounce, storage helpers, etc.
  */
 
-export {};
+export {
+  logError,
+  getUserFriendlyMessage,
+  isNetworkError,
+  createAppError,
+  createValidationError,
+  createNetworkError,
+  createAuthError,
+} from './errorHandler';
+
+export type { AppError } from './errorHandler';

@@ -7,4 +7,4 @@
  * Ejemplos: useAuth, useTrips, useDebounce, useKeyboard, etc.
  */
 
-export {};
+export { useAsync } from './useAsync';

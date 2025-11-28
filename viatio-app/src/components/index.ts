@@ -17,8 +17,8 @@ export { CategoryBadge, CATEGORY_COLORS, getCategoryConfig } from './CategoryBad
 export type { CategoryType } from './CategoryBadge';
 export { SectionHeader } from './SectionHeader';
 export { FloatingActionButton } from './FloatingActionButton';
+export { ErrorBoundary } from './ErrorBoundary';
+export { LoadingOverlay } from './LoadingOverlay';
 
 // Los siguientes se crearán en fases posteriores:
-// export { LoadingOverlay } from './LoadingOverlay';
-// export { ErrorBoundary } from './ErrorBoundary';
 // export { EmptyState } from './EmptyState';
