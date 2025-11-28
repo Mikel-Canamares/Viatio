@@ -2,15 +2,15 @@
  * PRIMARY BUTTON
  *
  * Componente de botón principal reutilizable.
- * Soporta múltiples variantes, estados de loading y disabled.
+ * Soporta estados de loading, disabled y variante small.
  */
 
-import { Pressable, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
+import { Pressable, Text, StyleSheet, ActivityIndicator, ViewStyle } from 'react-native';
 import { theme } from '@/config';
 
 interface PrimaryButtonProps {
   /** Texto del botón */
-  title: string;
+  children: string;
 
   /** Función a ejecutar al presionar */
   onPress: () => void;
@@ -21,135 +21,70 @@ interface PrimaryButtonProps {
   /** Si true, muestra un loading spinner */
   loading?: boolean;
 
-  /** Variante visual del botón */
-  variant?: 'primary' | 'secondary' | 'outline';
+  /** Variante del tamaño del botón */
+  variant?: 'primary' | 'small';
 
-  /** Si true, el botón ocupa todo el ancho */
-  fullWidth?: boolean;
+  /** Estilos adicionales */
+  style?: ViewStyle;
 }
 
 export function PrimaryButton({
-  title,
+  children,
   onPress,
   disabled = false,
   loading = false,
   variant = 'primary',
-  fullWidth = true,
+  style,
 }: PrimaryButtonProps) {
   const isDisabled = disabled || loading;
-
-  // Estilos base según variante
-  const getButtonStyle = (): ViewStyle => {
-    const baseStyle: ViewStyle = {
-      paddingVertical: theme.spacing.md,
-      paddingHorizontal: theme.spacing.xl,
-      borderRadius: theme.radius.md,
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: 48,
-      width: fullWidth ? '100%' : 'auto',
-    };
-
-    switch (variant) {
-      case 'primary':
-        return {
-          ...baseStyle,
-          backgroundColor: theme.colors.primary,
-        };
-
-      case 'secondary':
-        return {
-          ...baseStyle,
-          backgroundColor: theme.colors.secondary,
-        };
-
-      case 'outline':
-        return {
-          ...baseStyle,
-          backgroundColor: 'transparent',
-          borderWidth: 1.5,
-          borderColor: theme.colors.primary,
-        };
-
-      default:
-        return baseStyle;
-    }
-  };
-
-  // Estilos de texto según variante
-  const getTextStyle = (): TextStyle => {
-    const baseStyle: TextStyle = {
-      ...theme.typography.subtitle,
-      textAlign: 'center',
-    };
-
-    switch (variant) {
-      case 'primary':
-        return {
-          ...baseStyle,
-          color: theme.colors.primaryForeground,
-        };
-
-      case 'secondary':
-        return {
-          ...baseStyle,
-          color: theme.colors.secondaryForeground,
-        };
-
-      case 'outline':
-        return {
-          ...baseStyle,
-          color: theme.colors.primary,
-        };
-
-      default:
-        return baseStyle;
-    }
-  };
-
-  // Color del spinner según variante
-  const getSpinnerColor = (): string => {
-    switch (variant) {
-      case 'primary':
-        return theme.colors.primaryForeground;
-      case 'secondary':
-        return theme.colors.secondaryForeground;
-      case 'outline':
-        return theme.colors.primary;
-      default:
-        return theme.colors.primary;
-    }
-  };
 
   return (
     <Pressable
       onPress={onPress}
       disabled={isDisabled}
       style={({ pressed }) => [
-        getButtonStyle(),
+        styles.button,
+        variant === 'small' ? styles.buttonSmall : styles.buttonPrimary,
         pressed && !isDisabled && styles.pressed,
         isDisabled && styles.disabled,
+        style,
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={getSpinnerColor()} size="small" />
+        <ActivityIndicator color="#FFFFFF" size="small" />
       ) : (
-        <Text style={[getTextStyle(), isDisabled && styles.textDisabled]}>
-          {title}
-        </Text>
+        <Text style={styles.text}>{children}</Text>
       )}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  button: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    paddingHorizontal: 24,
+  },
+  buttonPrimary: {
+    backgroundColor: theme.colors.primaryLight, // #0066CC
+    paddingVertical: 16,
+  },
+  buttonSmall: {
+    backgroundColor: theme.colors.primaryLight, // #0066CC
+    paddingVertical: 12,
+  },
   pressed: {
-    opacity: 0.7,
+    backgroundColor: theme.colors.primaryDark, // #0052A3
   },
   disabled: {
-    opacity: 0.5,
+    backgroundColor: '#D1D5DB',
   },
-  textDisabled: {
-    opacity: 0.7,
+  text: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

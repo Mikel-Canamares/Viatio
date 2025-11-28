@@ -8,27 +8,38 @@
  */
 
 import { Text, StyleSheet, View } from 'react-native';
-import { ScreenContainer } from '@/components';
+import { ScreenContainer, PageHeader } from '@/components';
 import { theme } from '@/config';
 
 export default function HomeScreen() {
   return (
-    <ScreenContainer>
-      <View style={styles.content}>
-        <Text style={styles.title}>Home</Text>
-      </View>
-    </ScreenContainer>
+    <View style={styles.container}>
+      <PageHeader title="Mis Viajes" />
+      <ScreenContainer>
+        <View style={styles.content}>
+          <Text style={styles.placeholderText}>
+            Aquí se mostrará la lista de viajes
+          </Text>
+        </View>
+      </ScreenContainer>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
   content: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: theme.spacing.lg,
   },
-  title: {
-    ...theme.typography.h2,
-    color: theme.colors.text,
+  placeholderText: {
+    fontSize: 16,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
   },
 });

@@ -15,53 +15,40 @@ interface ScreenContainerProps {
   children: ReactNode;
 
   /** Si true, usa ScrollView; si false, usa View */
-  scrollable?: boolean;
+  scroll?: boolean;
 
-  /** Si true, aplica padding horizontal */
-  padded?: boolean;
-
-  /** Color de fondo del contenedor */
-  backgroundColor?: string;
+  /** Estilos adicionales para el contenedor */
+  style?: ViewStyle;
 }
 
 export function ScreenContainer({
   children,
-  scrollable = false,
-  padded = true,
-  backgroundColor = theme.colors.background,
+  scroll = false,
+  style,
 }: ScreenContainerProps) {
-  const containerStyle: ViewStyle = {
-    flex: 1,
-    backgroundColor,
-  };
-
-  const contentStyle: ViewStyle = {
-    flex: 1,
-    paddingHorizontal: padded ? theme.spacing.lg : 0,
-  };
-
   return (
-    <SafeAreaView style={containerStyle} edges={['top', 'left', 'right']}>
-      {scrollable ? (
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      {scroll ? (
         <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingHorizontal: padded ? theme.spacing.lg : 0 },
-          ]}
+          style={[styles.content, style]}
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
           {children}
         </ScrollView>
       ) : (
-        <View style={contentStyle}>{children}</View>
+        <View style={[styles.content, style]}>{children}</View>
       )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: {
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  content: {
     flex: 1,
   },
   scrollContent: {

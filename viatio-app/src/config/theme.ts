@@ -10,12 +10,13 @@
 import { TextStyle, ViewStyle } from 'react-native';
 
 // ============================================
-// COLORS
+// COLORS (del prototipo web)
 // ============================================
 const colors = {
-  // Primary - Azul Booking
+  // Primary - Azul oscuro (headers, fondos principales)
   primary: '#003580',
-  primaryLight: '#0057B8',
+  primaryLight: '#0066CC', // Azul medio - botones, enlaces, focus
+  primaryDark: '#0052A3', // Hover de botones
   primaryForeground: '#FFFFFF',
 
   // Secondary
@@ -23,27 +24,37 @@ const colors = {
   secondaryForeground: '#1A1A1A',
 
   // Background
-  background: '#FFFFFF',
-  surface: '#FAFAFA',
+  background: '#F5F5F5', // Gris claro - fondo de páginas
+  surface: '#FFFFFF', // Blanco - cards
   card: '#FFFFFF',
 
   // Border
-  border: '#E0E0E0',
-  borderLight: '#F0F0F0',
+  border: 'rgba(0, 0, 0, 0.08)',
+  borderLight: 'rgba(229, 231, 235, 0.5)',
 
-  // Accent - Amarillo
+  // Accent - Amarillo (FAB, highlights)
   accent: '#FFC043',
+  accentHover: '#FFB400',
   accentForeground: '#1A1A1A',
 
   // Text
   text: '#1A1A1A',
   textSecondary: '#6B6B6B',
-  textMuted: '#9E9E9E',
+  textMuted: '#9CA3AF', // Gris claro
 
   // Status
-  success: '#1F8A70',
-  error: '#D32F2F',
+  success: '#16A34A',
+  error: '#DC2626',
   warning: '#F59E0B',
+
+  // Categorías de gastos
+  categories: {
+    transport: '#0066CC',
+    accommodation: '#16A34A',
+    food: '#EA580C',
+    activity: '#9333EA',
+    other: '#6B7280',
+  },
 } as const;
 
 // ============================================
@@ -98,13 +109,13 @@ const spacing = {
 const radius = {
   sm: 6,
   md: 10,
-  lg: 16,
+  lg: 16, // Estándar para cards y botones (del prototipo)
   xl: 24,
-  full: 9999,
+  full: 9999, // Para badges y avatares
 } as const;
 
 // ============================================
-// SHADOWS
+// SHADOWS (del prototipo)
 // ============================================
 /**
  * Sombras para iOS y Android
@@ -112,21 +123,29 @@ const radius = {
  * Android usa elevation
  */
 const shadows = {
+  // Sombra suave para cards (0 2px 8px rgba(0,0,0,0.08))
   card: {
-    // Sombra suave para cards
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
-    shadowRadius: 4,
+    shadowRadius: 8,
     elevation: 2,
   } as ViewStyle,
+  // Sombra elevada (0 4px 16px rgba(0,102,204,0.15))
   elevated: {
-    // Sombra más pronunciada para elementos elevados
-    shadowColor: '#000000',
+    shadowColor: '#0066CC',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
     elevation: 4,
+  } as ViewStyle,
+  // Sombra FAB (0 4px 16px rgba(255,192,67,0.4))
+  fab: {
+    shadowColor: '#FFC043',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 6,
   } as ViewStyle,
 } as const;
 

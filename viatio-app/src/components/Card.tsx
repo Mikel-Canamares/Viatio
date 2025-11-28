@@ -7,21 +7,36 @@
 
 import { ReactNode } from 'react';
 import { View, Pressable, StyleSheet, ViewStyle } from 'react-native';
-import { theme } from '@/config';
 
 interface CardProps {
   /** Contenido de la tarjeta */
   children: ReactNode;
 
+  /** Estilos personalizados adicionales */
+  style?: ViewStyle;
+
   /** Si se proporciona, la tarjeta será touchable */
   onPress?: () => void;
 
-  /** Estilos personalizados adicionales */
-  style?: ViewStyle;
+  /** Padding interno de la tarjeta (default: 16) */
+  padding?: number;
 }
 
-export function Card({ children, onPress, style }: CardProps) {
-  const cardStyle = [styles.card, style];
+export function Card({ children, style, onPress, padding = 16 }: CardProps) {
+  const cardStyle: ViewStyle = {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding,
+    borderWidth: 1,
+    borderColor: 'rgba(229, 231, 235, 0.5)',
+    // Sombra iOS
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    // Sombra Android
+    elevation: 2,
+  };
 
   // Si tiene onPress, renderiza como Pressable
   if (onPress) {
@@ -29,7 +44,8 @@ export function Card({ children, onPress, style }: CardProps) {
       <Pressable
         onPress={onPress}
         style={({ pressed }) => [
-          ...cardStyle,
+          cardStyle,
+          style,
           pressed && styles.pressed,
         ]}
       >
@@ -39,18 +55,12 @@ export function Card({ children, onPress, style }: CardProps) {
   }
 
   // Si no tiene onPress, renderiza como View simple
-  return <View style={cardStyle}>{children}</View>;
+  return <View style={[cardStyle, style]}>{children}</View>;
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.radius.md,
-    padding: theme.spacing.md,
-    ...theme.shadows.card,
-  },
   pressed: {
-    opacity: 0.8,
+    opacity: 0.95,
     transform: [{ scale: 0.98 }],
   },
 });
