@@ -7,4 +7,8 @@
  * Ejemplos: RootNavigator, TabNavigator, ParamLists, etc.
  */
 
-export {};
+// Exportar tipos de navegación
+export * from './types';
+
+// Exportar navegadores
+export { RootTabs } from './RootTabs';
