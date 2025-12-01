@@ -6,6 +6,7 @@
  */
 
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { Ionicons } from '@expo/vector-icons';
 import { CalendarScreen, ProfileScreen } from '@/screens';
 import { HomeStackNavigator } from './HomeStackNavigator';
 import type { RootTabParamList } from './types';
@@ -42,7 +43,9 @@ export function RootTabs() {
         component={HomeStackNavigator}
         options={{
           tabBarLabel: 'Inicio',
-          // TODO: Añadir icon cuando se configure el sistema de iconos
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home" size={size} color={color} />
+          ),
         }}
       />
 
@@ -51,7 +54,9 @@ export function RootTabs() {
         component={CalendarScreen}
         options={{
           tabBarLabel: 'Calendario',
-          // TODO: Añadir icon cuando se configure el sistema de iconos
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="calendar" size={size} color={color} />
+          ),
         }}
       />
 
@@ -60,7 +65,9 @@ export function RootTabs() {
         component={ProfileScreen}
         options={{
           tabBarLabel: 'Perfil',
-          // TODO: Añadir icon cuando se configure el sistema de iconos
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person" size={size} color={color} />
+          ),
         }}
       />
     </Tab.Navigator>
