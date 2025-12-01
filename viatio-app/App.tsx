@@ -4,9 +4,12 @@ import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { RootTabs } from '@/navigation';
 import { ErrorBoundary, PrimaryButton } from '@/components';
-import { initializeDatabase } from '@/database';
+import { initializeDatabase, clearDatabase } from '@/database';
 import { logError } from '@/utils';
 import { theme } from '@/config';
+
+// DEVELOPMENT: Cambiar a true para limpiar la BD al iniciar
+const CLEAR_DB_ON_START = true;
 
 export default function App() {
   const [dbReady, setDbReady] = useState(false);
@@ -16,6 +19,13 @@ export default function App() {
     try {
       console.log('[App] Inicializando base de datos...');
       await initializeDatabase();
+
+      // DEVELOPMENT: Limpiar base de datos si está habilitado
+      if (__DEV__ && CLEAR_DB_ON_START) {
+        console.log('[App] Limpiando base de datos (desarrollo)...');
+        await clearDatabase();
+      }
+
       setDbReady(true);
       setDbError(null);
       console.log('[App] Base de datos lista');

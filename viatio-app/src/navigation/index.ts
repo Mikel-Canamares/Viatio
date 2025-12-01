@@ -12,3 +12,4 @@ export * from './types';
 
 // Exportar navegadores
 export { RootTabs } from './RootTabs';
+export { HomeStackNavigator } from './HomeStackNavigator';

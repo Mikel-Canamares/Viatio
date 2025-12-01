@@ -10,3 +10,6 @@
 export { default as HomeScreen } from './HomeScreen';
 export { default as CalendarScreen } from './CalendarScreen';
 export { default as ProfileScreen } from './ProfileScreen';
+export { default as TripListScreen } from './TripListScreen';
+export { default as CreateTripScreen } from './CreateTripScreen';
+export { default as TripDetailScreen } from './TripDetailScreen';

@@ -7,4 +7,4 @@
  * Ejemplos: useAuthStore, useTripStore, useSettingsStore, etc.
  */
 
-export {};
+export { useViajesStore } from './viajesStore';

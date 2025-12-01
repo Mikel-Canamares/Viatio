@@ -6,7 +6,8 @@
  */
 
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { HomeScreen, CalendarScreen, ProfileScreen } from '@/screens';
+import { CalendarScreen, ProfileScreen } from '@/screens';
+import { HomeStackNavigator } from './HomeStackNavigator';
 import type { RootTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -38,7 +39,7 @@ export function RootTabs() {
     >
       <Tab.Screen
         name="Home"
-        component={HomeScreen}
+        component={HomeStackNavigator}
         options={{
           tabBarLabel: 'Inicio',
           // TODO: Añadir icon cuando se configure el sistema de iconos

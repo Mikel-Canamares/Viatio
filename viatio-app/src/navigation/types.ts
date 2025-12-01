@@ -39,6 +39,37 @@ export type RootTabParamList = {
 };
 
 // ============================================
+// HOME STACK NAVIGATOR
+// ============================================
+/**
+ * ParamList para el stack de Home (pantallas relacionadas con viajes).
+ *
+ * Rutas disponibles:
+ * - TripList: Lista de viajes del usuario
+ * - CreateTrip: Formulario para crear nuevo viaje
+ * - TripDetail: Detalle de un viaje
+ * - TripAgenda: Agenda día a día del viaje
+ * - TripReservations: Lista de reservas del viaje
+ * - AddReservation: Formulario para añadir reserva
+ * - ReservationDetail: Detalle de una reserva
+ * - TripMap: Mapa con lugares del viaje
+ * - TripDocuments: Documentos del viaje
+ * - AddDocument: Formulario para añadir documento
+ */
+export type HomeStackParamList = {
+  TripList: undefined;
+  CreateTrip: undefined;
+  TripDetail: { viajeId: string };
+  TripAgenda: { viajeId: string };
+  TripReservations: { viajeId: string };
+  AddReservation: { viajeId: string; prefillData?: any };
+  ReservationDetail: { viajeId: string; reservaId: string };
+  TripMap: { viajeId: string };
+  TripDocuments: { viajeId: string };
+  AddDocument: { viajeId: string };
+};
+
+// ============================================
 // STACK NAVIGATOR (TODO: se añadirá después)
 // ============================================
 /**

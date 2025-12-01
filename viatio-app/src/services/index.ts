@@ -7,4 +7,11 @@
  * Ejemplos: authService, mapsService, geminiService, etc.
  */
 
-export {};
+export {
+  createViaje,
+  getViajesByUsuario,
+  getViajeById,
+  updateViaje,
+  deleteViaje,
+  getViajeStats,
+} from './viajesService';

@@ -7,4 +7,10 @@
  * Ejemplos: Trip, User, Booking, Expense, etc.
  */
 
-export {};
+export type {
+  Viaje,
+  CreateViajeInput,
+  UpdateViajeInput,
+  ViajeStats,
+  ViajeConStats,
+} from './viaje';
