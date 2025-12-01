@@ -8,5 +8,5 @@
  */
 
 export { initializeDatabase, getDatabase, closeDatabase } from './database';
-export { runMigrations, getCurrentVersion, needsMigration } from './migrations';
-export { CURRENT_SCHEMA_VERSION, CREATE_TABLES_SQL, CREATE_INDEXES_SQL } from './schema';
+export { generateId, getCurrentTimestamp, clearDatabase } from './utils';
+export { CURRENT_SCHEMA_VERSION } from './schema';
