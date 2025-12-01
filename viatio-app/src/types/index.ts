@@ -14,3 +14,12 @@ export type {
   ViajeStats,
   ViajeConStats,
 } from './viaje';
+
+export type {
+  AuthUser,
+  LoginCredentials,
+  RegisterCredentials,
+  AuthState,
+} from './auth';
+
+export { mapFirebaseUser } from './auth';

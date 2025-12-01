@@ -2,14 +2,15 @@ import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
-import { RootTabs } from '@/navigation';
+import { RootNavigator } from '@/navigation';
 import { ErrorBoundary, PrimaryButton } from '@/components';
+import { AuthProvider } from '@/context';
 import { initializeDatabase, clearDatabase } from '@/database';
 import { logError } from '@/utils';
 import { theme } from '@/config';
 
 // DEVELOPMENT: Cambiar a true para limpiar la BD al iniciar
-const CLEAR_DB_ON_START = true;
+const CLEAR_DB_ON_START = false;
 
 export default function App() {
   const [dbReady, setDbReady] = useState(false);
@@ -70,10 +71,12 @@ export default function App() {
   // App lista
   return (
     <ErrorBoundary>
-      <NavigationContainer>
-        <RootTabs />
-        <StatusBar style="auto" />
-      </NavigationContainer>
+      <AuthProvider>
+        <NavigationContainer>
+          <RootNavigator />
+          <StatusBar style="auto" />
+        </NavigationContainer>
+      </AuthProvider>
     </ErrorBoundary>
   );
 }
