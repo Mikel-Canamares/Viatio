@@ -5,12 +5,13 @@
  * Usado para acciones secundarias o alternativas.
  */
 
-import { Pressable, Text, StyleSheet, ViewStyle } from 'react-native';
+import { ReactNode } from 'react';
+import { Pressable, StyleSheet, ViewStyle } from 'react-native';
 import { theme } from '@/config';
 
 interface SecondaryButtonProps {
-  /** Texto del botón */
-  children: string;
+  /** Contenido del botón (texto, iconos, etc.) */
+  children: ReactNode;
 
   /** Función a ejecutar al presionar */
   onPress: () => void;
@@ -39,9 +40,7 @@ export function SecondaryButton({
         style,
       ]}
     >
-      <Text style={[styles.text, disabled && styles.textDisabled]}>
-        {children}
-      </Text>
+      {children}
     </Pressable>
   );
 }
