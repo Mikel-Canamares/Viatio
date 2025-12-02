@@ -6,7 +6,7 @@
  */
 
 import { ReactNode } from 'react';
-import { Pressable, StyleSheet, ViewStyle } from 'react-native';
+import { Pressable, Text, StyleSheet, ViewStyle } from 'react-native';
 import { theme } from '@/config';
 
 interface SecondaryButtonProps {
@@ -29,6 +29,13 @@ export function SecondaryButton({
   disabled = false,
   style,
 }: SecondaryButtonProps) {
+  // Si children es un string, envolverlo en Text
+  const content = typeof children === 'string' ? (
+    <Text style={[styles.text, disabled && styles.textDisabled]}>{children}</Text>
+  ) : (
+    children
+  );
+
   return (
     <Pressable
       onPress={onPress}
@@ -40,7 +47,7 @@ export function SecondaryButton({
         style,
       ]}
     >
-      {children}
+      {content}
     </Pressable>
   );
 }

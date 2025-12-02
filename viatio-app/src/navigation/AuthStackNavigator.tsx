@@ -6,7 +6,7 @@
  */
 
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { LoginScreen, RegisterScreen } from '@/screens';
+import { LoginScreen, RegisterScreen, ForgotPasswordScreen } from '@/screens';
 
 export type AuthStackParamList = {
   Login: undefined;
@@ -25,7 +25,7 @@ export function AuthStackNavigator() {
     >
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
-      {/* ForgotPassword se añadirá en fase posterior */}
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
     </Stack.Navigator>
   );
 }

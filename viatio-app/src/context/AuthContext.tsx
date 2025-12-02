@@ -12,19 +12,39 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   updateProfile,
+  sendEmailVerification,
+  sendPasswordResetEmail,
 } from 'firebase/auth';
 import { auth } from '@/config/firebase';
 import { AuthUser, LoginCredentials, RegisterCredentials, mapFirebaseUser } from '@/types/auth';
-import { logError, getUserFriendlyMessage } from '@/utils/errorHandler';
+import {
+  logError,
+  getUserFriendlyMessage,
+  shouldSuggestRegister,
+  shouldSuggestLogin,
+} from '@/utils/errorHandler';
+
+/**
+ * Tipo para errores de autenticación con sugerencias
+ */
+export interface AuthError {
+  message: string;
+  suggestRegister?: boolean;
+  suggestLogin?: boolean;
+  originalError?: unknown;
+}
 
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
-  error: string | null;
+  error: AuthError | null;
   loginWithEmail: (credentials: LoginCredentials) => Promise<boolean>;
   registerWithEmail: (credentials: RegisterCredentials) => Promise<boolean>;
   logout: () => Promise<void>;
   clearError: () => void;
+  resendVerificationEmail: () => Promise<boolean>;
+  resetPassword: (email: string) => Promise<boolean>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -32,7 +52,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AuthError | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -55,7 +75,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return true;
     } catch (err) {
       const message = getUserFriendlyMessage(err);
-      setError(message);
+      setError({
+        message,
+        suggestRegister: shouldSuggestRegister(err),
+        originalError: err,
+      });
       logError(err, 'loginWithEmail');
       return false;
     } finally {
@@ -67,16 +91,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
       setError(null);
+
+      // Crear usuario
       const result = await createUserWithEmailAndPassword(
         auth,
         credentials.email,
         credentials.password
       );
+
+      // Actualizar perfil con nombre
       await updateProfile(result.user, { displayName: credentials.displayName });
+
+      // Enviar email de verificación
+      await sendEmailVerification(result.user, {
+        url: 'https://viatio-app-d0e13.firebaseapp.com/__/auth/action',
+        handleCodeInApp: false,
+      });
+
       return true;
     } catch (err) {
       const message = getUserFriendlyMessage(err);
-      setError(message);
+      setError({
+        message,
+        suggestLogin: shouldSuggestLogin(err),
+        originalError: err,
+      });
       logError(err, 'registerWithEmail');
       return false;
     } finally {
@@ -92,6 +131,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const resendVerificationEmail = async (): Promise<boolean> => {
+    try {
+      if (auth.currentUser && !auth.currentUser.emailVerified) {
+        await sendEmailVerification(auth.currentUser);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      logError(err, 'resendVerificationEmail');
+      setError({
+        message: getUserFriendlyMessage(err),
+      });
+      return false;
+    }
+  };
+
+  const resetPassword = async (email: string): Promise<boolean> => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      await sendPasswordResetEmail(auth, email, {
+        url: 'https://viatio-app-d0e13.firebaseapp.com/__/auth/action',
+        handleCodeInApp: false,
+      });
+
+      return true;
+    } catch (err) {
+      const message = getUserFriendlyMessage(err);
+      setError({ message, originalError: err });
+      logError(err, 'resetPassword');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const refreshUser = async (): Promise<void> => {
+    try {
+      if (auth.currentUser) {
+        await auth.currentUser.reload();
+        // Forzar actualización del estado
+        setUser(mapFirebaseUser(auth.currentUser));
+      }
+    } catch (err) {
+      logError(err, 'refreshUser');
+    }
+  };
+
   const clearError = () => setError(null);
 
   return (
@@ -104,6 +192,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         registerWithEmail,
         logout,
         clearError,
+        resendVerificationEmail,
+        resetPassword,
+        refreshUser,
       }}
     >
       {children}

@@ -18,16 +18,15 @@ import {
   LoadingOverlay,
 } from '@/components';
 import { useViajesStore } from '@/store';
+import { useAuth } from '@/context';
 import { theme } from '@/config';
 import type { HomeStackParamList } from '@/navigation/types';
-
-// TODO: Obtener usuarioId del auth store cuando esté implementado
-const TEMP_USER_ID = 'user-1';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'CreateTrip'>;
 
 export default function CreateTripScreen({ navigation }: Props) {
   const { addViaje, loading } = useViajesStore();
+  const { user } = useAuth();
 
   // Form state
   const [destino, setDestino] = useState('');
@@ -76,6 +75,11 @@ export default function CreateTripScreen({ navigation }: Props) {
       return;
     }
 
+    if (!user?.uid) {
+      Alert.alert('Error', 'No se pudo identificar el usuario. Inicia sesión nuevamente.');
+      return;
+    }
+
     const viaje = await addViaje(
       {
         destino: destino.trim(),
@@ -85,7 +89,7 @@ export default function CreateTripScreen({ navigation }: Props) {
         presupuesto: presupuesto ? parseFloat(presupuesto) : undefined,
         numViajeros: parseInt(numViajeros) || 1,
       },
-      TEMP_USER_ID
+      user.uid
     );
 
     if (viaje) {
