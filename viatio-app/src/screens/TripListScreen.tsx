@@ -17,20 +17,21 @@ import {
   PrimaryButton,
 } from '@/components';
 import { useViajesStore } from '@/store';
+import { useAuth } from '@/context';
 import { theme } from '@/config';
 import type { HomeStackParamList } from '@/navigation/types';
-
-// TODO: Obtener usuarioId del auth store cuando esté implementado
-const TEMP_USER_ID = 'user-1';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'TripList'>;
 
 export default function TripListScreen({ navigation }: Props) {
   const { viajes, loading, fetchViajes } = useViajesStore();
+  const { user } = useAuth();
 
   useEffect(() => {
-    fetchViajes(TEMP_USER_ID);
-  }, []);
+    if (user?.uid) {
+      fetchViajes(user.uid);
+    }
+  }, [user?.uid, fetchViajes]);
 
   const handleTripPress = (viajeId: string) => {
     navigation.navigate('TripDetail', { viajeId });

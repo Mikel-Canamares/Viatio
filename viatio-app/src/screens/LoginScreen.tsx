@@ -59,18 +59,11 @@ export default function LoginScreen({ navigation }: Props) {
     }
 
     clearError();
-    const success = await loginWithEmail({ email: email.trim(), password });
-
-    if (!success && error) {
-      Alert.alert('Error de inicio de sesión', error);
-    }
+    await loginWithEmail({ email: email.trim(), password });
   };
 
   const handleForgotPassword = () => {
-    Alert.alert(
-      'Recuperar contraseña',
-      'Esta funcionalidad estará disponible próximamente.'
-    );
+    navigation.navigate('ForgotPassword');
   };
 
   const handleSocialLogin = (provider: string) => {
@@ -116,10 +109,36 @@ export default function LoginScreen({ navigation }: Props) {
 
             {/* Formulario */}
             <View style={styles.form}>
+              {/* Error banner con sugerencias */}
+              {error && (
+                <View style={styles.errorContainer}>
+                  <View style={styles.errorContent}>
+                    <Ionicons name="alert-circle" size={20} color={theme.colors.error} />
+                    <Text style={styles.errorText}>{error.message}</Text>
+                  </View>
+
+                  {error.suggestRegister && (
+                    <Pressable
+                      onPress={() => {
+                        clearError();
+                        navigation.navigate('Register');
+                      }}
+                      style={styles.errorAction}
+                    >
+                      <Text style={styles.errorActionText}>Crear cuenta nueva</Text>
+                      <Ionicons name="arrow-forward" size={16} color={theme.colors.primaryLight} />
+                    </Pressable>
+                  )}
+                </View>
+              )}
+
               <Input
                 label="Correo electrónico"
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  if (error) clearError();
+                }}
                 placeholder="tu@email.com"
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -130,7 +149,10 @@ export default function LoginScreen({ navigation }: Props) {
               <Input
                 label="Contraseña"
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  if (error) clearError();
+                }}
                 placeholder="••••••••"
                 secureTextEntry={!showPassword}
                 leftIcon="lock-closed-outline"
@@ -323,5 +345,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: theme.colors.primaryLight,
+  },
+  errorContainer: {
+    backgroundColor: '#FEF2F2',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  errorContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  errorText: {
+    flex: 1,
+    color: '#991B1B',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  errorAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#FECACA',
+    gap: 4,
+  },
+  errorActionText: {
+    color: theme.colors.primaryLight,
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

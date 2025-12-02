@@ -46,18 +46,46 @@ export function logError(error: unknown, context?: string): void {
 // ============================================
 
 /**
- * Mapeo de códigos de error a mensajes amigables
+ * Mapeo de códigos de error de Firebase Auth a mensajes amigables
+ */
+const FIREBASE_AUTH_ERRORS: Record<string, string> = {
+  // Errores de login
+  'auth/user-not-found': 'No existe una cuenta con este email. ¿Quieres registrarte?',
+  'auth/wrong-password': 'Contraseña incorrecta. Inténtalo de nuevo.',
+  'auth/invalid-credential': 'Las credenciales no son válidas. Verifica tu email y contraseña.',
+  'auth/invalid-email': 'El formato del email no es válido.',
+  'auth/user-disabled': 'Esta cuenta ha sido deshabilitada. Contacta con soporte.',
+
+  // Errores de registro
+  'auth/email-already-in-use': 'Ya existe una cuenta con este email. ¿Quieres iniciar sesión?',
+  'auth/weak-password': 'La contraseña debe tener al menos 6 caracteres.',
+  'auth/operation-not-allowed': 'El registro con email no está habilitado.',
+
+  // Errores de recuperación de contraseña
+  'auth/expired-action-code': 'El enlace ha expirado. Solicita uno nuevo.',
+  'auth/invalid-action-code': 'El enlace no es válido. Solicita uno nuevo.',
+
+  // Errores de red y generales
+  'auth/network-request-failed': 'Error de conexión. Verifica tu internet.',
+  'auth/too-many-requests': 'Demasiados intentos. Espera unos minutos.',
+  'auth/internal-error': 'Error interno. Inténtalo más tarde.',
+  'auth/requires-recent-login': 'Por seguridad, vuelve a iniciar sesión.',
+
+  // Google Sign-In
+  'auth/popup-closed-by-user': 'Se canceló el inicio de sesión.',
+  'auth/cancelled-popup-request': 'Se canceló la solicitud.',
+  'auth/account-exists-with-different-credential': 'Ya existe una cuenta con este email usando otro método de inicio de sesión.',
+
+  // Apple Sign-In
+  'auth/invalid-credential-apple': 'Las credenciales de Apple no son válidas.',
+};
+
+/**
+ * Mapeo de códigos de error generales
  */
 const ERROR_MESSAGES: Record<string, string> = {
-  // Errores de autenticación (Firebase)
-  'auth/invalid-email': 'El email no es válido',
-  'auth/user-not-found': 'No existe una cuenta con este email',
-  'auth/wrong-password': 'Contraseña incorrecta',
-  'auth/email-already-in-use': 'Ya existe una cuenta con este email',
-  'auth/weak-password': 'La contraseña debe tener al menos 6 caracteres',
-  'auth/too-many-requests': 'Demasiados intentos. Inténtalo más tarde',
-  'auth/user-disabled': 'Esta cuenta ha sido deshabilitada',
-  'auth/requires-recent-login': 'Por seguridad, inicia sesión nuevamente',
+  // Incluir errores de Firebase Auth
+  ...FIREBASE_AUTH_ERRORS,
 
   // Errores de red
   'network-error': 'Error de conexión. Verifica tu internet.',
@@ -98,6 +126,11 @@ export function getUserFriendlyMessage(error: unknown): string {
 
   // Si es un Error con mensaje
   if (error instanceof Error && error.message) {
+    // Detectar errores de red por palabras clave
+    if (error.message.includes('network') || error.message.includes('Network')) {
+      return 'Error de conexión. Verifica tu internet.';
+    }
+
     // Verificar si el mensaje contiene códigos conocidos
     for (const [code, message] of Object.entries(ERROR_MESSAGES)) {
       if (error.message.includes(code)) {
@@ -113,6 +146,26 @@ export function getUserFriendlyMessage(error: unknown): string {
 
   // Mensaje por defecto
   return ERROR_MESSAGES['unknown'];
+}
+
+/**
+ * Detecta si el error sugiere que el usuario debería registrarse
+ */
+export function shouldSuggestRegister(error: unknown): boolean {
+  if (error && typeof error === 'object' && 'code' in error) {
+    return (error as { code: string }).code === 'auth/user-not-found';
+  }
+  return false;
+}
+
+/**
+ * Detecta si el error sugiere que el usuario debería iniciar sesión
+ */
+export function shouldSuggestLogin(error: unknown): boolean {
+  if (error && typeof error === 'object' && 'code' in error) {
+    return (error as { code: string }).code === 'auth/email-already-in-use';
+  }
+  return false;
 }
 
 // ============================================
