@@ -10,6 +10,7 @@ import {
   TripListScreen,
   CreateTripScreen,
   TripDetailScreen,
+  TripAgendaScreen,
 } from '@/screens';
 import type { HomeStackParamList } from './types';
 
@@ -29,8 +30,8 @@ export function HomeStackNavigator() {
       <Stack.Screen name="TripList" component={TripListScreen} />
       <Stack.Screen name="CreateTrip" component={CreateTripScreen} />
       <Stack.Screen name="TripDetail" component={TripDetailScreen} />
+      <Stack.Screen name="TripAgenda" component={TripAgendaScreen} />
       {/* Las demás rutas se añadirán en fases posteriores:
-        - TripAgenda
         - TripReservations
         - AddReservation
         - ReservationDetail

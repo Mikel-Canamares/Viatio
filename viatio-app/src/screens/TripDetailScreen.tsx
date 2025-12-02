@@ -55,8 +55,25 @@ export default function TripDetailScreen({ navigation, route }: Props) {
   };
 
   const handleNavigate = (screen: string) => {
-    // TODO: Implementar navegación a subsecciones
-    console.log('Navigate to:', screen, 'for trip:', viajeId);
+    switch (screen) {
+      case 'agenda':
+        navigation.navigate('TripAgenda', { viajeId });
+        break;
+      case 'reservations':
+        // TODO: Implementar cuando exista TripReservations
+        console.log('Navigate to: reservations for trip:', viajeId);
+        break;
+      case 'map':
+        // TODO: Implementar cuando exista TripMap
+        console.log('Navigate to: map for trip:', viajeId);
+        break;
+      case 'documents':
+        // TODO: Implementar cuando exista TripDocuments
+        console.log('Navigate to: documents for trip:', viajeId);
+        break;
+      default:
+        console.log('Unknown screen:', screen);
+    }
   };
 
   if (loading) {

@@ -18,3 +18,4 @@ export { default as ProfileScreen } from './ProfileScreen';
 export { default as TripListScreen } from './TripListScreen';
 export { default as CreateTripScreen } from './CreateTripScreen';
 export { default as TripDetailScreen } from './TripDetailScreen';
+export { default as TripAgendaScreen } from './TripAgendaScreen';

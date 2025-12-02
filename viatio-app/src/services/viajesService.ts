@@ -13,6 +13,7 @@ import type {
   ViajeStats,
 } from '@/types/viaje';
 import { logError } from '@/utils';
+import { createDiasParaViaje, deleteDiasByViajeId } from './diasViajeService';
 
 // ============================================
 // CREAR
@@ -68,6 +69,11 @@ export async function createViaje(
     );
 
     console.log('[ViajesService] Viaje creado:', viaje.id);
+
+    // Crear días del viaje automáticamente
+    await createDiasParaViaje(viaje.id, viaje.fechaInicio, viaje.fechaFin);
+    console.log('[ViajesService] Días creados para viaje:', viaje.id);
+
     return viaje;
   } catch (error) {
     logError(error, 'createViaje');
@@ -215,8 +221,12 @@ export async function deleteViaje(id: string): Promise<boolean> {
       return false;
     }
 
+    // Eliminar días del viaje en cascada
+    await deleteDiasByViajeId(id);
+    console.log('[ViajesService] Días eliminados para viaje:', id);
+
     // DELETE CASCADE eliminará automáticamente registros relacionados
-    // (dias_viaje, reservas, lugares, documentos, gastos)
+    // (reservas, lugares, documentos, gastos)
     const result = await db.runAsync('DELETE FROM viajes WHERE id = ?', [id]);
 
     console.log('[ViajesService] Viaje eliminado:', id);
