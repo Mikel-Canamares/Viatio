@@ -12,11 +12,10 @@ import {
   StyleSheet,
   SectionList,
   ActivityIndicator,
-  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Card } from '@/components';
+import { ScreenContainer, PageHeader, Card } from '@/components';
 import { theme } from '@/config';
 import { getAgendaByViajeId } from '@/services/agendaService';
 import type { DiaAgenda, EventoAgenda } from '@/types/diaViaje';
@@ -65,29 +64,32 @@ export default function TripAgendaScreen({ route, navigation }: Props) {
 
   const renderDayHeader = ({ section }: { section: AgendaSection }) => (
     <View style={styles.dayHeader}>
-      <View style={styles.dayIconContainer}>
-        <Ionicons name="calendar-outline" size={20} color={theme.colors.primaryLight} />
-      </View>
-      <View>
-        <Text style={styles.dayName}>{section.diaSemana}</Text>
-        <Text style={styles.dayDate}>{section.fechaFormateada}</Text>
-      </View>
+      <Text style={styles.dayHeaderText}>
+        {section.diaSemana}, {section.fechaFormateada}
+      </Text>
     </View>
   );
 
   const renderEvent = ({ item }: { item: EventoAgenda }) => (
     <Card style={styles.eventCard}>
-      <View style={styles.eventContent}>
-        {/* Badge de hora */}
-        {item.hora && (
-          <View style={styles.timeBadge}>
-            <Ionicons name="time-outline" size={14} color={theme.colors.primaryLight} />
+      <View style={styles.eventRow}>
+        {/* Hora a la izquierda */}
+        <View style={styles.timeContainer}>
+          {item.hora ? (
             <Text style={styles.timeText}>{item.hora}</Text>
-          </View>
-        )}
+          ) : (
+            <Text style={styles.timeTextEmpty}>--:--</Text>
+          )}
+        </View>
 
         {/* Contenido del evento */}
         <View style={styles.eventDetails}>
+          {item.categoria && (
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryText}>{item.categoria}</Text>
+            </View>
+          )}
+
           <Text style={styles.eventTitle}>{item.titulo}</Text>
 
           {item.subtitulo && (
@@ -96,16 +98,10 @@ export default function TripAgendaScreen({ route, navigation }: Props) {
 
           {item.ubicacion && (
             <View style={styles.locationRow}>
-              <Ionicons name="location-outline" size={16} color={theme.colors.textMuted} />
+              <Ionicons name="location-outline" size={14} color={theme.colors.textMuted} />
               <Text style={styles.locationText} numberOfLines={1}>
                 {item.ubicacion}
               </Text>
-            </View>
-          )}
-
-          {item.categoria && (
-            <View style={styles.categoryBadge}>
-              <Text style={styles.categoryText}>{item.categoria}</Text>
             </View>
           )}
         </View>
@@ -117,67 +113,43 @@ export default function TripAgendaScreen({ route, navigation }: Props) {
     if (section.data.length > 0) return null;
 
     return (
-      <Card style={styles.emptyCard}>
-        <Text style={styles.emptyText}>Sin actividades programadas</Text>
-        <View style={styles.emptyActions}>
-          <Pressable
-            style={styles.emptyLink}
-            onPress={() => {
-              // TODO: Navegar a añadir reserva
-              console.log('Añadir reserva para día:', section.dia.fecha);
-            }}
-          >
-            <Text style={styles.emptyLinkText}>Añadir reserva</Text>
-          </Pressable>
-          <Text style={styles.emptySeparator}>·</Text>
-          <Pressable
-            style={styles.emptyLink}
-            onPress={() => {
-              // TODO: Navegar a añadir lugar
-              console.log('Añadir lugar para día:', section.dia.fecha);
-            }}
-          >
-            <Text style={styles.emptyLinkText}>Añadir lugar</Text>
-          </Pressable>
-        </View>
-      </Card>
+      <View style={styles.emptyCard}>
+        <Text style={styles.emptyText}>Sin eventos programados</Text>
+      </View>
     );
   };
 
   if (loading) {
     return (
       <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primaryLight} />
-          <Text style={styles.loadingText}>Cargando agenda...</Text>
-        </View>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-        </Pressable>
+        <PageHeader title="Agenda" onBack={() => navigation.goBack()} />
+        <ScreenContainer>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.colors.primaryLight} />
+            <Text style={styles.loadingText}>Cargando agenda...</Text>
+          </View>
+        </ScreenContainer>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <SectionList
-        sections={agenda}
-        keyExtractor={(item) => item.id}
-        renderItem={renderEvent}
-        renderSectionHeader={renderDayHeader}
-        renderSectionFooter={renderEmptyDay}
-        stickySectionHeadersEnabled={false}
-        contentContainerStyle={styles.listContent}
-        style={styles.list}
-        ItemSeparatorComponent={() => <View style={styles.eventSeparator} />}
-        SectionSeparatorComponent={() => <View style={styles.daySeparator} />}
-      />
-      <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-        <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-      </Pressable>
-      <View style={styles.headerTitle}>
-        <Text style={styles.titleText}>Agenda</Text>
-      </View>
+      <PageHeader title="Agenda" onBack={() => navigation.goBack()} />
+      <ScreenContainer>
+        <SectionList
+          sections={agenda}
+          keyExtractor={(item) => item.id}
+          renderItem={renderEvent}
+          renderSectionHeader={renderDayHeader}
+          renderSectionFooter={renderEmptyDay}
+          stickySectionHeadersEnabled={false}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          ItemSeparatorComponent={() => <View style={styles.eventSeparator} />}
+          SectionSeparatorComponent={() => <View style={styles.daySeparator} />}
+        />
+      </ScreenContainer>
     </View>
   );
 }
@@ -187,14 +159,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
-  list: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
   listContent: {
-    paddingHorizontal: theme.spacing.lg,
+    paddingHorizontal: 20,
     paddingTop: theme.spacing.md,
-    paddingBottom: theme.spacing.xl,
+    paddingBottom: theme.spacing.xl * 2,
   },
   loadingContainer: {
     flex: 1,
@@ -206,82 +174,53 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: theme.colors.textSecondary,
   },
-  backButton: {
-    position: 'absolute',
-    top: 40,
-    left: 16,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  headerTitle: {
-    position: 'absolute',
-    top: 50,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 5,
-  },
-  titleText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme.colors.text,
-  },
   dayHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-    marginBottom: theme.spacing.md,
-    marginTop: theme.spacing.sm,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.sm,
   },
-  dayIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: '#DBEAFE',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dayName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.colors.text,
-    textTransform: 'capitalize',
-  },
-  dayDate: {
+  dayHeaderText: {
     fontSize: 14,
-    color: theme.colors.textSecondary,
+    fontWeight: '600',
+    color: theme.colors.textMuted,
     textTransform: 'capitalize',
   },
   eventCard: {
     padding: theme.spacing.md,
   },
-  eventContent: {
-    gap: theme.spacing.sm,
-  },
-  timeBadge: {
+  eventRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#DBEAFE',
-    borderWidth: 1,
-    borderColor: '#93C5FD',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    alignSelf: 'flex-start',
+    gap: theme.spacing.md,
+  },
+  timeContainer: {
+    minWidth: 50,
+    paddingTop: 2,
   },
   timeText: {
     fontSize: 14,
+    fontWeight: '600',
     color: theme.colors.primaryLight,
-    fontWeight: '500',
+  },
+  timeTextEmpty: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.textMuted,
   },
   eventDetails: {
-    gap: theme.spacing.xs,
+    flex: 1,
+    gap: 4,
+  },
+  categoryBadge: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+    marginBottom: 4,
+  },
+  categoryText: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    fontWeight: '500',
   },
   eventTitle: {
     fontSize: 16,
@@ -295,56 +234,28 @@ const styles = StyleSheet.create({
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
+    marginTop: 2,
   },
   locationText: {
-    fontSize: 14,
+    fontSize: 13,
     color: theme.colors.textMuted,
     flex: 1,
   },
-  categoryBadge: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    alignSelf: 'flex-start',
-    marginTop: theme.spacing.xs,
-  },
-  categoryText: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
-    fontWeight: '500',
-  },
   emptyCard: {
-    padding: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
     alignItems: 'center',
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: 13,
     color: theme.colors.textMuted,
-    marginBottom: theme.spacing.sm,
-  },
-  emptyActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.xs,
-  },
-  emptyLink: {
-    paddingVertical: 4,
-  },
-  emptyLinkText: {
-    fontSize: 14,
-    color: theme.colors.primaryLight,
-    fontWeight: '500',
-  },
-  emptySeparator: {
-    fontSize: 14,
-    color: theme.colors.textMuted,
+    fontStyle: 'italic',
   },
   eventSeparator: {
     height: theme.spacing.sm,
   },
   daySeparator: {
-    height: theme.spacing.lg,
+    height: 0,
   },
 });

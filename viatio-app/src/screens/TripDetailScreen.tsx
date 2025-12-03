@@ -38,6 +38,15 @@ export default function TripDetailScreen({ navigation, route }: Props) {
     loadData();
   }, [viajeId]);
 
+  // Refrescar stats al volver de otras pantallas
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadData();
+    });
+
+    return unsubscribe;
+  }, [navigation, viajeId]);
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -60,8 +69,7 @@ export default function TripDetailScreen({ navigation, route }: Props) {
         navigation.navigate('TripAgenda', { viajeId });
         break;
       case 'reservations':
-        // TODO: Implementar cuando exista TripReservations
-        console.log('Navigate to: reservations for trip:', viajeId);
+        navigation.navigate('TripReservations', { viajeId });
         break;
       case 'map':
         // TODO: Implementar cuando exista TripMap

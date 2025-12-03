@@ -64,6 +64,7 @@ export type HomeStackParamList = {
   TripReservations: { viajeId: string };
   AddReservation: { viajeId: string; prefillData?: any };
   ReservationDetail: { viajeId: string; reservaId: string };
+  EditReservation: { reservaId: string };
   TripMap: { viajeId: string };
   TripDocuments: { viajeId: string };
   AddDocument: { viajeId: string };

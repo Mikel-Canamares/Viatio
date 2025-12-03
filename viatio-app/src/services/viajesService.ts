@@ -238,6 +238,46 @@ export async function deleteViaje(id: string): Promise<boolean> {
 }
 
 // ============================================
+// REPARACIÓN Y MANTENIMIENTO
+// ============================================
+
+/**
+ * Repara viajes que no tienen días creados
+ * Útil para viajes creados antes de la implementación de creación automática de días
+ */
+export async function repairViajesSinDias(usuarioId: string): Promise<number> {
+  try {
+    const db = await getDatabase();
+
+    // Obtener todos los viajes del usuario
+    const viajes = await getViajesByUsuario(usuarioId);
+    let viajesReparados = 0;
+
+    for (const viaje of viajes) {
+      // Verificar si el viaje tiene días
+      const dias = await db.getAllAsync<{ count: number }>(
+        'SELECT COUNT(*) as count FROM dias_viaje WHERE viajeId = ?',
+        [viaje.id]
+      );
+
+      const tieneDias = (dias[0]?.count || 0) > 0;
+
+      if (!tieneDias) {
+        console.log('[ViajesService] Reparando viaje sin días:', viaje.id, viaje.destino);
+        await createDiasParaViaje(viaje.id, viaje.fechaInicio, viaje.fechaFin);
+        viajesReparados++;
+      }
+    }
+
+    console.log('[ViajesService] Reparación completada:', viajesReparados, 'viajes reparados');
+    return viajesReparados;
+  } catch (error) {
+    logError(error, 'repairViajesSinDias');
+    throw new Error('Error al reparar viajes sin días');
+  }
+}
+
+// ============================================
 // ESTADÍSTICAS
 // ============================================
 

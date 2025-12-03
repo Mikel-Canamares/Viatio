@@ -21,6 +21,7 @@ export { FloatingActionButton } from './FloatingActionButton';
 export { ErrorBoundary } from './ErrorBoundary';
 export { LoadingOverlay } from './LoadingOverlay';
 export { TripCard } from './TripCard';
+export { default as ReservationCard } from './ReservationCard';
 
 // Los siguientes se crearán en fases posteriores:
 // export { EmptyState } from './EmptyState';

@@ -7,6 +7,8 @@
 
 import { DiaAgenda, EventoAgenda } from '@/types/diaViaje';
 import { getDiasByViajeId } from './diasViajeService';
+import { getReservasByViajeId } from './reservasService';
+import { RESERVA_CATEGORIAS, Reserva } from '@/types/reserva';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -15,48 +17,52 @@ import { es } from 'date-fns/locale';
  * Retorna días con información formateada y eventos asociados
  */
 export async function getAgendaByViajeId(viajeId: string): Promise<DiaAgenda[]> {
-  const dias = await getDiasByViajeId(viajeId);
+  const [dias, reservas] = await Promise.all([
+    getDiasByViajeId(viajeId),
+    getReservasByViajeId(viajeId),
+  ]);
 
-  // Por ahora, retornar días sin eventos (se completará cuando existan reservas y lugares)
   return dias.map((dia) => {
     const fecha = parseISO(dia.fecha);
+    const eventos = combinarEventos(reservas, [], dia.fecha);
+
     return {
       dia,
       fecha,
       diaSemana: format(fecha, 'EEEE', { locale: es }), // "lunes", "martes", etc.
       fechaFormateada: format(fecha, "d 'de' MMMM", { locale: es }), // "21 de diciembre"
-      eventos: [], // Se poblarán con reservas y lugares
+      eventos,
     };
   });
 }
 
 /**
  * Función helper para combinar reservas y lugares en eventos
- * Se completará cuando se implementen las tablas de reservas y lugares
  */
 export function combinarEventos(
-  _reservas: any[], // tipo Reserva cuando exista
-  _lugares: any[], // tipo Lugar cuando exista
-  _fecha: string
+  reservas: Reserva[],
+  _lugares: any[],
+  fecha: string
 ): EventoAgenda[] {
   const eventos: EventoAgenda[] = [];
 
-  // TODO: Filtrar y mapear reservas del día
-  // reservas
-  //   .filter(r => r.fecha === fecha)
-  //   .forEach(r => {
-  //     eventos.push({
-  //       id: r.id,
-  //       tipo: 'reserva',
-  //       hora: r.hora,
-  //       titulo: r.titulo,
-  //       subtitulo: r.subtitulo,
-  //       categoria: r.categoria,
-  //       ubicacion: r.ubicacion,
-  //     });
-  //   });
+  // Filtrar y mapear reservas del día
+  reservas
+    .filter((r) => r.fechaInicio === fecha)
+    .forEach((r) => {
+      const categoriaInfo = RESERVA_CATEGORIAS[r.categoria];
+      eventos.push({
+        id: r.id,
+        tipo: 'reserva',
+        hora: r.horaInicio,
+        titulo: r.nombre,
+        subtitulo: r.proveedor,
+        categoria: categoriaInfo.label,
+        ubicacion: r.ubicacion || r.direccion,
+      });
+    });
 
-  // TODO: Filtrar y mapear lugares del día
+  // TODO: Filtrar y mapear lugares del día cuando se implementen
   // lugares
   //   .filter(l => l.fecha === fecha)
   //   .forEach(l => {

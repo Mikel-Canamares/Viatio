@@ -14,4 +14,7 @@ export {
   updateViaje,
   deleteViaje,
   getViajeStats,
+  repairViajesSinDias,
 } from './viajesService';
+
+export { getReservaById, updateReserva } from './reservasService';

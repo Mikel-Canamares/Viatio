@@ -5,7 +5,7 @@
  * Incluye búsqueda, filtros y FAB para crear nuevo viaje.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { View, FlatList, StyleSheet, ActivityIndicator, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -20,18 +20,38 @@ import { useViajesStore } from '@/store';
 import { useAuth } from '@/context';
 import { theme } from '@/config';
 import type { HomeStackParamList } from '@/navigation/types';
+import { repairViajesSinDias } from '@/services';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'TripList'>;
 
 export default function TripListScreen({ navigation }: Props) {
   const { viajes, loading, fetchViajes } = useViajesStore();
   const { user } = useAuth();
+  const [repairExecuted, setRepairExecuted] = useState(false);
 
   useEffect(() => {
     if (user?.uid) {
       fetchViajes(user.uid);
+
+      // Ejecutar reparación de viajes sin días (solo una vez por sesión)
+      if (!repairExecuted) {
+        repairViajesSinDias(user.uid)
+          .then((count) => {
+            if (count > 0) {
+              console.log('[TripListScreen] Viajes reparados:', count);
+              // Recargar viajes si hubo reparaciones
+              fetchViajes(user.uid);
+            }
+          })
+          .catch((error) => {
+            console.error('[TripListScreen] Error en reparación:', error);
+          })
+          .finally(() => {
+            setRepairExecuted(true);
+          });
+      }
     }
-  }, [user?.uid, fetchViajes]);
+  }, [user?.uid, fetchViajes, repairExecuted]);
 
   const handleTripPress = (viajeId: string) => {
     navigation.navigate('TripDetail', { viajeId });

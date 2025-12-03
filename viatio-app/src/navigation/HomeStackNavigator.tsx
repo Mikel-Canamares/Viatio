@@ -11,7 +11,11 @@ import {
   CreateTripScreen,
   TripDetailScreen,
   TripAgendaScreen,
+  EditReservationScreen,
 } from '@/screens';
+import TripReservationsScreen from '@/screens/TripReservationsScreen';
+import AddReservationScreen from '@/screens/AddReservationScreen';
+import ReservationDetailScreen from '@/screens/ReservationDetailScreen';
 import type { HomeStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<HomeStackParamList>();
@@ -31,10 +35,11 @@ export function HomeStackNavigator() {
       <Stack.Screen name="CreateTrip" component={CreateTripScreen} />
       <Stack.Screen name="TripDetail" component={TripDetailScreen} />
       <Stack.Screen name="TripAgenda" component={TripAgendaScreen} />
+      <Stack.Screen name="TripReservations" component={TripReservationsScreen} />
+      <Stack.Screen name="AddReservation" component={AddReservationScreen} />
+      <Stack.Screen name="ReservationDetail" component={ReservationDetailScreen} />
+      <Stack.Screen name="EditReservation" component={EditReservationScreen} />
       {/* Las demás rutas se añadirán en fases posteriores:
-        - TripReservations
-        - AddReservation
-        - ReservationDetail
         - TripMap
         - TripDocuments
         - AddDocument
