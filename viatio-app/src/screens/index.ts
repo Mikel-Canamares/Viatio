@@ -20,3 +20,4 @@ export { default as CreateTripScreen } from './CreateTripScreen';
 export { default as TripDetailScreen } from './TripDetailScreen';
 export { default as TripAgendaScreen } from './TripAgendaScreen';
 export { default as EditReservationScreen } from './EditReservationScreen';
+export { default as ScanReservationScreen } from './ScanReservationScreen';

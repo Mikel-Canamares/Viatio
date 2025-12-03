@@ -18,3 +18,16 @@ export {
 } from './viajesService';
 
 export { getReservaById, updateReserva } from './reservasService';
+
+export {
+  pickDocument,
+  pickImage,
+  readFileAsBase64,
+  isImageFile,
+  isPdfFile,
+  formatFileSize,
+  getFileExtension,
+} from './fileService';
+export type { DocumentInfo, ImageInfo } from './fileService';
+
+export { extractReservaFromImage } from './ai/ocrService';

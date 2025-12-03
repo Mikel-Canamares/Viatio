@@ -119,10 +119,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
   };
 
   const handleScan = () => {
-    Alert.alert(
-      'Próximamente',
-      'La función de escaneo estará disponible en la Fase 10'
-    );
+    navigation.navigate('ScanReservation', { viajeId });
   };
 
   if (mode === 'select') {
@@ -179,6 +176,16 @@ export default function AddReservationScreen({ route, navigation }: Props) {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.formContent}
         >
+          {/* Banner de datos extraídos */}
+          {prefillData && (
+            <View style={styles.aiBanner}>
+              <Ionicons name="sparkles" size={20} color="#2563EB" />
+              <Text style={styles.aiBannerText}>
+                Datos extraídos automáticamente - Revisa y completa la información
+              </Text>
+            </View>
+          )}
+
           <Card style={styles.formCard}>
             <SectionHeader title="Tipo de reserva" />
             <View style={styles.categoriaGrid}>
@@ -383,6 +390,23 @@ const styles = StyleSheet.create({
   selectContent: {
     paddingTop: theme.spacing.lg,
     gap: theme.spacing.md,
+  },
+  aiBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: 8,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+  },
+  aiBannerText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1E40AF',
+    fontWeight: '500',
   },
   optionCard: {
     padding: theme.spacing.md,
