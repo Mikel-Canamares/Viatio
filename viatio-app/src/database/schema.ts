@@ -9,7 +9,7 @@
 // VERSIÓN DEL ESQUEMA
 // ============================================
 
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 // ============================================
 // CREACIÓN DE TABLAS
@@ -66,10 +66,12 @@ const CREATE_RESERVAS_TABLE = `
     estadoPago TEXT DEFAULT 'pending',
     notas TEXT,
     metadatos TEXT,
+    documentoId TEXT,
     createdAt TEXT NOT NULL,
     updatedAt TEXT NOT NULL,
     FOREIGN KEY (viajeId) REFERENCES viajes(id) ON DELETE CASCADE,
-    FOREIGN KEY (diaId) REFERENCES dias_viaje(id) ON DELETE SET NULL
+    FOREIGN KEY (diaId) REFERENCES dias_viaje(id) ON DELETE SET NULL,
+    FOREIGN KEY (documentoId) REFERENCES documentos(id) ON DELETE SET NULL
   );
 `;
 

@@ -165,10 +165,11 @@ export default function ScanReservationScreen({ route, navigation }: Props) {
       return;
     }
 
-    // Navegar a AddReservation con datos pre-llenados
+    // Navegar a AddReservation con datos pre-llenados y archivos escaneados
     navigation.navigate('AddReservation', {
       viajeId,
       prefillData: result.data,
+      scannedFiles: files, // Pasamos los archivos escaneados para crear el documento
     });
   };
 

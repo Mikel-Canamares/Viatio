@@ -65,6 +65,8 @@ export async function createDocumento(
   sourceUri: string
 ): Promise<Documento> {
   try {
+    console.log('[createDocumento] Input recibido:', JSON.stringify(input, null, 2));
+
     await ensureDocumentsDir();
 
     const id = generateId();
@@ -192,11 +194,42 @@ export function getDocumentoUri(documento: Documento): string {
 }
 
 // ============================================
+// UPDATE
+// ============================================
+
+/**
+ * Actualiza la categoría de un documento
+ */
+export async function updateDocumentoCategoria(
+  id: string,
+  categoria: CategoriaDocumento
+): Promise<boolean> {
+  try {
+    const db = await getDatabase();
+    const timestamp = getCurrentTimestamp();
+
+    await db.runAsync(
+      'UPDATE documentos SET categoria = ?, updatedAt = ? WHERE id = ?',
+      [categoria, timestamp, id]
+    );
+
+    console.log('[updateDocumentoCategoria] Categoría actualizada:', { id, categoria });
+
+    return true;
+  } catch (error) {
+    logError(error, 'updateDocumentoCategoria');
+    return false;
+  }
+}
+
+// ============================================
 // DELETE
 // ============================================
 
 /**
  * Elimina un documento (archivo físico y registro de BD)
+ * IMPORTANTE: La foreign key con ON DELETE SET NULL se encarga automáticamente
+ * de poner a NULL el documentoId en las reservas asociadas
  */
 export async function deleteDocumento(id: string): Promise<boolean> {
   try {
@@ -216,8 +249,12 @@ export async function deleteDocumento(id: string): Promise<boolean> {
     }
 
     // Eliminar registro de BD
+    // La foreign key con ON DELETE SET NULL actualiza automáticamente
+    // el campo documentoId a NULL en las reservas asociadas
     const db = await getDatabase();
     await db.runAsync('DELETE FROM documentos WHERE id = ?', [id]);
+
+    console.log('[deleteDocumento] Documento eliminado:', id);
 
     return true;
   } catch (error) {
