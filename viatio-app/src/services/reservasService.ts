@@ -44,8 +44,8 @@ export async function createReserva(input: CreateReservaInput): Promise<Reserva>
       id, viajeId, diaId, categoria, nombre, proveedor, numeroConfirmacion,
       fechaInicio, horaInicio, fechaFin, horaFin, ubicacion, direccion,
       latitud, longitud, precio, moneda, estadoPago, notas, metadatos,
-      createdAt, updatedAt
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      documentoId, createdAt, updatedAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       reserva.id,
       reserva.viajeId,
@@ -67,6 +67,7 @@ export async function createReserva(input: CreateReservaInput): Promise<Reserva>
       reserva.estadoPago,
       reserva.notas || null,
       reserva.metadatos ? JSON.stringify(reserva.metadatos) : null,
+      input.documentoId || null,
       reserva.createdAt,
       reserva.updatedAt,
     ]
@@ -221,6 +222,10 @@ export async function updateReserva(
     fields.push('diaId = ?');
     values.push(input.diaId);
   }
+  if (input.documentoId !== undefined) {
+    fields.push('documentoId = ?');
+    values.push(input.documentoId);
+  }
 
   fields.push('updatedAt = ?');
   values.push(now);
@@ -261,4 +266,61 @@ export async function getReservasConfirmadas(viajeId: string): Promise<number> {
   );
 
   return result?.count || 0;
+}
+
+/**
+ * Obtiene el documento asociado a una reserva (si existe)
+ */
+export async function getDocumentoByReservaId(reservaId: string) {
+  const db = await getDatabase();
+
+  const reserva = await getReservaById(reservaId);
+  if (!reserva?.documentoId) {
+    return null;
+  }
+
+  const result = await db.getFirstAsync(
+    'SELECT * FROM documentos WHERE id = ?',
+    [reserva.documentoId]
+  );
+
+  return result || null;
+}
+
+/**
+ * Elimina la asociación de documento de una reserva
+ */
+export async function removeDocumentoFromReserva(reservaId: string): Promise<boolean> {
+  try {
+    const db = await getDatabase();
+    const timestamp = getCurrentTimestamp();
+
+    await db.runAsync(
+      'UPDATE reservas SET documentoId = NULL, updatedAt = ? WHERE id = ?',
+      [timestamp, reservaId]
+    );
+
+    return true;
+  } catch (error) {
+    console.error('[reservasService] Error al eliminar documento de reserva:', error);
+    return false;
+  }
+}
+
+/**
+ * Encuentra todas las reservas asociadas a un documento
+ */
+export async function getReservasByDocumentoId(documentoId: string): Promise<string[]> {
+  try {
+    const db = await getDatabase();
+    const results = await db.getAllAsync<{ id: string }>(
+      'SELECT id FROM reservas WHERE documentoId = ?',
+      [documentoId]
+    );
+
+    return results.map(r => r.id);
+  } catch (error) {
+    console.error('[reservasService] Error al obtener reservas por documento:', error);
+    return [];
+  }
 }

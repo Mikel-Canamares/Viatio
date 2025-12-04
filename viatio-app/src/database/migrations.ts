@@ -74,10 +74,11 @@ export async function runMigrations(
     await migrateToV1(db);
   }
 
+  if (currentVersion < 2) {
+    await migrateToV2(db);
+  }
+
   // Futuras migraciones se añadirán aquí:
-  // if (currentVersion < 2) {
-  //   await migrateToV2(db);
-  // }
   // if (currentVersion < 3) {
   //   await migrateToV3(db);
   // }
@@ -130,15 +131,43 @@ async function migrateToV1(db: SQLite.SQLiteDatabase): Promise<void> {
   }
 }
 
+/**
+ * Migración a versión 2: Añadir campo documentoId a tabla reservas
+ */
+async function migrateToV2(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migrations] Ejecutando migración a v2...');
+
+  try {
+    await db.execAsync('BEGIN TRANSACTION;');
+
+    // Añadir campo documentoId a la tabla reservas
+    await db.execAsync('ALTER TABLE reservas ADD COLUMN documentoId TEXT;');
+
+    // Registrar migración
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'INSERT INTO _migrations (version, appliedAt) VALUES (?, ?)',
+      [2, now]
+    );
+
+    await db.execAsync('COMMIT;');
+    console.log('[Migrations] Migración a v2 completada');
+  } catch (error) {
+    await db.execAsync('ROLLBACK;');
+    console.error('[Migrations] Error en migración a v2:', error);
+    throw error;
+  }
+}
+
 // ============================================
 // MIGRACIONES FUTURAS
 // ============================================
 
 /**
- * Ejemplo de migración futura (v1 -> v2)
+ * Ejemplo de migración futura (v2 -> v3)
  *
- * async function migrateToV2(db: SQLite.SQLiteDatabase): Promise<void> {
- *   console.log('[Migrations] Ejecutando migración a v2...');
+ * async function migrateToV3(db: SQLite.SQLiteDatabase): Promise<void> {
+ *   console.log('[Migrations] Ejecutando migración a v3...');
  *
  *   try {
  *     await db.execAsync('BEGIN TRANSACTION;');
@@ -150,14 +179,14 @@ async function migrateToV1(db: SQLite.SQLiteDatabase): Promise<void> {
  *     const now = new Date().toISOString();
  *     await db.runAsync(
  *       'INSERT INTO _migrations (version, appliedAt) VALUES (?, ?)',
- *       [2, now]
+ *       [3, now]
  *     );
  *
  *     await db.execAsync('COMMIT;');
- *     console.log('[Migrations] Migración a v2 completada');
+ *     console.log('[Migrations] Migración a v3 completada');
  *   } catch (error) {
  *     await db.execAsync('ROLLBACK;');
- *     console.error('[Migrations] Error en migración a v2:', error);
+ *     console.error('[Migrations] Error en migración a v3:', error);
  *     throw error;
  *   }
  * }

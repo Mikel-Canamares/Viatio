@@ -60,6 +60,7 @@ export interface Reserva {
   estadoPago: EstadoPago;
   notas?: string;
   metadatos?: ReservaMetadatos;
+  documentoId?: string; // ID del documento asociado (opcional)
   createdAt: string;
   updatedAt: string;
 }
@@ -84,6 +85,7 @@ export interface CreateReservaInput {
   estadoPago?: EstadoPago;
   notas?: string;
   metadatos?: ReservaMetadatos;
+  documentoId?: string; // ID del documento asociado (opcional)
 }
 
 export const RESERVA_CATEGORIAS: Record<CategoriaReserva, { label: string; icon: string }> = {
@@ -93,3 +95,22 @@ export const RESERVA_CATEGORIAS: Record<CategoriaReserva, { label: string; icon:
   activity: { label: 'Actividad', icon: 'ticket' },
   other: { label: 'Otro', icon: 'ellipsis-horizontal' },
 };
+
+/**
+ * Mapea una categoría de reserva a categoría de documento
+ * Solo para las categorías compatibles: transporte, alojamiento, actividades
+ */
+export function mapReservaToCategoriaDocumento(
+  categoria: CategoriaReserva
+): 'transporte' | 'alojamiento' | 'actividades' | 'otros' {
+  switch (categoria) {
+    case 'transport':
+      return 'transporte';
+    case 'accommodation':
+      return 'alojamiento';
+    case 'activity':
+      return 'actividades';
+    default:
+      return 'otros';
+  }
+}

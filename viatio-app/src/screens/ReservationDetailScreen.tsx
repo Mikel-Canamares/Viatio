@@ -28,8 +28,10 @@ import {
 } from '@/components';
 import { theme } from '@/config';
 import { useReservasStore } from '@/store/reservasStore';
-import { getReservaById } from '@/services/reservasService';
+import { getReservaById, getDocumentoByReservaId } from '@/services/reservasService';
+import { openDocument } from '@/utils/documentViewer';
 import type { Reserva } from '@/types/reserva';
+import type { Documento } from '@/types/documento';
 import { RESERVA_CATEGORIAS } from '@/types/reserva';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -57,6 +59,7 @@ const CATEGORIA_COLORS: Record<
 export default function ReservationDetailScreen({ route, navigation }: Props) {
   const { reservaId } = route.params;
   const [reserva, setReserva] = useState<Reserva | null>(null);
+  const [documento, setDocumento] = useState<Documento | null>(null);
   const [loading, setLoading] = useState(true);
   const { removeReserva } = useReservasStore();
 
@@ -76,6 +79,12 @@ export default function ReservationDetailScreen({ route, navigation }: Props) {
       setLoading(true);
       const data = await getReservaById(reservaId);
       setReserva(data);
+
+      // Cargar documento asociado si existe
+      if (data?.documentoId) {
+        const doc = await getDocumentoByReservaId(reservaId);
+        setDocumento(doc as Documento | null);
+      }
     } catch (error) {
       console.error('Error loading reservation:', error);
       Alert.alert('Error', 'No se pudo cargar la reserva');
@@ -300,6 +309,32 @@ export default function ReservationDetailScreen({ route, navigation }: Props) {
             </View>
           )}
 
+          {documento && (
+            <View style={styles.section}>
+              <SectionHeader title="Documento asociado" />
+              <Pressable onPress={() => openDocument(documento)}>
+                <Card style={styles.documentCard}>
+                  <View style={styles.documentRow}>
+                    <View style={styles.documentIconContainer}>
+                      <Ionicons
+                        name={documento.tipoArchivo === 'pdf' ? 'document-text' : 'image'}
+                        size={24}
+                        color={theme.colors.primaryLight}
+                      />
+                    </View>
+                    <View style={styles.documentInfo}>
+                      <Text style={styles.documentName}>{documento.nombre}</Text>
+                      <Text style={styles.documentMeta}>
+                        {documento.tipoArchivo.toUpperCase()} • {(documento.tamano / 1024).toFixed(0)} KB
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+                  </View>
+                </Card>
+              </Pressable>
+            </View>
+          )}
+
           <View style={styles.actions}>
             <SecondaryButton onPress={handleEdit}>Editar reserva</SecondaryButton>
             <Pressable onPress={handleDelete} style={styles.deleteButton}>
@@ -453,6 +488,35 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: theme.colors.text,
     lineHeight: 22,
+  },
+  documentCard: {
+    padding: theme.spacing.md,
+  },
+  documentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  documentIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: theme.colors.primaryLight + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  documentInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  documentName: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: theme.colors.text,
+  },
+  documentMeta: {
+    fontSize: 13,
+    color: theme.colors.textMuted,
   },
   actions: {
     gap: theme.spacing.md,

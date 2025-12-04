@@ -22,6 +22,7 @@ interface DocumentCardProps {
   documento: Documento;
   onPress: () => void;
   onDownload?: () => void;
+  onDelete?: () => void;
 }
 
 // ============================================
@@ -73,7 +74,7 @@ function getTypeBadgeStyles(tipo: string): {
 // COMPONENT
 // ============================================
 
-export default function DocumentCard({ documento, onPress, onDownload }: DocumentCardProps) {
+export default function DocumentCard({ documento, onPress, onDownload, onDelete }: DocumentCardProps) {
   const categoryConfig = DOCUMENTO_CATEGORIAS[documento.categoria];
   const typeBadge = getTypeBadgeStyles(documento.tipoArchivo);
 
@@ -124,22 +125,42 @@ export default function DocumentCard({ documento, onPress, onDownload }: Documen
             </View>
           </View>
 
-          {/* Botón download */}
-          {onDownload && (
-            <Pressable
-              onPress={(e) => {
-                e.stopPropagation();
-                onDownload();
-              }}
-              style={styles.downloadButton}
-            >
-              <Ionicons
-                name="download-outline"
-                size={20}
-                color={theme.colors.primaryLight}
-              />
-            </Pressable>
-          )}
+          {/* Botones de acción */}
+          <View style={styles.actionsContainer}>
+            {/* Botón download */}
+            {onDownload && (
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation();
+                  onDownload();
+                }}
+                style={styles.actionButton}
+              >
+                <Ionicons
+                  name="download-outline"
+                  size={20}
+                  color={theme.colors.primaryLight}
+                />
+              </Pressable>
+            )}
+
+            {/* Botón delete */}
+            {onDelete && (
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                style={styles.actionButton}
+              >
+                <Ionicons
+                  name="trash-outline"
+                  size={20}
+                  color="#EF4444"
+                />
+              </Pressable>
+            )}
+          </View>
         </View>
 
         {/* Row inferior: fecha */}
@@ -204,7 +225,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.textSecondary,
   },
-  downloadButton: {
+  actionsContainer: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  actionButton: {
     padding: theme.spacing.sm,
   },
   bottomRow: {

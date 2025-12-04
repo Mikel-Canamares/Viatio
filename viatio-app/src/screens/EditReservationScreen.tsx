@@ -13,9 +13,12 @@ import {
   Pressable,
   Alert,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import {
   ScreenContainer,
   PageHeader,
@@ -27,9 +30,14 @@ import {
 } from '@/components';
 import { theme } from '@/config';
 import { useReservasStore } from '@/store/reservasStore';
-import { getViajeById, getReservaById } from '@/services';
+import { useDocumentosStore } from '@/store/documentosStore';
+import { getViajeById } from '@/services';
+import { getReservaById, getDocumentoByReservaId } from '@/services/reservasService';
+import { updateDocumentoCategoria } from '@/services/documentosService';
+import { mapReservaToCategoriaDocumento } from '@/types/reserva';
 import type { CreateReservaInput, CategoriaReserva } from '@/types/reserva';
 import type { Viaje } from '@/types/viaje';
+import type { Documento } from '@/types/documento';
 import type { HomeStackParamList } from '@/navigation/types';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'EditReservation'>;
@@ -51,10 +59,21 @@ const ESTADO_PAGO_OPTIONS = [
 export default function EditReservationScreen({ route, navigation }: Props) {
   const { reservaId } = route.params;
   const { updateReserva, loading: storeLoading } = useReservasStore();
+  const { addDocumento, removeDocumento } = useDocumentosStore();
 
   const [loading, setLoading] = useState(true);
   const [viaje, setViaje] = useState<Viaje | null>(null);
   const [formData, setFormData] = useState<Partial<CreateReservaInput>>({});
+
+  // Document state
+  const [existingDocument, setExistingDocument] = useState<Documento | null>(null);
+  const [attachedFile, setAttachedFile] = useState<{
+    uri: string;
+    name: string;
+    type: string;
+    size: number;
+  } | null>(null);
+  const [documentToDelete, setDocumentToDelete] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -74,6 +93,12 @@ export default function EditReservationScreen({ route, navigation }: Props) {
       // Cargar viaje para limitar fechas
       const viajeData = await getViajeById(reservaData.viajeId);
       setViaje(viajeData);
+
+      // Cargar documento asociado si existe
+      if (reservaData.documentoId) {
+        const doc = await getDocumentoByReservaId(reservaId);
+        setExistingDocument(doc as Documento | null);
+      }
 
       // Precargar formulario con datos existentes
       setFormData({
@@ -108,31 +133,156 @@ export default function EditReservationScreen({ route, navigation }: Props) {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handlePickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/pdf',
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const file = result.assets[0];
+        setAttachedFile({
+          uri: file.uri,
+          name: file.name,
+          type: file.mimeType || 'application/pdf',
+          size: file.size || 0,
+        });
+      }
+    } catch (error) {
+      console.error('Error picking document:', error);
+      Alert.alert('Error', 'No se pudo seleccionar el documento');
+    }
+  };
+
+  const handlePickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permiso denegado', 'Se necesita acceso a la galería para seleccionar imágenes');
+      return;
+    }
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const image = result.assets[0];
+        const fileName = image.uri.split('/').pop() || 'imagen.jpg';
+        setAttachedFile({
+          uri: image.uri,
+          name: fileName,
+          type: image.mimeType || 'image/jpeg',
+          size: 0,
+        });
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'No se pudo seleccionar la imagen');
+    }
+  };
+
+  const handleDeleteExistingDocument = () => {
+    if (!existingDocument) return;
+
+    Alert.alert(
+      'Eliminar documento',
+      '¿Deseas eliminar el documento asociado? Se eliminará al guardar los cambios.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => {
+            setDocumentToDelete(true);
+            setExistingDocument(null);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRemoveAttachedFile = () => {
+    setAttachedFile(null);
+  };
+
   const handleSave = async () => {
     if (!formData.nombre || !formData.categoria) {
       Alert.alert('Error', 'El nombre y la categoría son obligatorios');
       return;
     }
 
-    const input: Partial<CreateReservaInput> = {
-      categoria: formData.categoria,
-      nombre: formData.nombre,
-      proveedor: formData.proveedor,
-      numeroConfirmacion: formData.numeroConfirmacion,
-      fechaInicio: formData.fechaInicio,
-      horaInicio: formData.horaInicio,
-      fechaFin: formData.fechaFin,
-      horaFin: formData.horaFin,
-      ubicacion: formData.ubicacion,
-      direccion: formData.direccion,
-      precio: formData.precio,
-      moneda: formData.moneda || 'EUR',
-      estadoPago: formData.estadoPago || 'pending',
-      notas: formData.notas,
-    };
+    try {
+      // 1. Delete existing document if marked for deletion
+      if (documentToDelete && existingDocument) {
+        await removeDocumento(existingDocument.id);
+      }
 
-    await updateReserva(reservaId, input);
-    navigation.goBack();
+      // 2. Update existing document category if it exists and category changed
+      if (existingDocument && !documentToDelete && formData.categoria) {
+        const nuevaCategoriaDocumento = mapReservaToCategoriaDocumento(formData.categoria);
+        // Solo actualizar si la categoría cambió
+        if (existingDocument.categoria !== nuevaCategoriaDocumento) {
+          await updateDocumentoCategoria(existingDocument.id, nuevaCategoriaDocumento);
+          console.log('[EditReservation] Categoría de documento actualizada:', {
+            documentoId: existingDocument.id,
+            categoriaAnterior: existingDocument.categoria,
+            categoriaNueva: nuevaCategoriaDocumento,
+          });
+        }
+      }
+
+      // 3. Create new document if attached
+      let newDocumentoId: string | undefined;
+      if (attachedFile && formData.viajeId && formData.categoria) {
+        const categoriaDocumento = mapReservaToCategoriaDocumento(formData.categoria);
+        const tipoArchivo = attachedFile.type.includes('pdf') ? 'pdf' : 'image';
+
+        const documento = await addDocumento(
+          {
+            viajeId: formData.viajeId,
+            nombre: attachedFile.name,
+            categoria: categoriaDocumento,
+            tipoArchivo,
+            rutaArchivo: '',
+            tamano: attachedFile.size,
+          },
+          attachedFile.uri
+        );
+
+        if (documento) {
+          newDocumentoId = documento.id;
+        }
+      }
+
+      // 4. Update reservation
+      const input: Partial<CreateReservaInput> = {
+        categoria: formData.categoria,
+        nombre: formData.nombre,
+        proveedor: formData.proveedor,
+        numeroConfirmacion: formData.numeroConfirmacion,
+        fechaInicio: formData.fechaInicio,
+        horaInicio: formData.horaInicio,
+        fechaFin: formData.fechaFin,
+        horaFin: formData.horaFin,
+        ubicacion: formData.ubicacion,
+        direccion: formData.direccion,
+        precio: formData.precio,
+        moneda: formData.moneda || 'EUR',
+        estadoPago: formData.estadoPago || 'pending',
+        notas: formData.notas,
+        documentoId: newDocumentoId,
+      };
+
+      await updateReserva(reservaId, input);
+      navigation.goBack();
+    } catch (error) {
+      console.error('[EditReservationScreen] Error al guardar:', error);
+      Alert.alert('Error', 'No se pudieron guardar los cambios');
+    }
   };
 
   if (loading) {
@@ -342,6 +492,85 @@ export default function EditReservationScreen({ route, navigation }: Props) {
             />
           </Card>
 
+          <Card style={styles.formCard}>
+            <SectionHeader title="Documento adjunto" />
+
+            {/* Existing document */}
+            {existingDocument && !documentToDelete && (
+              <View style={styles.documentPreview}>
+                <View style={styles.documentRow}>
+                  <View style={styles.documentIconContainer}>
+                    <Ionicons
+                      name={existingDocument.tipoArchivo === 'pdf' ? 'document-text' : 'image'}
+                      size={24}
+                      color={theme.colors.primaryLight}
+                    />
+                  </View>
+                  <View style={styles.documentInfo}>
+                    <Text style={styles.documentName}>{existingDocument.nombre}</Text>
+                    <Text style={styles.documentMeta}>
+                      {existingDocument.tipoArchivo.toUpperCase()} • {(existingDocument.tamano / 1024).toFixed(0)} KB
+                    </Text>
+                  </View>
+                  <Pressable onPress={handleDeleteExistingDocument} style={styles.deleteIconButton}>
+                    <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                  </Pressable>
+                </View>
+              </View>
+            )}
+
+            {/* Attached file preview */}
+            {attachedFile && (
+              <View style={styles.documentPreview}>
+                <View style={styles.documentRow}>
+                  {attachedFile.type.includes('image') ? (
+                    <Image source={{ uri: attachedFile.uri }} style={styles.imagePreview} />
+                  ) : (
+                    <View style={styles.documentIconContainer}>
+                      <Ionicons name="document-text" size={24} color={theme.colors.primaryLight} />
+                    </View>
+                  )}
+                  <View style={styles.documentInfo}>
+                    <Text style={styles.documentName}>{attachedFile.name}</Text>
+                    <Text style={styles.documentMeta}>
+                      {attachedFile.type.includes('pdf') ? 'PDF' : 'Imagen'}
+                    </Text>
+                  </View>
+                  <Pressable onPress={handleRemoveAttachedFile} style={styles.deleteIconButton}>
+                    <Ionicons name="close-circle" size={24} color="#6B7280" />
+                  </Pressable>
+                </View>
+              </View>
+            )}
+
+            {/* Attach buttons */}
+            {!existingDocument && !attachedFile && (
+              <View style={styles.attachButtons}>
+                <Pressable onPress={handlePickDocument} style={styles.attachButton}>
+                  <Ionicons name="document-attach-outline" size={20} color={theme.colors.primaryLight} />
+                  <Text style={styles.attachButtonText}>Adjuntar PDF</Text>
+                </Pressable>
+                <Pressable onPress={handlePickImage} style={styles.attachButton}>
+                  <Ionicons name="image-outline" size={20} color={theme.colors.primaryLight} />
+                  <Text style={styles.attachButtonText}>Adjuntar imagen</Text>
+                </Pressable>
+              </View>
+            )}
+
+            {(existingDocument && !attachedFile) && (
+              <View style={styles.attachButtons}>
+                <Pressable onPress={handlePickDocument} style={styles.attachButton}>
+                  <Ionicons name="document-attach-outline" size={20} color={theme.colors.primaryLight} />
+                  <Text style={styles.attachButtonText}>Adjuntar PDF</Text>
+                </Pressable>
+                <Pressable onPress={handlePickImage} style={styles.attachButton}>
+                  <Ionicons name="image-outline" size={20} color={theme.colors.primaryLight} />
+                  <Text style={styles.attachButtonText}>Adjuntar imagen</Text>
+                </Pressable>
+              </View>
+            )}
+          </Card>
+
           <View style={styles.buttonContainer}>
             <PrimaryButton onPress={handleSave} loading={storeLoading}>
               Guardar cambios
@@ -451,5 +680,67 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     marginTop: theme.spacing.lg,
+  },
+  documentPreview: {
+    padding: theme.spacing.sm,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    marginBottom: theme.spacing.sm,
+  },
+  documentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  documentIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: theme.colors.primaryLight + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  documentInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  documentName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: theme.colors.text,
+  },
+  documentMeta: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
+  },
+  deleteIconButton: {
+    padding: 8,
+  },
+  imagePreview: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+  },
+  attachButtons: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  attachButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.primaryLight,
+    backgroundColor: '#FFFFFF',
+  },
+  attachButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.primaryLight,
   },
 });

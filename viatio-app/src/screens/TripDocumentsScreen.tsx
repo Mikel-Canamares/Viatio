@@ -48,7 +48,7 @@ interface DocumentSection {
 
 export default function TripDocumentsScreen({ route, navigation }: Props) {
   const { viajeId } = route.params;
-  const { documentos, loading, error, fetchDocumentos, clearError } = useDocumentosStore();
+  const { documentos, loading, error, fetchDocumentos, removeDocumento, clearError } = useDocumentosStore();
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -101,6 +101,25 @@ export default function TripDocumentsScreen({ route, navigation }: Props) {
 
   const handleAddDocument = () => {
     navigation.navigate('AddDocument', { viajeId });
+  };
+
+  const handleDeleteDocument = (documento: Documento) => {
+    Alert.alert(
+      'Eliminar documento',
+      `¿Estás seguro de que quieres eliminar "${documento.nombre}"? Si está asociado a una reserva, se desvinculará automáticamente.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            await removeDocumento(documento.id);
+            // Recargar lista
+            await loadDocumentos();
+          },
+        },
+      ]
+    );
   };
 
   // ============================================
@@ -221,6 +240,7 @@ export default function TripDocumentsScreen({ route, navigation }: Props) {
         documento={item}
         onPress={() => handleViewDocument(item)}
         onDownload={() => handleDownloadDocument(item)}
+        onDelete={() => handleDeleteDocument(item)}
       />
     </View>
   );
