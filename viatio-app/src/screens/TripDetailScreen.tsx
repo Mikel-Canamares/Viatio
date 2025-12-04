@@ -76,8 +76,7 @@ export default function TripDetailScreen({ navigation, route }: Props) {
         console.log('Navigate to: map for trip:', viajeId);
         break;
       case 'documents':
-        // TODO: Implementar cuando exista TripDocuments
-        console.log('Navigate to: documents for trip:', viajeId);
+        navigation.navigate('TripDocuments', { viajeId });
         break;
       default:
         console.log('Unknown screen:', screen);
