@@ -71,10 +71,6 @@ export type HomeStackParamList = {
   EditReservation: { reservaId: string };
   ScanReservation: { viajeId: string };
   TripMap: { viajeId: string };
-  AddPlace: {
-    viajeId: string;
-    initialLocation?: { latitude: number; longitude: number };
-  };
   TripDocuments: { viajeId: string };
   AddDocument: { viajeId: string };
 };
