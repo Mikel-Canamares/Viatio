@@ -1,9 +1,13 @@
 {
-  "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    // ============================================
-    // MODO ESTRICTO COMPLETO
-    // ============================================
+    "target": "esnext",
+    "module": "esnext",
+    "lib": [
+      "esnext"
+    ],
+    "jsx": "react-native",
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
@@ -12,25 +16,15 @@
     "strictPropertyInitialization": true,
     "noImplicitThis": true,
     "alwaysStrict": true,
-
-    // ============================================
-    // ALIAS DE IMPORTS
-    // ============================================
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": [
+        "src/*"
+      ]
     },
-
-    // ============================================
-    // OPCIONES RECOMENDADAS
-    // ============================================
     "esModuleInterop": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-
-    // ============================================
-    // CHEQUEOS ADICIONALES
-    // ============================================
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
@@ -47,5 +41,6 @@
     "babel.config.js",
     "metro.config.js",
     "src/prototipo"
-  ]
+  ],
+  "extends": "expo/tsconfig.base"
 }
