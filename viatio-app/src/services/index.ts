@@ -31,3 +31,13 @@ export {
 export type { DocumentInfo, ImageInfo } from './fileService';
 
 export { extractReservaFromImage } from './ai/ocrService';
+
+export {
+  createDocumento,
+  getDocumentosByViajeId,
+  getDocumentosByCategoria,
+  getDocumentoById,
+  getDocumentoUri,
+  deleteDocumento,
+  detectTipoArchivo,
+} from './documentosService';

@@ -11,6 +11,8 @@ import {
   CreateTripScreen,
   TripDetailScreen,
   TripAgendaScreen,
+  TripDocumentsScreen,
+  AddDocumentScreen,
   EditReservationScreen,
   ScanReservationScreen,
 } from '@/screens';
@@ -37,14 +39,14 @@ export function HomeStackNavigator() {
       <Stack.Screen name="TripDetail" component={TripDetailScreen} />
       <Stack.Screen name="TripAgenda" component={TripAgendaScreen} />
       <Stack.Screen name="TripReservations" component={TripReservationsScreen} />
+      <Stack.Screen name="TripDocuments" component={TripDocumentsScreen} />
+      <Stack.Screen name="AddDocument" component={AddDocumentScreen} />
       <Stack.Screen name="AddReservation" component={AddReservationScreen} />
       <Stack.Screen name="ReservationDetail" component={ReservationDetailScreen} />
       <Stack.Screen name="EditReservation" component={EditReservationScreen} />
       <Stack.Screen name="ScanReservation" component={ScanReservationScreen} />
       {/* Las demás rutas se añadirán en fases posteriores:
         - TripMap
-        - TripDocuments
-        - AddDocument
       */}
     </Stack.Navigator>
   );
