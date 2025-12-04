@@ -19,6 +19,8 @@ import {
 import TripReservationsScreen from '@/screens/TripReservationsScreen';
 import AddReservationScreen from '@/screens/AddReservationScreen';
 import ReservationDetailScreen from '@/screens/ReservationDetailScreen';
+import TripMapScreen from '@/screens/TripMapScreen';
+import AddPlaceScreen from '@/screens/AddPlaceScreen';
 import type { HomeStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<HomeStackParamList>();
@@ -45,9 +47,8 @@ export function HomeStackNavigator() {
       <Stack.Screen name="ReservationDetail" component={ReservationDetailScreen} />
       <Stack.Screen name="EditReservation" component={EditReservationScreen} />
       <Stack.Screen name="ScanReservation" component={ScanReservationScreen} />
-      {/* Las demás rutas se añadirán en fases posteriores:
-        - TripMap
-      */}
+      <Stack.Screen name="TripMap" component={TripMapScreen} />
+      <Stack.Screen name="AddPlace" component={AddPlaceScreen} />
     </Stack.Navigator>
   );
 }
