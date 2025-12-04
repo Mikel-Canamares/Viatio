@@ -23,7 +23,12 @@ export { LoadingOverlay } from './LoadingOverlay';
 export { TripCard } from './TripCard';
 export { default as ReservationCard } from './ReservationCard';
 export { default as DocumentCard } from './DocumentCard';
-export { PlaceDetailsModal } from './PlaceDetailsModal';
+
+// Componentes de Google Places (Fase 11)
+export { PlaceSearchBar } from './PlaceSearchBar';
+export { PlaceDetailCard } from './PlaceDetailCard';
+export { AddToTripModal } from './AddToTripModal';
+export { SavedPlacesAccordion } from './SavedPlacesAccordion';
 
 // Los siguientes se crearán en fases posteriores:
 // export { EmptyState } from './EmptyState';

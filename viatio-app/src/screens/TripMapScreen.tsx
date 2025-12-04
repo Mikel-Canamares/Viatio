@@ -225,6 +225,7 @@ export default function TripMapScreen() {
         direccion: place.address,
         latitud: place.latitude,
         longitud: place.longitude,
+        googlePlaceId: place.placeId, // Guardar el ID de Google Places
       });
 
       Alert.alert('Lugar añadido', `"${place.name}" añadido a tu viaje`);
@@ -242,16 +243,89 @@ export default function TripMapScreen() {
     }
   };
 
+  // Convertir Lugar de BD a PlaceResult para mostrar en tarjeta
+  const lugarToPlaceResult = (lugar: Lugar): PlaceResult => {
+    return {
+      placeId: lugar.id,
+      name: lugar.nombre,
+      address: lugar.direccion || '',
+      latitude: lugar.latitud || 0,
+      longitude: lugar.longitud || 0,
+      types: [lugar.categoria],
+      primaryType: lugar.categoria,
+      description: lugar.descripcion,
+    };
+  };
+
   // Manejar selección de lugar guardado
-  const handleSelectLugar = (lugar: Lugar) => {
-    if (lugar.latitud && lugar.longitud) {
+  const handleSelectLugar = async (lugar: Lugar) => {
+    if (!lugar.latitud || !lugar.longitud) return;
+
+    // Paso A: Activar estado de carga
+    setLoading(true);
+
+    try {
+      // Cambiar a vista mapa PRIMERO (para que se renderice el MapView)
+      setViewMode('map');
+
+      // Esperar un frame para que el MapView se renderice
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Zoom natural tipo Google Maps (~500m vista)
       mapRef.current?.animateToRegion({
         latitude: lugar.latitud,
         longitude: lugar.longitud,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      }, 300);
-      setViewMode('map');
+        latitudeDelta: 0.005, // Zoom natural (~500m)
+        longitudeDelta: 0.005,
+      }, 800);
+
+      // Paso B & C: Fetch - Obtener detalles completos de Google Places
+      let placeDetails: PlaceResult | null = null;
+
+      if (lugar.googlePlaceId) {
+        // Si tenemos el googlePlaceId guardado, usarlo directamente (ÓPTIMO)
+        console.log('[handleSelectLugar] Usando googlePlaceId guardado:', lugar.googlePlaceId);
+        placeDetails = await getPlaceDetails(lugar.googlePlaceId);
+      } else {
+        // Fallback: Buscar por coordenadas y nombre (para lugares antiguos sin googlePlaceId)
+        console.log('[handleSelectLugar] googlePlaceId no disponible, buscando por coordenadas');
+        const nearbyPlaces = await searchNearbyPlaces(
+          lugar.latitud,
+          lugar.longitud,
+          50, // Radio de 50 metros
+          5
+        );
+
+        const matchingPlace = nearbyPlaces.find(p =>
+          p.name.toLowerCase().includes(lugar.nombre.toLowerCase()) ||
+          lugar.nombre.toLowerCase().includes(p.name.toLowerCase())
+        );
+
+        if (matchingPlace) {
+          console.log('[handleSelectLugar] Lugar encontrado por coordenadas:', matchingPlace.name);
+          placeDetails = await getPlaceDetails(matchingPlace.placeId);
+        }
+      }
+
+      if (placeDetails) {
+        // Usar datos RICOS de Google Places
+        setSelectedPlace(placeDetails);
+        setShowPlaceCard(true);
+      } else {
+        // Fallback a datos locales si no se pudieron obtener detalles
+        console.log('[handleSelectLugar] No se pudieron obtener detalles de Google, usando datos locales');
+        const placeResult = lugarToPlaceResult(lugar);
+        setSelectedPlace(placeResult);
+        setShowPlaceCard(true);
+      }
+    } catch (error) {
+      console.error('[handleSelectLugar] Error obteniendo detalles:', error);
+      // Fallback a datos locales en caso de error
+      const placeResult = lugarToPlaceResult(lugar);
+      setSelectedPlace(placeResult);
+      setShowPlaceCard(true);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -346,21 +420,41 @@ export default function TripMapScreen() {
                     longitude: lugar.longitud,
                   }}
                   title={lugar.nombre}
-                  pinColor={config.color}
                   onPress={() => handleSelectLugar(lugar)}
-                />
+                >
+                  <View style={styles.markerContainer}>
+                    <View style={[styles.markerCircle, { backgroundColor: config.color }]}>
+                      <Ionicons
+                        name={config.icon as any}
+                        size={20}
+                        color="#FFFFFF"
+                      />
+                    </View>
+                    <View style={[styles.markerTriangle, { borderTopColor: config.color }]} />
+                  </View>
+                </Marker>
               );
             })}
 
-            {/* Marcador del lugar seleccionado */}
-            {selectedPlace && (
+            {/* Marcador del lugar seleccionado (solo si NO está en lugares guardados) */}
+            {selectedPlace && !lugares.some(l => l.id === selectedPlace.placeId) && (
               <Marker
                 coordinate={{
                   latitude: selectedPlace.latitude,
                   longitude: selectedPlace.longitude,
                 }}
-                pinColor={theme.colors.primaryLight}
-              />
+              >
+                <View style={styles.markerContainer}>
+                  <View style={[styles.markerCircle, { backgroundColor: theme.colors.primaryLight }]}>
+                    <Ionicons
+                      name="location"
+                      size={20}
+                      color="#FFFFFF"
+                    />
+                  </View>
+                  <View style={[styles.markerTriangle, { borderTopColor: theme.colors.primaryLight }]} />
+                </View>
+              </Marker>
             )}
           </MapView>
 
@@ -412,6 +506,16 @@ export default function TripMapScreen() {
                 place={selectedPlace}
                 onClose={() => setShowPlaceCard(false)}
                 onAddToTrip={handleAddToTrip}
+                hideAddButton={
+                  // Verificar si ya está guardado por ID (lugares creados desde lista)
+                  // o por nombre y coordenadas (lugares creados desde mapa/búsqueda)
+                  lugares.some(l =>
+                    l.id === selectedPlace.placeId ||
+                    (l.nombre === selectedPlace.name &&
+                     Math.abs((l.latitud || 0) - selectedPlace.latitude) < 0.0001 &&
+                     Math.abs((l.longitud || 0) - selectedPlace.longitude) < 0.0001)
+                  )
+                }
               />
             )}
           </Pressable>
@@ -493,5 +597,37 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'flex-end',
+  },
+  // Marcadores personalizados (forma de gota invertida - teardrop)
+  markerContainer: {
+    alignItems: 'center',
+    width: 40,
+    height: 50,
+  },
+  markerCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 6,
+  },
+  markerTriangle: {
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 10,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    marginTop: -2,
   },
 });
