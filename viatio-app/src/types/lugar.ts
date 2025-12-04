@@ -23,6 +23,7 @@ export interface Lugar {
   direccion?: string;
   latitud?: number;
   longitud?: number;
+  googlePlaceId?: string; // ID de Google Places para obtener detalles completos
   orden: number;
   visitado: boolean;
   createdAt: string;
@@ -38,6 +39,7 @@ export interface CreateLugarInput {
   direccion?: string;
   latitud?: number;
   longitud?: number;
+  googlePlaceId?: string; // ID de Google Places
   orden?: number;
 }
 

@@ -18,7 +18,7 @@
     "@types/lodash": "^4.17.21",
     "babel-preset-expo": "~54.0.0",
     "date-fns": "^4.1.0",
-    "expo": "~54.0.25",
+    "expo": "~54.0.26",
     "expo-clipboard": "~8.0.7",
     "expo-constants": "^18.0.10",
     "expo-crypto": "~15.0.7",

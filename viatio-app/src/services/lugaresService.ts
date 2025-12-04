@@ -54,6 +54,7 @@ function rowToLugar(row: any): Lugar {
     direccion: row.direccion || undefined,
     latitud: row.latitud !== null ? row.latitud : undefined,
     longitud: row.longitud !== null ? row.longitud : undefined,
+    googlePlaceId: row.googlePlaceId || undefined,
     orden: row.orden,
     visitado: row.visitado === 1,
     createdAt: row.createdAt,
@@ -89,9 +90,9 @@ export async function createLugar(input: CreateLugarInput): Promise<Lugar> {
     await db.runAsync(
       `INSERT INTO lugares (
         id, viajeId, diaId, nombre, descripcion, categoria,
-        direccion, latitud, longitud, orden, visitado,
+        direccion, latitud, longitud, googlePlaceId, orden, visitado,
         createdAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         input.viajeId,
@@ -102,6 +103,7 @@ export async function createLugar(input: CreateLugarInput): Promise<Lugar> {
         input.direccion || null,
         input.latitud !== undefined ? input.latitud : null,
         input.longitud !== undefined ? input.longitud : null,
+        input.googlePlaceId || null,
         orden,
         0, // visitado = false
         timestamp,

@@ -19,8 +19,8 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 interface SavedPlacesAccordionProps {
   lugares: Lugar[];
-  onSelectLugar: (lugar: Lugar) => void;
-  onToggleVisitado: (lugar: Lugar) => void;
+  onSelectLugar: (lugar: Lugar) => void | Promise<void>;
+  onToggleVisitado: (lugar: Lugar) => void | Promise<void>;
   onDeleteLugar: (lugar: Lugar) => void;
 }
 

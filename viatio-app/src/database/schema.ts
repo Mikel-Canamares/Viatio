@@ -9,7 +9,7 @@
 // VERSIÓN DEL ESQUEMA
 // ============================================
 
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 // ============================================
 // CREACIÓN DE TABLAS
@@ -86,6 +86,7 @@ const CREATE_LUGARES_TABLE = `
     direccion TEXT,
     latitud REAL,
     longitud REAL,
+    googlePlaceId TEXT,
     orden INTEGER DEFAULT 0,
     visitado INTEGER DEFAULT 0,
     createdAt TEXT NOT NULL,

@@ -78,9 +78,13 @@ export async function runMigrations(
     await migrateToV2(db);
   }
 
+  if (currentVersion < 3) {
+    await migrateToV3(db);
+  }
+
   // Futuras migraciones se añadirán aquí:
-  // if (currentVersion < 3) {
-  //   await migrateToV3(db);
+  // if (currentVersion < 4) {
+  //   await migrateToV4(db);
   // }
 
   console.log('[Migrations] Migraciones completadas exitosamente');
@@ -97,10 +101,7 @@ async function migrateToV1(db: SQLite.SQLiteDatabase): Promise<void> {
   console.log('[Migrations] Ejecutando migración a v1...');
 
   try {
-    // Iniciar transacción
-    await db.execAsync('BEGIN TRANSACTION;');
-
-    // Crear tablas
+    // Crear tablas (sin transacción, CREATE TABLE IF NOT EXISTS es seguro)
     console.log('[Migrations] Creando tablas...');
     for (const sql of CREATE_TABLES_SQL) {
       await db.execAsync(sql);
@@ -119,13 +120,8 @@ async function migrateToV1(db: SQLite.SQLiteDatabase): Promise<void> {
       [1, now]
     );
 
-    // Commit transacción
-    await db.execAsync('COMMIT;');
-
     console.log('[Migrations] Migración a v1 completada');
   } catch (error) {
-    // Rollback en caso de error
-    await db.execAsync('ROLLBACK;');
     console.error('[Migrations] Error en migración a v1:', error);
     throw error;
   }
@@ -138,10 +134,20 @@ async function migrateToV2(db: SQLite.SQLiteDatabase): Promise<void> {
   console.log('[Migrations] Ejecutando migración a v2...');
 
   try {
-    await db.execAsync('BEGIN TRANSACTION;');
+    // Verificar si la columna documentoId ya existe
+    const tableInfo = await db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(reservas);'
+    );
 
-    // Añadir campo documentoId a la tabla reservas
-    await db.execAsync('ALTER TABLE reservas ADD COLUMN documentoId TEXT;');
+    const columnExists = tableInfo.some(col => col.name === 'documentoId');
+
+    if (!columnExists) {
+      // Añadir campo documentoId solo si no existe
+      console.log('[Migrations] Añadiendo columna documentoId a reservas...');
+      await db.execAsync('ALTER TABLE reservas ADD COLUMN documentoId TEXT;');
+    } else {
+      console.log('[Migrations] Columna documentoId ya existe, omitiendo...');
+    }
 
     // Registrar migración
     const now = new Date().toISOString();
@@ -150,11 +156,45 @@ async function migrateToV2(db: SQLite.SQLiteDatabase): Promise<void> {
       [2, now]
     );
 
-    await db.execAsync('COMMIT;');
     console.log('[Migrations] Migración a v2 completada');
   } catch (error) {
-    await db.execAsync('ROLLBACK;');
     console.error('[Migrations] Error en migración a v2:', error);
+    throw error;
+  }
+}
+
+/**
+ * Migración a versión 3: Añadir campo googlePlaceId a tabla lugares
+ */
+async function migrateToV3(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migrations] Ejecutando migración a v3...');
+
+  try {
+    // Verificar si la columna googlePlaceId ya existe
+    const tableInfo = await db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(lugares);'
+    );
+
+    const columnExists = tableInfo.some(col => col.name === 'googlePlaceId');
+
+    if (!columnExists) {
+      // Añadir campo googlePlaceId solo si no existe
+      console.log('[Migrations] Añadiendo columna googlePlaceId a lugares...');
+      await db.execAsync('ALTER TABLE lugares ADD COLUMN googlePlaceId TEXT;');
+    } else {
+      console.log('[Migrations] Columna googlePlaceId ya existe, omitiendo...');
+    }
+
+    // Registrar migración
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'INSERT INTO _migrations (version, appliedAt) VALUES (?, ?)',
+      [3, now]
+    );
+
+    console.log('[Migrations] Migración a v3 completada');
+  } catch (error) {
+    console.error('[Migrations] Error en migración a v3:', error);
     throw error;
   }
 }
@@ -164,29 +204,33 @@ async function migrateToV2(db: SQLite.SQLiteDatabase): Promise<void> {
 // ============================================
 
 /**
- * Ejemplo de migración futura (v2 -> v3)
+ * Ejemplo de migración futura (v3 -> v4)
  *
- * async function migrateToV3(db: SQLite.SQLiteDatabase): Promise<void> {
- *   console.log('[Migrations] Ejecutando migración a v3...');
+ * async function migrateToV4(db: SQLite.SQLiteDatabase): Promise<void> {
+ *   console.log('[Migrations] Ejecutando migración a v4...');
  *
  *   try {
- *     await db.execAsync('BEGIN TRANSACTION;');
+ *     // Verificar si la columna ya existe
+ *     const tableInfo = await db.getAllAsync<{ name: string }>(
+ *       'PRAGMA table_info(tabla);'
+ *     );
  *
- *     // ALTER TABLE o nuevas tablas aquí
- *     await db.execAsync('ALTER TABLE viajes ADD COLUMN nuevoCampo TEXT;');
+ *     const columnExists = tableInfo.some(col => col.name === 'nuevoCampo');
+ *
+ *     if (!columnExists) {
+ *       await db.execAsync('ALTER TABLE tabla ADD COLUMN nuevoCampo TEXT;');
+ *     }
  *
  *     // Registrar migración
  *     const now = new Date().toISOString();
  *     await db.runAsync(
  *       'INSERT INTO _migrations (version, appliedAt) VALUES (?, ?)',
- *       [3, now]
+ *       [4, now]
  *     );
  *
- *     await db.execAsync('COMMIT;');
- *     console.log('[Migrations] Migración a v3 completada');
+ *     console.log('[Migrations] Migración a v4 completada');
  *   } catch (error) {
- *     await db.execAsync('ROLLBACK;');
- *     console.error('[Migrations] Error en migración a v3:', error);
+ *     console.error('[Migrations] Error en migración a v4:', error);
  *     throw error;
  *   }
  * }

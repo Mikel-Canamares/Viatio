@@ -20,6 +20,7 @@ interface PlaceDetailCardProps {
   onClose: () => void;
   onAddToTrip: (place: PlaceResult) => void;
   loading?: boolean;
+  hideAddButton?: boolean;
 }
 
 export function PlaceDetailCard({
@@ -27,6 +28,7 @@ export function PlaceDetailCard({
   onClose,
   onAddToTrip,
   loading = false,
+  hideAddButton = false,
 }: PlaceDetailCardProps) {
   const [imageError, setImageError] = useState(false);
 
@@ -226,27 +228,34 @@ export function PlaceDetailCard({
           {/* Botones de acción */}
           <View style={styles.actions}>
             <Pressable
-              style={styles.actionButton}
+              style={[
+                styles.actionButton,
+                hideAddButton && styles.actionButtonFullWidth,
+              ]}
               onPress={handleOpenInMaps}
             >
-              <Ionicons name="navigate" size={20} color={theme.colors.primaryLight} />
-              <Text style={styles.actionButtonText}>Cómo llegar</Text>
+              <Ionicons name="navigate" size={20} color={hideAddButton ? '#FFFFFF' : theme.colors.primaryLight} />
+              <Text style={hideAddButton ? styles.actionButtonTextPrimary : styles.actionButtonText}>
+                Cómo llegar
+              </Text>
             </Pressable>
 
-            <Pressable
-              style={[styles.actionButton, styles.actionButtonPrimary]}
-              onPress={() => onAddToTrip(place)}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <>
-                  <Ionicons name="add-circle" size={20} color="#FFFFFF" />
-                  <Text style={styles.actionButtonTextPrimary}>Añadir al viaje</Text>
-                </>
-              )}
-            </Pressable>
+            {!hideAddButton && (
+              <Pressable
+                style={[styles.actionButton, styles.actionButtonPrimary]}
+                onPress={() => onAddToTrip(place)}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="add-circle" size={20} color="#FFFFFF" />
+                    <Text style={styles.actionButtonTextPrimary}>Añadir al viaje</Text>
+                  </>
+                )}
+              </Pressable>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -406,6 +415,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
     borderWidth: 1,
+    borderColor: theme.colors.primaryLight,
+  },
+  actionButtonFullWidth: {
+    backgroundColor: theme.colors.primaryLight,
     borderColor: theme.colors.primaryLight,
   },
   actionButtonPrimary: {
