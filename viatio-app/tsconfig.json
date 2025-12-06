@@ -3,10 +3,11 @@
     "target": "esnext",
     "module": "esnext",
     "lib": [
-      "esnext"
+      "esnext",
+      "dom"
     ],
     "jsx": "react-native",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
     "strict": true,
     "noImplicitAny": true,
