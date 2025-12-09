@@ -2,17 +2,25 @@
  * SCREEN: TripCalendarScreen
  *
  * Calendario mensual que muestra eventos de viajes (reservas, actividades, etc.)
- * Permite navegar entre meses y ver detalles de eventos por día.
+ * Permite navegar entre meses y ver detalles de eventos por dia.
  */
 
-import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { ScreenContainer, PageHeader, Card, SectionHeader, CategoryBadge } from '@/components';
+import { ScreenContainer, PageHeader, Card, DayEventsModal } from '@/components';
 import { CalendarDay } from '@/components/CalendarDay';
+import type { EventoAgendaCalendario } from '@/components';
 import { theme } from '@/config';
-import type { EventoCalendario, TipoEvento } from '@/types/evento';
+import type { Viaje } from '@/types/viaje';
+import type { CategoriaReserva } from '@/types/reserva';
+import type { TipoEvento } from '@/types/evento';
 import { EVENTO_COLORS, EVENTO_LABELS } from '@/types/evento';
+import { useAuth } from '@/context';
+import { getViajesByUsuario } from '@/services/viajesService';
+import { getReservasByViajeId } from '@/services/reservasService';
+import { useReservasStore } from '@/store/reservasStore';
 
 interface TripCalendarScreenProps {
   viajeId?: string;
@@ -25,40 +33,62 @@ const MESES_NOMBRES = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 
+const CATEGORIA_RESERVA_VALUES: CategoriaReserva[] = [
+  'transport',
+  'accommodation',
+  'food',
+  'activity',
+  'other',
+];
+
+const isCategoriaReserva = (value?: string): value is CategoriaReserva => {
+  return value ? CATEGORIA_RESERVA_VALUES.includes(value as CategoriaReserva) : false;
+};
+
+const startOfDay = (date: Date) => {
+  const normalized = new Date(date);
+  normalized.setHours(0, 0, 0, 0);
+  return normalized;
+};
+
 export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
+  const { user } = useAuth();
+  const reservasStoreTimestamp = useReservasStore((state) => state.reservas.length);
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [eventos, setEventos] = useState<Map<string, EventoCalendario[]>>(new Map());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [eventos, setEventos] = useState<Map<string, EventoAgendaCalendario[]>>(new Map());
+  const [viajes, setViajes] = useState<Viaje[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Generar días del calendario (incluyendo días de otros meses)
+  // Generar dias del calendario (incluyendo dias de otros meses)
   const generateCalendarDays = (date: Date): Date[] => {
     const year = date.getFullYear();
     const month = date.getMonth();
 
-    // Primer día del mes (0 = domingo, 1 = lunes, etc.)
+    // Primer dia del mes (0 = domingo, 1 = lunes, etc.)
     const firstDay = new Date(year, month, 1).getDay();
     // Ajustar para que lunes sea 0
     const adjustedFirstDay = firstDay === 0 ? 6 : firstDay - 1;
 
-    // Total de días en el mes
+    // Total de dias en el mes
     const totalDays = new Date(year, month + 1, 0).getDate();
 
     const days: Date[] = [];
 
-    // Añadir días del mes anterior (disabled)
+    // Anadir dias del mes anterior (disabled)
     const prevMonthDays = new Date(year, month, 0).getDate();
     for (let i = adjustedFirstDay - 1; i >= 0; i--) {
       days.push(new Date(year, month - 1, prevMonthDays - i));
     }
 
-    // Añadir días del mes actual
+    // Anadir dias del mes actual
     for (let day = 1; day <= totalDays; day++) {
       days.push(new Date(year, month, day));
     }
 
-    // Añadir días del próximo mes para completar la grid
-    const remainingDays = 42 - days.length; // 6 semanas * 7 días
+    // Anadir dias del proximo mes para completar la grid
+    const remainingDays = 42 - days.length; // 6 semanas * 7 dias
     for (let day = 1; day <= remainingDays; day++) {
       days.push(new Date(year, month + 1, day));
     }
@@ -74,15 +104,136 @@ export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
     return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   };
 
-  // Obtener eventos de un día
-  const getEventosDelDia = (dateString: string): EventoCalendario[] => {
-    return eventos.get(dateString) || [];
+  const getSafeCategoria = (categoria?: string): CategoriaReserva => {
+    return isCategoriaReserva(categoria) ? categoria : 'other';
   };
 
-  // Manejar selección de día
+  // Cargar eventos del mes
+  const loadEventosDelMes = useCallback(async (month: Date) => {
+    if (!user) {
+      setEventos(new Map());
+      setViajes([]);
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const monthStart = startOfDay(new Date(month.getFullYear(), month.getMonth(), 1));
+      const monthEnd = startOfDay(new Date(month.getFullYear(), month.getMonth() + 1, 0));
+
+      const viajesUsuario = await getViajesByUsuario(user.uid);
+      setViajes(viajesUsuario);
+
+      const eventosMap = new Map<string, EventoAgendaCalendario[]>();
+
+      await Promise.all(
+        viajesUsuario.map(async (viaje) => {
+          const viajeInicio = startOfDay(new Date(viaje.fechaInicio));
+          const viajeFin = startOfDay(new Date(viaje.fechaFin));
+          const intersectsMonth = viajeFin >= monthStart && viajeInicio <= monthEnd;
+
+          if (!intersectsMonth) {
+            return;
+          }
+
+          const reservas = await getReservasByViajeId(viaje.id);
+
+          reservas.forEach((reserva) => {
+            if (!reserva.fechaInicio) {
+              console.log('[TripCalendarScreen] Reserva sin fechaInicio:', reserva.id, reserva.nombre);
+              return;
+            }
+
+            console.log('[TripCalendarScreen] Procesando reserva:', {
+              id: reserva.id,
+              nombre: reserva.nombre,
+              fechaInicio: reserva.fechaInicio,
+              categoria: reserva.categoria,
+            });
+
+            const fechaReserva = startOfDay(new Date(reserva.fechaInicio));
+
+            console.log('[TripCalendarScreen] Fecha parseada:', {
+              fechaReserva,
+              month: fechaReserva.getMonth(),
+              year: fechaReserva.getFullYear(),
+              currentMonth: month.getMonth(),
+              currentYear: month.getFullYear(),
+            });
+
+            if (
+              fechaReserva.getMonth() !== month.getMonth() ||
+              fechaReserva.getFullYear() !== month.getFullYear()
+            ) {
+              console.log('[TripCalendarScreen] Reserva descartada: fuera del mes');
+              return;
+            }
+
+            const fechaISO = formatDateISO(fechaReserva);
+            const categoria = getSafeCategoria(reserva.categoria);
+
+            const evento: EventoAgendaCalendario = {
+              id: reserva.id,
+              tipo: 'reserva',
+              hora: reserva.horaInicio || undefined,
+              titulo: reserva.nombre,
+              subtitulo: reserva.proveedor,
+              categoria,
+              ubicacion: reserva.ubicacion || reserva.direccion,
+              tieneReserva: true,
+              tieneDocumento: Boolean(reserva.documentoId),
+              viajeId: viaje.id,
+            };
+
+            const eventosDia = eventosMap.get(fechaISO) || [];
+            eventosMap.set(fechaISO, [...eventosDia, evento]);
+          });
+        })
+      );
+
+      eventosMap.forEach((lista) => {
+        lista.sort((a, b) => {
+          if (!a.hora) return 1;
+          if (!b.hora) return -1;
+          return a.hora.localeCompare(b.hora);
+        });
+      });
+
+      setEventos(eventosMap);
+
+      setSelectedDate((prev) => {
+        if (!prev) return prev;
+        const sameMonth =
+          prev.getMonth() === month.getMonth() && prev.getFullYear() === month.getFullYear();
+        return sameMonth ? prev : null;
+      });
+    } catch (error) {
+      console.error('Error loading eventos del mes:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  // Obtener eventos de un dia
+  const getEventosDelDia = (date: Date): EventoAgendaCalendario[] => {
+    const key = formatDateISO(date);
+    return eventos.get(key) || [];
+  };
+
+  // Manejar seleccion de dia
   const handleDayPress = (date: Date) => {
-    const dateString = formatDateISO(date);
-    setSelectedDate(dateString);
+    const eventosDelDia = getEventosDelDia(date);
+    // Solo abrir modal si hay eventos o si está dentro de un viaje
+    if (eventosDelDia.length > 0 || isDateInAnyTrip(date)) {
+      setSelectedDate(date);
+      setModalVisible(true);
+    }
+  };
+
+  // Cerrar modal
+  const handleCloseModal = () => {
+    setModalVisible(false);
   };
 
   // Verificar si una fecha es hoy
@@ -95,92 +246,49 @@ export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
     );
   };
 
-  // Verificar si una fecha es del mes actual
   // Verificar si una fecha es del mes actual (USED IN RENDER)
   const isCurrentMonth = (date: Date): boolean => {
-    return date.getMonth() === currentMonth.getMonth();
+    return (
+      date.getMonth() === currentMonth.getMonth() &&
+      date.getFullYear() === currentMonth.getFullYear()
+    );
+  };
+
+  // Verificar si fecha esta dentro de algun viaje
+  const isDateInAnyTrip = (date: Date): boolean => {
+    const target = startOfDay(date);
+    return viajes.some((viaje) => {
+      const inicio = startOfDay(new Date(viaje.fechaInicio));
+      const fin = startOfDay(new Date(viaje.fechaFin));
+      return target >= inicio && target <= fin;
+    });
   };
 
   // Navegar al mes anterior
   const handlePreviousMonth = () => {
-    setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+    setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
   };
 
   // Navegar al mes siguiente
   const handleNextMonth = () => {
-    setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+    setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   };
 
-  // Cargar eventos del mes (mock data por ahora)
+  // Recargar eventos cuando cambia el mes o cuando se modifican las reservas
   useEffect(() => {
-    const loadEventos = async () => {
-      setLoading(true);
+    loadEventosDelMes(currentMonth);
+  }, [currentMonth, loadEventosDelMes, reservasStoreTimestamp]);
 
-      // TODO: Aquí se cargarán eventos reales de la BD
-      // Por ahora, datos de ejemplo
-      const mockEventos = new Map<string, EventoCalendario[]>();
-
-      // Añadir algunos eventos de ejemplo
-      const currentYear = currentMonth.getFullYear();
-      const currentMonthNum = currentMonth.getMonth();
-
-      // Evento de ejemplo 1 - día 15
-      const date1 = new Date(currentYear, currentMonthNum, 15);
-      const dateStr1 = formatDateISO(date1);
-      mockEventos.set(dateStr1, [
-        {
-          id: '1',
-          fecha: dateStr1,
-          hora: '10:00',
-          titulo: 'Vuelo a Madrid',
-          tipo: 'transport',
-          tieneReserva: true,
-          tieneDocumento: true,
-        },
-        {
-          id: '2',
-          fecha: dateStr1,
-          hora: '16:00',
-          titulo: 'Check-in Hotel',
-          tipo: 'accommodation',
-          tieneReserva: true,
-        },
-      ]);
-
-      // Evento de ejemplo 2 - día 20
-      const date2 = new Date(currentYear, currentMonthNum, 20);
-      const dateStr2 = formatDateISO(date2);
-      mockEventos.set(dateStr2, [
-        {
-          id: '3',
-          fecha: dateStr2,
-          hora: '12:00',
-          titulo: 'Visita al Museo',
-          tipo: 'activity',
-          tieneReserva: false,
-        },
-      ]);
-
-      setEventos(mockEventos);
-      setLoading(false);
-    };
-
-    loadEventos();
-  }, [currentMonth]);
+  // Recargar eventos cada vez que la pantalla se enfoca
+  useFocusEffect(
+    useCallback(() => {
+      console.log('[TripCalendarScreen] Pantalla enfocada, recargando eventos');
+      loadEventosDelMes(currentMonth);
+    }, [currentMonth, loadEventosDelMes])
+  );
 
   const calendarDays = generateCalendarDays(currentMonth);
   const eventosDelDiaSeleccionado = selectedDate ? getEventosDelDia(selectedDate) : [];
-
-  // Obtener icono según tipo de evento
-  const getEventIcon = (tipo: TipoEvento): keyof typeof Ionicons.glyphMap => {
-    switch (tipo) {
-      case 'transport': return 'airplane';
-      case 'accommodation': return 'bed';
-      case 'food': return 'restaurant';
-      case 'activity': return 'ticket';
-      default: return 'calendar';
-    }
-  };
 
   return (
     <ScreenContainer>
@@ -205,6 +313,13 @@ export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
               </Pressable>
             </View>
 
+            {loading && (
+              <View style={styles.loadingRow}>
+                <ActivityIndicator size="small" color={theme.colors.primary} />
+                <Text style={styles.loadingText}>Actualizando eventos...</Text>
+              </View>
+            )}
+
             {/* Week Days */}
             <View style={styles.weekDaysRow}>
               {DIAS_SEMANA.map((day) => (
@@ -217,18 +332,20 @@ export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
             {/* Calendar Grid */}
             <View style={styles.calendarGrid}>
               {calendarDays.map((day, index) => {
-                const dateString = day
-                  ? formatDateISO(day)
-                  : null;
+                const dateString = day ? formatDateISO(day) : null;
+                const isSelected =
+                  selectedDate && dateString
+                    ? formatDateISO(selectedDate) === dateString
+                    : false;
 
                 return (
                   <CalendarDay
                     key={index}
                     date={day}
-                    isSelected={dateString === selectedDate}
+                    isSelected={isSelected}
                     isToday={isToday(day)}
-                    isInTrip={false} // Todo: Implement trip range logic
-                    eventos={dateString ? getEventosDelDia(dateString) : []}
+                    isInTrip={isDateInAnyTrip(day)}
+                    eventos={dateString ? getEventosDelDia(day) : []}
                     onPress={() => handleDayPress(day)}
                     disabled={!isCurrentMonth(day)}
                   />
@@ -247,73 +364,14 @@ export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
             </View>
           </Card>
 
-          {/* Eventos del día seleccionado */}
+          {/* Modal de eventos del día */}
           {selectedDate && (
-            <View style={styles.eventsSection}>
-              <SectionHeader title="Eventos del día" />
-
-              {eventosDelDiaSeleccionado.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <Ionicons name="calendar-outline" size={48} color={theme.colors.textSecondary} />
-                  <Text style={styles.emptyStateText}>No hay eventos este día</Text>
-                </View>
-              ) : (
-                <View style={styles.eventsList}>
-                  {eventosDelDiaSeleccionado.map((evento) => (
-                    <Card key={evento.id}>
-                      <View style={styles.eventCard}>
-                        {/* Icon */}
-                        <View
-                          style={[
-                            styles.eventIcon,
-                            { backgroundColor: `${EVENTO_COLORS[evento.tipo]}20` },
-                          ]}
-                        >
-                          <Ionicons
-                            name={getEventIcon(evento.tipo)}
-                            size={24}
-                            color={EVENTO_COLORS[evento.tipo]}
-                          />
-                        </View>
-
-                        {/* Content */}
-                        <View style={styles.eventContent}>
-                          <View style={styles.eventHeader}>
-                            {evento.hora && (
-                              <>
-                                <Text style={styles.eventTime}>{evento.hora}</Text>
-                                <Text style={styles.eventSeparator}>·</Text>
-                              </>
-                            )}
-                            <Text style={styles.eventTitle}>{evento.titulo}</Text>
-                          </View>
-
-                          <CategoryBadge category={evento.tipo} label={EVENTO_LABELS[evento.tipo]} />
-
-                          {/* Indicators */}
-                          {(evento.tieneReserva || evento.tieneDocumento) && (
-                            <View style={styles.eventIndicators}>
-                              {evento.tieneReserva && (
-                                <View style={styles.indicator}>
-                                  <Ionicons name="bookmark" size={12} color={theme.colors.primary} />
-                                  <Text style={styles.indicatorText}>Reserva</Text>
-                                </View>
-                              )}
-                              {evento.tieneDocumento && (
-                                <View style={styles.indicator}>
-                                  <Ionicons name="document" size={12} color={theme.colors.primary} />
-                                  <Text style={styles.indicatorText}>Documento</Text>
-                                </View>
-                              )}
-                            </View>
-                          )}
-                        </View>
-                      </View>
-                    </Card>
-                  ))}
-                </View>
-              )}
-            </View>
+            <DayEventsModal
+              visible={modalVisible}
+              date={selectedDate}
+              eventos={eventosDelDiaSeleccionado}
+              onClose={handleCloseModal}
+            />
           )}
         </View>
       </ScrollView>
@@ -343,6 +401,16 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: theme.colors.text,
+  },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.sm,
+  },
+  loadingText: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
   },
   weekDaysRow: {
     flexDirection: 'row',
@@ -384,69 +452,5 @@ const styles = StyleSheet.create({
   legendText: {
     fontSize: 12,
     color: theme.colors.textSecondary,
-  },
-  eventsSection: {
-    gap: theme.spacing.md,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: theme.spacing.xl * 2,
-  },
-  emptyStateText: {
-    marginTop: theme.spacing.md,
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-  },
-  eventsList: {
-    gap: theme.spacing.md,
-  },
-  eventCard: {
-    flexDirection: 'row',
-    gap: theme.spacing.md,
-  },
-  eventIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  eventContent: {
-    flex: 1,
-    gap: theme.spacing.sm,
-  },
-  eventHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flexWrap: 'wrap',
-  },
-  eventTime: {
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-  },
-  eventSeparator: {
-    fontSize: 14,
-    color: theme.colors.border,
-  },
-  eventTitle: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: theme.colors.text,
-    flex: 1,
-  },
-  eventIndicators: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-  },
-  indicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  indicatorText: {
-    fontSize: 12,
-    color: theme.colors.primary,
   },
 });

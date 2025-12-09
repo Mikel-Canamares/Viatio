@@ -7,7 +7,7 @@
 
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { CalendarScreen, ProfileScreen } from '@/screens';
+import { TripCalendarScreen, ProfileScreen } from '@/screens';
 import { HomeStackNavigator } from './HomeStackNavigator';
 import type { RootTabParamList } from './types';
 
@@ -51,11 +51,11 @@ export function RootTabs() {
 
       <Tab.Screen
         name="Calendar"
-        component={CalendarScreen}
+        component={TripCalendarScreen}
         options={{
           tabBarLabel: 'Calendario',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="calendar" size={size} color={color} />
+            <Ionicons name="calendar-outline" size={size} color={color} />
           ),
         }}
       />
