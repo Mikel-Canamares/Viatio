@@ -23,3 +23,4 @@ export { default as TripDocumentsScreen } from './TripDocumentsScreen';
 export { default as AddDocumentScreen } from './AddDocumentScreen';
 export { default as EditReservationScreen } from './EditReservationScreen';
 export { default as ScanReservationScreen } from './ScanReservationScreen';
+export { default as TripCalendarScreen } from './TripCalendarScreen';

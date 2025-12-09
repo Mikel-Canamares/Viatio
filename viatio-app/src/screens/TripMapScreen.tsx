@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
 import MapView, { Marker, Region, PROVIDER_GOOGLE, MapPressEvent } from 'react-native-maps';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { ScreenContainer, PageHeader } from '@/components';
 import { PlaceSearchBar } from '@/components/PlaceSearchBar';
 import { PlaceDetailCard } from '@/components/PlaceDetailCard';
@@ -61,6 +62,51 @@ export default function TripMapScreen() {
   const [loadingAdd, setLoadingAdd] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('map');
   const [region, setRegion] = useState<Region>(DEFAULT_REGION);
+  const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
+  const [hasLocationPermission, setHasLocationPermission] = useState(false);
+
+  // Solicitar permisos de ubicación al montar
+  useEffect(() => {
+    requestLocationPermission();
+  }, []);
+
+  // Solicitar permisos de ubicación
+  const requestLocationPermission = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+
+      if (status === 'granted') {
+        setHasLocationPermission(true);
+
+        // Obtener ubicación actual
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+
+        setUserLocation(location);
+
+        // Si no hay lugares guardados, centrar en la ubicación del usuario
+        if (lugares.length === 0) {
+          const newRegion: Region = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          };
+          setRegion(newRegion);
+          mapRef.current?.animateToRegion(newRegion, 500);
+        }
+      } else {
+        setHasLocationPermission(false);
+        Alert.alert(
+          'Permisos de ubicación',
+          'Para mostrarte en el mapa, necesitamos acceso a tu ubicación.'
+        );
+      }
+    } catch (error) {
+      console.error('Error solicitando permisos de ubicación:', error);
+    }
+  };
 
   // Cargar lugares guardados
   useFocusEffect(
@@ -363,6 +409,43 @@ export default function TripMapScreen() {
     );
   };
 
+  // Centrar mapa en ubicación del usuario
+  const handleCenterOnUserLocation = async () => {
+    if (!hasLocationPermission) {
+      Alert.alert(
+        'Permisos requeridos',
+        'Necesitamos acceso a tu ubicación para mostrarte en el mapa.',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: 'Permitir',
+            onPress: () => requestLocationPermission(),
+          },
+        ]
+      );
+      return;
+    }
+
+    try {
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      setUserLocation(location);
+
+      // Animar mapa a ubicación del usuario
+      mapRef.current?.animateToRegion({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      }, 500);
+    } catch (error) {
+      console.error('Error obteniendo ubicación:', error);
+      Alert.alert('Error', 'No se pudo obtener tu ubicación');
+    }
+  };
+
   return (
     <ScreenContainer>
       <PageHeader
@@ -464,6 +547,14 @@ export default function TripMapScreen() {
               <Text style={styles.loadingText}>Cargando información...</Text>
             </View>
           )}
+
+          {/* Botón de Mi Ubicación */}
+          <Pressable
+            style={styles.myLocationButton}
+            onPress={handleCenterOnUserLocation}
+          >
+            <Ionicons name="locate" size={24} color={theme.colors.primary} />
+          </Pressable>
 
           {/* Contador de lugares */}
           {lugares.length > 0 && (
@@ -592,6 +683,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: theme.colors.text,
+  },
+  myLocationButton: {
+    position: 'absolute',
+    bottom: 20,
+    right: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
   },
   modalOverlay: {
     flex: 1,

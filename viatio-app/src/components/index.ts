@@ -30,5 +30,10 @@ export { PlaceDetailCard } from './PlaceDetailCard';
 export { AddToTripModal } from './AddToTripModal';
 export { SavedPlacesAccordion } from './SavedPlacesAccordion';
 
+// Componentes de Calendario
+export { CalendarDay } from './CalendarDay';
+export { DayEventsModal } from './DayEventsModal';
+export type { EventoAgendaCalendario } from './DayEventsModal';
+
 // Los siguientes se crearán en fases posteriores:
 // export { EmptyState } from './EmptyState';
