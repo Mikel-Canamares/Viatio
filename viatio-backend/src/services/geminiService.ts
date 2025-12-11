@@ -1,50 +1,71 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { env } from '../config/env';
+import { config } from '../config/env';
 import type { ReservaExtractedData } from '../types';
 
-class GeminiService {
-  private genAI: GoogleGenerativeAI;
-  private model: any;
+const genAI = new GoogleGenerativeAI(config.geminiApiKey);
 
-  constructor() {
-    this.genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
-    this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
-  }
+interface ChatMessage {
+  role: 'user' | 'model';
+  content: string;
+}
 
+interface TripContext {
+  tripId?: string;
+  tripName?: string;
+  startDate?: string;
+  endDate?: string;
+  destination?: string;
+}
+
+// Prompt del sistema para extracción de reservas
+const EXTRACT_RESERVA_PROMPT = `Eres un asistente que extrae información estructurada de imágenes de reservas de viaje.
+Analiza la imagen y extrae la siguiente información en formato JSON:
+
+{
+  "tipo": "vuelo" | "hotel" | "restaurante" | "actividad" | "transporte" | "otro",
+  "titulo": "Nombre descriptivo de la reserva",
+  "fecha": "YYYY-MM-DD o null",
+  "hora": "HH:MM o null",
+  "ubicacion": "Ciudad, País o dirección específica o null",
+  "numeroReserva": "Código/número de confirmación o null",
+  "proveedor": "Nombre de la aerolínea/hotel/empresa o null",
+  "detalles": "Información adicional relevante",
+  "confianza": 0.0-1.0 (qué tan seguro estás de la extracción)
+}
+
+Si no encuentras cierta información, usa null. Sé preciso y devuelve SOLO el JSON, sin texto adicional.`;
+
+// Prompt del sistema para el asistente de viaje
+const ASSISTANT_PROMPT = `Eres un asistente de viaje inteligente para la app Viatio.
+Tu función es ayudar al usuario con:
+- Recomendaciones de lugares para visitar
+- Sugerencias de actividades
+- Información sobre destinos
+- Organización del itinerario
+- Consejos de viaje
+
+Sé conciso, amigable y útil. Usa el contexto del viaje si está disponible.`;
+
+/**
+ * Servicio de integración con Gemini AI
+ */
+export const geminiService = {
   /**
-   * Extrae datos estructurados de una imagen de reserva usando OCR + LLM
+   * Extrae datos estructurados de una imagen de reserva usando Gemini Vision
    */
   async extractReservaFromImage(
     imageBase64: string,
-    mimeType: string = 'image/jpeg'
+    mimeType: string
   ): Promise<ReservaExtractedData> {
-    const prompt = `Analiza esta imagen de reserva y extrae la siguiente informaciÃ³n en formato JSON:
-
-{
-  "tipo": "vuelo | hotel | restaurante | actividad | transporte | otro",
-  "titulo": "Nombre descriptivo corto de la reserva",
-  "fecha": "YYYY-MM-DD o null si no estÃ¡ clara",
-  "hora": "HH:MM o null",
-  "ubicacion": "DirecciÃ³n o lugar",
-  "numeroReserva": "CÃ³digo/nÃºmero de reserva",
-  "proveedor": "Nombre de la aerolÃ­nea/hotel/empresa",
-  "detalles": "InformaciÃ³n adicional relevante (pasajeros, servicios incluidos, etc.)",
-  "confianza": 0.85
-}
-
-REGLAS:
-- Si un campo no estÃ¡ claro, usa null
-- "confianza" debe ser entre 0 y 1 segÃºn quÃ© tan seguro estÃ©s de la informaciÃ³n
-- "detalles" debe ser un resumen natural y legible
-- Responde SOLO con el JSON, sin markdown ni explicaciones`;
-
     try {
-      const result = await this.model.generateContent([
-        prompt,
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+      const result = await model.generateContent([
+        EXTRACT_RESERVA_PROMPT,
         {
           inlineData: {
-            data: imageBase64,
             mimeType,
+            data: imageBase64,
           },
         },
       ]);
@@ -52,78 +73,79 @@ REGLAS:
       const response = await result.response;
       const text = response.text();
 
-      // Limpiar markdown si Gemini lo incluye
-      const jsonText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      const data = JSON.parse(jsonText) as ReservaExtractedData;
+      // Intentar parsear como JSON
+      try {
+        // Limpiar posibles markdown code blocks (```json ... ```)
+        const cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        const parsed = JSON.parse(cleanText);
 
-      // ValidaciÃ³n bÃ¡sica
-      if (!data.tipo || !data.titulo) {
-        throw new Error('Respuesta de Gemini incompleta: faltan campos obligatorios');
+        // Validar campos requeridos
+        if (!parsed.tipo || !parsed.titulo) {
+          throw new Error('Missing required fields in AI response');
+        }
+
+        return parsed as ReservaExtractedData;
+      } catch (parseError) {
+        throw new Error(`Invalid JSON response from AI: ${text}`);
       }
-
-      return data;
     } catch (error) {
-      console.error('Error en extractReservaFromImage:', error);
-      throw new Error(
-        `Error al procesar la imagen: ${error instanceof Error ? error.message : 'Desconocido'}`
-      );
+      if (error instanceof Error) {
+        throw new Error(`Error extracting reservation: ${error.message}`);
+      }
+      throw error;
     }
-  }
+  },
 
   /**
-   * Asistente de viaje conversacional
+   * Mantiene una conversación con el asistente de viaje usando Gemini
    */
   async chatAssistant(
-    userMessage: string,
-    context?: {
-      tripId?: string;
-      tripName?: string;
-      startDate?: string;
-      endDate?: string;
-      destination?: string;
-    },
-    conversationHistory?: Array<{ role: 'user' | 'model'; content: string }>
+    message: string,
+    context?: TripContext,
+    conversationHistory?: ChatMessage[]
   ): Promise<string> {
-    let systemPrompt = `Eres un asistente de viaje experto y amigable para la app Viatio.
-Tu objetivo es ayudar al usuario con su planificaciÃ³n de viajes, dar recomendaciones, responder dudas logÃ­sticas, y ser Ãºtil con informaciÃ³n sobre destinos.
-
-INSTRUCCIONES:
-- Responde de forma concisa pero Ãºtil (mÃ¡ximo 3-4 pÃ¡rrafos)
-- Si el usuario pregunta sobre un lugar, da informaciÃ³n prÃ¡ctica (transporte, horarios, recomendaciones)
-- Si te piden crear o modificar datos del viaje, indica que eso lo harÃ¡n desde la app
-- SÃ© conversacional y cercano, pero profesional`;
-
-    if (context) {
-      systemPrompt += `\n\nCONTEXTO DEL VIAJE ACTUAL:`;
-      if (context.tripName) systemPrompt += `\n- Nombre: ${context.tripName}`;
-      if (context.destination) systemPrompt += `\n- Destino: ${context.destination}`;
-      if (context.startDate && context.endDate) {
-        systemPrompt += `\n- Fechas: ${context.startDate} a ${context.endDate}`;
-      }
-    }
-
     try {
-      const chat = this.model.startChat({
-        history: conversationHistory?.map((msg) => ({
-          role: msg.role,
-          parts: [{ text: msg.content }],
-        })) || [],
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+      // Construir contexto adicional si existe información del viaje
+      let contextPrompt = ASSISTANT_PROMPT;
+      if (context) {
+        const { tripName, destination, startDate, endDate } = context;
+        contextPrompt += `\n\nContexto del viaje actual:`;
+        if (tripName) contextPrompt += `\n- Viaje: ${tripName}`;
+        if (destination) contextPrompt += `\n- Destino: ${destination}`;
+        if (startDate) contextPrompt += `\n- Fecha inicio: ${startDate}`;
+        if (endDate) contextPrompt += `\n- Fecha fin: ${endDate}`;
+      }
+
+      // Construir historial de chat en formato Gemini
+      const history = conversationHistory?.map(m => ({
+        role: m.role,
+        parts: [{ text: m.content }],
+      })) || [];
+
+      const chat = model.startChat({
+        history,
         generationConfig: {
-          maxOutputTokens: 500,
+          maxOutputTokens: 1000,
           temperature: 0.7,
         },
       });
 
-      const result = await chat.sendMessage(`${systemPrompt}\n\nUsuario: ${userMessage}`);
+      // Enviar mensaje con contexto en el primer mensaje
+      const prompt = history.length === 0
+        ? `${contextPrompt}\n\nUsuario: ${message}`
+        : message;
+
+      const result = await chat.sendMessage(prompt);
       const response = await result.response;
+
       return response.text();
     } catch (error) {
-      console.error('Error en chatAssistant:', error);
-      throw new Error(
-        `Error al comunicarse con el asistente: ${error instanceof Error ? error.message : 'Desconocido'}`
-      );
+      if (error instanceof Error) {
+        throw new Error(`Error in chat assistant: ${error.message}`);
+      }
+      throw error;
     }
-  }
-}
-
-export const geminiService = new GeminiService();
+  },
+};

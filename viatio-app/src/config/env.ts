@@ -1,36 +1,33 @@
 /**
  * Configuración de variables de entorno
  *
- * TODO: Configurar expo-constants para cargar desde .env
- * Por ahora usamos valores placeholder para que la app funcione sin Firebase/Google Maps
+ * Las variables con prefijo EXPO_PUBLIC_ son automáticamente inyectadas por Expo
+ * desde el archivo .env en la raíz del proyecto
  */
 
-interface EnvConfig {
-  FIREBASE_API_KEY: string;
-  FIREBASE_AUTH_DOMAIN: string;
-  FIREBASE_PROJECT_ID: string;
-  GOOGLE_MAPS_API_KEY: string;
-  BACKEND_URL: string;
-}
+export const config = {
+  // Firebase
+  firebase: {
+    apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || '',
+    authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || '',
+    projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || '',
+    storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || '',
+    messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '',
+    appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || '',
+  },
 
-// Valores placeholder temporales
-// Cuando implementemos Firebase/Maps, configuraremos expo-constants correctamente
-const env: EnvConfig = {
-  FIREBASE_API_KEY: '',
-  FIREBASE_AUTH_DOMAIN: '',
-  FIREBASE_PROJECT_ID: '',
-  GOOGLE_MAPS_API_KEY: '',
-  BACKEND_URL: '',
+  // Google Maps
+  googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+
+  // Backend
+  backendUrl: process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:3000',
 };
 
-// Exportar constantes inmutables
-export const {
-  FIREBASE_API_KEY,
-  FIREBASE_AUTH_DOMAIN,
-  FIREBASE_PROJECT_ID,
-  GOOGLE_MAPS_API_KEY,
-  BACKEND_URL,
-} = env;
+// Exportar valores individuales para retrocompatibilidad
+export const FIREBASE_API_KEY = config.firebase.apiKey;
+export const FIREBASE_AUTH_DOMAIN = config.firebase.authDomain;
+export const FIREBASE_PROJECT_ID = config.firebase.projectId;
+export const GOOGLE_MAPS_API_KEY = config.googleMapsApiKey;
+export const BACKEND_URL = config.backendUrl;
 
-// Exportar objeto completo como default
-export default env;
+export default config;

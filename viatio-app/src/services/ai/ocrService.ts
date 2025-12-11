@@ -8,6 +8,7 @@
 import { buildOcrPrompt } from './geminiPrompt';
 import type { CreateReservaInput, CategoriaReserva } from '@/types/reserva';
 import { logError } from '@/utils/errorHandler';
+import { config } from '@/config/env';
 
 const API_TIMEOUT = 30000; // 30 segundos
 
@@ -35,15 +36,14 @@ export async function extractReservaFromImage(
   mimeType: string = 'image/jpeg'
 ): Promise<OcrResult> {
   try {
-    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL;
-    if (!backendUrl) {
+    if (!config.backendUrl) {
       throw new Error('Backend URL not configured');
     }
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
-    const response = await fetch(`${backendUrl}/api/extract-reserva`, {
+    const response = await fetch(`${config.backendUrl}/api/extract-reserva`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

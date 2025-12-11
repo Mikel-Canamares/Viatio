@@ -1,32 +1,29 @@
 import { Request, Response, NextFunction } from 'express';
-import type { ApiError } from '../types';
+
+export interface AppError extends Error {
+  statusCode?: number;
+}
 
 export function errorHandler(
-  err: Error,
+  err: AppError,
   req: Request,
   res: Response,
   _next: NextFunction
 ): void {
-  console.error('[ERROR]', {
+  console.error('Error:', {
     message: err.message,
     stack: err.stack,
     path: req.path,
     method: req.method,
   });
 
-  const response: ApiError = {
-    success: false,
-    error: err.message || 'Error interno del servidor',
-  };
+  const statusCode = err.statusCode || 500;
+  const message = statusCode === 500
+    ? 'Internal server error'
+    : err.message;
 
-  // En desarrollo, incluir más detalles
-  if (process.env.NODE_ENV === 'development') {
-    response.details = {
-      stack: err.stack,
-      path: req.path,
-      method: req.method,
-    };
-  }
-
-  res.status(500).json(response);
+  res.status(statusCode).json({
+    error: message,
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+  });
 }
