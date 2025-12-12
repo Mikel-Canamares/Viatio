@@ -1,32 +1,36 @@
 import express from 'express';
 import cors from 'cors';
-import { env } from './config/env';
+import { config, validateConfig } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
-import { limiter } from './middleware/rateLimiter';
+import { apiLimiter, aiLimiter } from './middleware/rateLimiter';
+import healthRouter from './routes/health';
+import extractReservaRouter from './routes/extractReserva';
+import assistantRouter from './routes/assistant';
 
-// Routes
-import healthRoutes from './routes/health';
-import extractReservaRoutes from './routes/extractReserva';
-import assistantRoutes from './routes/assistant';
+// Validar configuración antes de iniciar
+validateConfig();
 
 const app = express();
 
-// Middleware
-app.use(cors({ origin: env.CORS_ORIGIN }));
+// Middleware global
+app.use(cors({
+  origin: config.corsOrigins,
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type'],
+}));
 app.use(express.json({ limit: '10mb' })); // Para imágenes base64
-app.use(limiter);
+app.use(apiLimiter);
 
-// Routes
-app.use('/api', healthRoutes);
-app.use('/api', extractReservaRoutes);
-app.use('/api', assistantRoutes);
+// Rutas
+app.use('/health', healthRouter);
+app.use('/api/extract-reserva', aiLimiter, extractReservaRouter);
+app.use('/api/assistant', aiLimiter, assistantRouter);
 
-// Error handler (debe ir al final)
+// Error handler
 app.use(errorHandler);
 
-// Start server
-app.listen(env.PORT, () => {
-  console.log(`🚀 Viatio Backend corriendo en puerto ${env.PORT}`);
-  console.log(`📍 Entorno: ${env.NODE_ENV}`);
-  console.log(`🔑 Gemini API Key configurada: ${env.GEMINI_API_KEY ? '✅' : '❌'}`);
+// Iniciar servidor
+app.listen(config.port, () => {
+  console.log(`🚀 Server running on port ${config.port}`);
+  console.log(`📍 Environment: ${config.nodeEnv}`);
 });

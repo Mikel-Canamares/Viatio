@@ -66,7 +66,18 @@ export default function AddReservationScreen({ route, navigation }: Props) {
   const { addReserva, loading } = useReservasStore();
   const { addDocumento } = useDocumentosStore();
 
-  const [mode, setMode] = useState<ScreenMode>(prefillData ? 'manual' : 'select');
+  // Debug: Log de datos recibidos
+  console.log('[AddReservation] viajeId:', viajeId);
+  console.log('[AddReservation] prefillData exists:', !!prefillData);
+  if (prefillData) {
+    console.log('[AddReservation] prefillData.categoria:', prefillData.categoria);
+    console.log('[AddReservation] prefillData.nombre:', prefillData.nombre);
+  }
+  console.log('[AddReservation] scannedFiles count:', scannedFiles?.length || 0);
+
+  const [mode, setMode] = useState<ScreenMode>(
+    prefillData || scannedFiles ? 'manual' : 'select'
+  );
   const [viaje, setViaje] = useState<Viaje | null>(null);
   const [formData, setFormData] = useState<Partial<CreateReservaInput>>(
     prefillData || {
@@ -83,6 +94,21 @@ export default function AddReservationScreen({ route, navigation }: Props) {
   useEffect(() => {
     loadViaje();
   }, [viajeId]);
+
+  // Asegurar que el modo sea 'manual' cuando hay datos pre-llenados
+  useEffect(() => {
+    if (prefillData || scannedFiles) {
+      setMode('manual');
+    }
+  }, [prefillData, scannedFiles]);
+
+  // Sincronizar formData con prefillData cuando cambia
+  useEffect(() => {
+    if (prefillData) {
+      console.log('[AddReservation] Sincronizando formData con prefillData');
+      setFormData(prefillData);
+    }
+  }, [prefillData]);
 
   const loadViaje = async () => {
     try {
@@ -111,7 +137,12 @@ export default function AddReservationScreen({ route, navigation }: Props) {
 
       // Determinar qué archivo usar: escaneados o adjuntados manualmente
       const fileToAttach = scannedFiles?.[0]
-        ? { uri: scannedFiles[0].uri, name: scannedFiles[0].name, type: scannedFiles[0].type, size: scannedFiles[0].uri.length }
+        ? {
+            uri: scannedFiles[0].uri,
+            name: scannedFiles[0].name,
+            type: scannedFiles[0].type,
+            size: scannedFiles[0].base64 ? scannedFiles[0].base64.length : 0
+          }
         : attachedFile;
 
       // Si hay un archivo (escaneado o manual), crear el documento primero
@@ -297,6 +328,33 @@ export default function AddReservationScreen({ route, navigation }: Props) {
               <Ionicons name="sparkles" size={20} color="#2563EB" />
               <Text style={styles.aiBannerText}>
                 Datos extraídos automáticamente - Revisa y completa la información
+              </Text>
+            </View>
+          )}
+
+          {/* Banner de archivos escaneados */}
+          {scannedFiles && scannedFiles.length > 0 && (
+            <View style={styles.scannedFilesBanner}>
+              <View style={styles.scannedFilesHeader}>
+                <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                <Text style={styles.scannedFilesTitle}>
+                  {`${scannedFiles.length} ${scannedFiles.length === 1 ? 'documento escaneado' : 'documentos escaneados'}`}
+                </Text>
+              </View>
+              {scannedFiles.map((file, index) => (
+                <View key={index} style={styles.scannedFileItem}>
+                  <Ionicons
+                    name={file.type.includes('pdf') ? 'document-text' : 'image'}
+                    size={16}
+                    color={theme.colors.textMuted}
+                  />
+                  <Text style={styles.scannedFileName} numberOfLines={1}>
+                    {file.name}
+                  </Text>
+                </View>
+              ))}
+              <Text style={styles.scannedFilesNote}>
+                Se adjuntará automáticamente al guardar la reserva
               </Text>
             </View>
           )}
@@ -592,6 +650,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#1E40AF',
     fontWeight: '500',
+  },
+  scannedFilesBanner: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 8,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+    gap: theme.spacing.sm,
+  },
+  scannedFilesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  scannedFilesTitle: {
+    fontSize: 14,
+    color: '#15803D',
+    fontWeight: '600',
+  },
+  scannedFileItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+    paddingLeft: theme.spacing.lg,
+  },
+  scannedFileName: {
+    flex: 1,
+    fontSize: 13,
+    color: theme.colors.text,
+  },
+  scannedFilesNote: {
+    fontSize: 12,
+    color: '#15803D',
+    fontStyle: 'italic',
+    paddingLeft: theme.spacing.lg,
   },
   optionCard: {
     padding: theme.spacing.md,

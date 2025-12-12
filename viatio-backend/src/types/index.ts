@@ -20,16 +20,55 @@ export interface AssistantRequest {
 }
 
 // Response types
+export type CategoriaReserva = 'transport' | 'accommodation' | 'food' | 'activity' | 'other';
+
+export interface ReservaMetadatos {
+  // Transport
+  aerolinea?: string;
+  numeroVuelo?: string;
+  terminal?: string;
+  puerta?: string;
+  asiento?: string;
+  clase?: string;
+
+  // Accommodation
+  tipoHabitacion?: string;
+  numNoches?: number;
+  checkIn?: string;
+  checkOut?: string;
+
+  // Food
+  numPersonas?: number;
+  tipoComida?: string;
+
+  // Activity
+  duracion?: string;
+  incluye?: string[];
+
+  // General
+  contacto?: string;
+  telefono?: string;
+  email?: string;
+  web?: string;
+  politicaCancelacion?: string;
+}
+
 export interface ReservaExtractedData {
-  tipo: 'vuelo' | 'hotel' | 'restaurante' | 'actividad' | 'transporte' | 'otro';
-  titulo: string;
-  fecha: string | null;
-  hora: string | null;
-  ubicacion: string | null;
-  numeroReserva: string | null;
-  proveedor: string | null;
-  detalles: string;
-  confianza: number; // 0-1
+  categoria: CategoriaReserva;
+  nombre: string;
+  proveedor?: string;
+  numeroConfirmacion?: string;
+  fechaInicio?: string;
+  horaInicio?: string;
+  fechaFin?: string;
+  horaFin?: string;
+  ubicacion?: string;
+  direccion?: string;
+  precio?: number;
+  moneda?: string;
+  notas?: string;
+  metadatos?: ReservaMetadatos;
+  confianza: 'alta' | 'media' | 'baja';
 }
 
 export interface ExtractReservaResponse {

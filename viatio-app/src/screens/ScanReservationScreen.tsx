@@ -34,9 +34,15 @@ type Props = NativeStackScreenProps<HomeStackParamList, 'ScanReservation'>;
 
 type Step = 'select' | 'preview' | 'processing' | 'result';
 
+// Tipo para datos extraídos del OCR (incluye campos adicionales del backend)
+interface OcrExtractedData extends Partial<CreateReservaInput> {
+  confianza?: 'alta' | 'media' | 'baja';
+  metadatos?: Record<string, any>;
+}
+
 interface OcrResult {
   success: boolean;
-  data?: Partial<CreateReservaInput>;
+  data?: OcrExtractedData;
   confianza?: 'alta' | 'media' | 'baja';
   error?: string;
 }
@@ -165,10 +171,25 @@ export default function ScanReservationScreen({ route, navigation }: Props) {
       return;
     }
 
+    // Transformar datos del backend al formato del formulario
+    // Eliminamos 'confianza' y 'metadatos' que no van al formulario
+    const { confianza, metadatos, ...cleanData } = result.data;
+
+    // Crear objeto con viajeId incluido
+    const formData: Partial<CreateReservaInput> = {
+      viajeId,
+      ...cleanData,
+      // Asegurar valores por defecto para campos requeridos
+      estadoPago: 'pending',
+      moneda: cleanData.moneda || 'EUR',
+    };
+
+    console.log('[ScanReservation] Datos transformados para formulario:', formData);
+
     // Navegar a AddReservation con datos pre-llenados y archivos escaneados
     navigation.navigate('AddReservation', {
       viajeId,
-      prefillData: result.data,
+      prefillData: formData,
       scannedFiles: files, // Pasamos los archivos escaneados para crear el documento
     });
   };
@@ -335,7 +356,9 @@ export default function ScanReservationScreen({ route, navigation }: Props) {
           <View style={styles.content}>
             <View style={styles.loadingOverlay}>
               <ActivityIndicator size="large" color={theme.colors.primaryLight} />
-              <Text style={styles.loadingText}>Analizando {files.length} {files.length === 1 ? 'documento' : 'documentos'}...</Text>
+              <Text style={styles.loadingText}>
+                {`Analizando ${files.length} ${files.length === 1 ? 'documento' : 'documentos'}...`}
+              </Text>
               <Text style={styles.loadingSubtext}>Esto puede tardar unos segundos</Text>
             </View>
           </View>
@@ -363,7 +386,7 @@ export default function ScanReservationScreen({ route, navigation }: Props) {
               <View style={styles.confianzaBadge}>
                 <View style={[styles.confianzaDot, { backgroundColor: confianzaColor }]} />
                 <Text style={styles.confianzaText}>
-                  Confianza: {result.confianza === 'alta' ? 'Alta' : result.confianza === 'media' ? 'Media' : 'Baja'}
+                  {`Confianza: ${result.confianza === 'alta' ? 'Alta' : result.confianza === 'media' ? 'Media' : 'Baja'}`}
                 </Text>
               </View>
 
@@ -382,15 +405,7 @@ export default function ScanReservationScreen({ route, navigation }: Props) {
                   <View style={styles.resultRow}>
                     <Text style={styles.resultLabel}>Categoría:</Text>
                     <Text style={styles.resultValue}>
-                      {result.data.categoria === 'transport'
-                        ? 'Transporte'
-                        : result.data.categoria === 'accommodation'
-                        ? 'Alojamiento'
-                        : result.data.categoria === 'food'
-                        ? 'Comida'
-                        : result.data.categoria === 'activity'
-                        ? 'Actividad'
-                        : 'Otro'}
+                      {result.data.categoria === 'transport' ? 'Transporte' : result.data.categoria === 'accommodation' ? 'Alojamiento' : result.data.categoria === 'food' ? 'Comida' : result.data.categoria === 'activity' ? 'Actividad' : 'Otro'}
                     </Text>
                   </View>
                 )}
@@ -427,7 +442,7 @@ export default function ScanReservationScreen({ route, navigation }: Props) {
                   <View style={styles.resultRow}>
                     <Text style={styles.resultLabel}>Precio:</Text>
                     <Text style={styles.resultValue}>
-                      {result.data.precio} {result.data.moneda || 'EUR'}
+                      {`${result.data.precio} ${result.data.moneda || 'EUR'}`}
                     </Text>
                   </View>
                 )}

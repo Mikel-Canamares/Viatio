@@ -19,7 +19,9 @@ npm install
 2. Configurar variables de entorno:
 ```bash
 cp .env.example .env
-# Editar .env y añadir tu GEMINI_API_KEY
+# Editar .env y añadir:
+# - GEMINI_API_KEY: tu API key de Google AI Studio
+# - CORS_ORIGINS: URLs de tu app Expo (separadas por comas)
 ```
 
 3. Desarrollo:

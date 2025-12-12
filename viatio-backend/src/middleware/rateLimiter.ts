@@ -1,13 +1,21 @@
 import rateLimit from 'express-rate-limit';
-import { env } from '../config/env';
+import { config } from '../config/env';
 
-export const limiter = rateLimit({
-  windowMs: env.RATE_LIMIT_WINDOW_MS, // 15 minutos por defecto
-  max: env.RATE_LIMIT_MAX_REQUESTS, // 100 requests por ventana
+export const apiLimiter = rateLimit({
+  windowMs: config.rateLimits.windowMs,
+  max: config.rateLimits.max,
   message: {
-    success: false,
-    error: 'Demasiadas solicitudes desde esta IP, por favor intenta más tarde.',
+    error: 'Too many requests, please try again later.',
   },
   standardHeaders: true,
   legacyHeaders: false,
+});
+
+// Límite más estricto para endpoints de IA
+export const aiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minuto
+  max: 10, // 10 requests por minuto
+  message: {
+    error: 'AI rate limit exceeded, please wait before trying again.',
+  },
 });
