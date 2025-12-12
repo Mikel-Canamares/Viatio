@@ -77,6 +77,9 @@ export default function TripDetailScreen({ navigation, route }: Props) {
       case 'documents':
         navigation.navigate('TripDocuments', { viajeId });
         break;
+      case 'expenses':
+        navigation.navigate('Expenses', { viajeId });
+        break;
       default:
         console.log('Unknown screen:', screen);
     }
@@ -207,6 +210,20 @@ export default function TripDetailScreen({ navigation, route }: Props) {
                 <View style={styles.menuTextContainer}>
                   <Text style={styles.menuTitle}>Documentos</Text>
                   <Text style={styles.menuDescription}>Billetes y confirmaciones</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+              </View>
+            </Card>
+
+            {/* Gastos */}
+            <Card onPress={() => handleNavigate('expenses')} style={styles.menuCard}>
+              <View style={styles.menuRow}>
+                <View style={styles.iconContainer}>
+                  <Ionicons name="wallet-outline" size={24} color={theme.colors.primaryLight} />
+                </View>
+                <View style={styles.menuTextContainer}>
+                  <Text style={styles.menuTitle}>Gastos</Text>
+                  <Text style={styles.menuDescription}>Control de presupuesto</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
               </View>

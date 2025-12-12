@@ -8,3 +8,4 @@
  */
 
 export { useViajesStore } from './viajesStore';
+export { useGastosStore } from './gastosStore';

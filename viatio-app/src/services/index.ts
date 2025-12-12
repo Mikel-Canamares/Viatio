@@ -41,3 +41,13 @@ export {
   deleteDocumento,
   detectTipoArchivo,
 } from './documentosService';
+
+export {
+  createGasto,
+  getGastosByViajeId,
+  getGastoById,
+  getGastosByCategoria,
+  updateGasto,
+  deleteGasto,
+  getResumenGastos,
+} from './gastosService';

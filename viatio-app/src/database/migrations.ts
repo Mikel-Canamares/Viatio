@@ -82,9 +82,13 @@ export async function runMigrations(
     await migrateToV3(db);
   }
 
+  if (currentVersion < 4) {
+    await migrateToV4(db);
+  }
+
   // Futuras migraciones se añadirán aquí:
-  // if (currentVersion < 4) {
-  //   await migrateToV4(db);
+  // if (currentVersion < 5) {
+  //   await migrateToV5(db);
   // }
 
   console.log('[Migrations] Migraciones completadas exitosamente');
@@ -195,6 +199,47 @@ async function migrateToV3(db: SQLite.SQLiteDatabase): Promise<void> {
     console.log('[Migrations] Migración a v3 completada');
   } catch (error) {
     console.error('[Migrations] Error en migración a v3:', error);
+    throw error;
+  }
+}
+
+/**
+ * Migración a versión 4: Añadir campo reservaId a tabla gastos
+ * Permite vincular gastos con reservas para sincronización automática
+ */
+async function migrateToV4(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migrations] Ejecutando migración a v4...');
+
+  try {
+    // Verificar si la columna reservaId ya existe
+    const tableInfo = await db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(gastos);'
+    );
+
+    const columnExists = tableInfo.some(col => col.name === 'reservaId');
+
+    if (!columnExists) {
+      // Añadir campo reservaId solo si no existe
+      console.log('[Migrations] Añadiendo columna reservaId a gastos...');
+      await db.execAsync('ALTER TABLE gastos ADD COLUMN reservaId TEXT;');
+
+      // Crear índice para reservaId
+      console.log('[Migrations] Creando índice para reservaId...');
+      await db.execAsync('CREATE INDEX IF NOT EXISTS idx_gastos_reservaId ON gastos(reservaId);');
+    } else {
+      console.log('[Migrations] Columna reservaId ya existe, omitiendo...');
+    }
+
+    // Registrar migración
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'INSERT INTO _migrations (version, appliedAt) VALUES (?, ?)',
+      [4, now]
+    );
+
+    console.log('[Migrations] Migración a v4 completada');
+  } catch (error) {
+    console.error('[Migrations] Error en migración a v4:', error);
     throw error;
   }
 }

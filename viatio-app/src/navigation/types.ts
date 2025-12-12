@@ -55,6 +55,8 @@ export type RootTabParamList = {
  * - TripMap: Mapa con lugares del viaje
  * - TripDocuments: Documentos del viaje
  * - AddDocument: Formulario para añadir documento
+ * - Expenses: Lista de gastos del viaje
+ * - AddExpense: Formulario para añadir gasto
  */
 export type HomeStackParamList = {
   TripList: undefined;
@@ -73,6 +75,8 @@ export type HomeStackParamList = {
   TripMap: { viajeId: string };
   TripDocuments: { viajeId: string };
   AddDocument: { viajeId: string };
+  Expenses: { viajeId: string };
+  AddExpense: { viajeId: string };
 };
 
 // ============================================
