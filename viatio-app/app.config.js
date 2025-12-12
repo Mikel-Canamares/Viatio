@@ -37,6 +37,9 @@ export default {
       favicon: './assets/favicon.png',
     },
     extra: {
+      eas: {
+        projectId: 'e82bcee5-f81e-4a73-b04f-1fc6db0b9c4a',
+      },
       EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
     },
     plugins: [
