@@ -35,5 +35,9 @@ export { CalendarDay } from './CalendarDay';
 export { DayEventsModal } from './DayEventsModal';
 export type { EventoAgendaCalendario } from './DayEventsModal';
 
+// Componentes de Gastos
+export { ExpensesSummary } from './ExpensesSummary';
+export { ExpenseCategoryGroup } from './ExpenseCategoryGroup';
+
 // Los siguientes se crearán en fases posteriores:
 // export { EmptyState } from './EmptyState';

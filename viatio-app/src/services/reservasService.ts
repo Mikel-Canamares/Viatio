@@ -6,6 +6,8 @@
 
 import { getDatabase, generateId, getCurrentTimestamp } from '@/database';
 import { Reserva, CreateReservaInput, CategoriaReserva } from '@/types/reserva';
+import { createGasto, getGastoByReservaId, updateGasto, deleteGastoByReservaId } from './gastosService';
+import { mapReservaToCategoriaGasto } from '@/types/gasto';
 
 /**
  * Crea una nueva reserva
@@ -74,6 +76,35 @@ export async function createReserva(input: CreateReservaInput): Promise<Reserva>
   );
 
   console.log('[ReservasService] Reserva creada:', reserva.id);
+
+  // Auto-crear gasto si la reserva tiene precio y está pagada (total o parcial)
+  if (
+    reserva.precio &&
+    reserva.precio > 0 &&
+    (reserva.estadoPago === 'paid' || reserva.estadoPago === 'partial')
+  ) {
+    try {
+      const categoriaGasto = mapReservaToCategoriaGasto(reserva.categoria);
+      const montoGasto = reserva.estadoPago === 'partial' ? reserva.precio / 2 : reserva.precio; // Si es parcial, asumimos 50%
+
+      await createGasto({
+        viajeId: reserva.viajeId,
+        diaId: reserva.diaId,
+        reservaId: reserva.id,
+        categoria: categoriaGasto,
+        descripcion: reserva.nombre,
+        monto: montoGasto,
+        moneda: reserva.moneda,
+        fecha: reserva.fechaInicio || new Date().toISOString(),
+      });
+
+      console.log('[ReservasService] Gasto auto-creado para reserva:', reserva.id);
+    } catch (error) {
+      console.error('[ReservasService] Error al auto-crear gasto:', error);
+      // No lanzamos error para no bloquear la creación de la reserva
+    }
+  }
+
   return reserva;
 }
 
@@ -238,14 +269,77 @@ export async function updateReserva(
   );
 
   console.log('[ReservasService] Reserva actualizada:', id);
+
+  // Sincronizar gasto asociado si cambió precio o estadoPago
+  if (input.precio !== undefined || input.estadoPago !== undefined || input.moneda !== undefined || input.nombre !== undefined) {
+    try {
+      const reservaActualizada = await getReservaById(id);
+      if (!reservaActualizada) return null;
+
+      const gastoExistente = await getGastoByReservaId(id);
+
+      // Si la reserva tiene precio y está pagada
+      if (
+        reservaActualizada.precio &&
+        reservaActualizada.precio > 0 &&
+        (reservaActualizada.estadoPago === 'paid' || reservaActualizada.estadoPago === 'partial')
+      ) {
+        const categoriaGasto = mapReservaToCategoriaGasto(reservaActualizada.categoria);
+        const montoGasto = reservaActualizada.estadoPago === 'partial'
+          ? reservaActualizada.precio / 2
+          : reservaActualizada.precio;
+
+        if (gastoExistente) {
+          // Actualizar gasto existente
+          await updateGasto(gastoExistente.id, {
+            categoria: categoriaGasto,
+            descripcion: reservaActualizada.nombre,
+            monto: montoGasto,
+            moneda: reservaActualizada.moneda,
+            fecha: reservaActualizada.fechaInicio || gastoExistente.fecha,
+          });
+          console.log('[ReservasService] Gasto sincronizado para reserva:', id);
+        } else {
+          // Crear gasto si no existía
+          await createGasto({
+            viajeId: reservaActualizada.viajeId,
+            diaId: reservaActualizada.diaId,
+            reservaId: reservaActualizada.id,
+            categoria: categoriaGasto,
+            descripcion: reservaActualizada.nombre,
+            monto: montoGasto,
+            moneda: reservaActualizada.moneda,
+            fecha: reservaActualizada.fechaInicio || new Date().toISOString(),
+          });
+          console.log('[ReservasService] Gasto auto-creado para reserva actualizada:', id);
+        }
+      } else if (gastoExistente && reservaActualizada.estadoPago === 'pending') {
+        // Si cambió a pending, eliminar el gasto
+        await deleteGastoByReservaId(id);
+        console.log('[ReservasService] Gasto eliminado (reserva pendiente):', id);
+      }
+    } catch (error) {
+      console.error('[ReservasService] Error al sincronizar gasto:', error);
+      // No lanzamos error para no bloquear la actualización
+    }
+  }
+
   return getReservaById(id);
 }
 
 /**
- * Elimina una reserva
+ * Elimina una reserva y su gasto asociado (si existe)
  */
 export async function deleteReserva(id: string): Promise<boolean> {
   const db = await getDatabase();
+
+  // Eliminar gasto asociado (si existe)
+  // La foreign key con CASCADE lo hará automáticamente, pero lo hacemos explícito por claridad
+  try {
+    await deleteGastoByReservaId(id);
+  } catch (error) {
+    console.error('[ReservasService] Error al eliminar gasto asociado:', error);
+  }
 
   await db.runAsync('DELETE FROM reservas WHERE id = ?', [id]);
 

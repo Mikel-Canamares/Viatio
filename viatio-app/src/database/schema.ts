@@ -9,7 +9,7 @@
 // VERSIÓN DEL ESQUEMA
 // ============================================
 
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
 
 // ============================================
 // CREACIÓN DE TABLAS
@@ -116,6 +116,7 @@ const CREATE_GASTOS_TABLE = `
     id TEXT PRIMARY KEY NOT NULL,
     viajeId TEXT NOT NULL,
     diaId TEXT,
+    reservaId TEXT,
     categoria TEXT NOT NULL,
     descripcion TEXT NOT NULL,
     monto REAL NOT NULL,
@@ -124,7 +125,8 @@ const CREATE_GASTOS_TABLE = `
     createdAt TEXT NOT NULL,
     updatedAt TEXT NOT NULL,
     FOREIGN KEY (viajeId) REFERENCES viajes(id) ON DELETE CASCADE,
-    FOREIGN KEY (diaId) REFERENCES dias_viaje(id) ON DELETE SET NULL
+    FOREIGN KEY (diaId) REFERENCES dias_viaje(id) ON DELETE SET NULL,
+    FOREIGN KEY (reservaId) REFERENCES reservas(id) ON DELETE CASCADE
   );
 `;
 
@@ -225,6 +227,11 @@ const INDEX_GASTOS_CATEGORIA = `
   ON gastos(categoria);
 `;
 
+const INDEX_GASTOS_RESERVA = `
+  CREATE INDEX IF NOT EXISTS idx_gastos_reservaId
+  ON gastos(reservaId);
+`;
+
 export const CREATE_INDEXES_SQL = [
   INDEX_VIAJES_USUARIO,
   INDEX_VIAJES_FECHAS,
@@ -241,4 +248,5 @@ export const CREATE_INDEXES_SQL = [
   INDEX_GASTOS_DIA,
   INDEX_GASTOS_FECHA,
   INDEX_GASTOS_CATEGORIA,
+  INDEX_GASTOS_RESERVA,
 ];

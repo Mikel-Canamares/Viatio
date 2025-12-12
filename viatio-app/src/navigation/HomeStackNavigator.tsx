@@ -20,6 +20,8 @@ import TripReservationsScreen from '@/screens/TripReservationsScreen';
 import AddReservationScreen from '@/screens/AddReservationScreen';
 import ReservationDetailScreen from '@/screens/ReservationDetailScreen';
 import TripMapScreen from '@/screens/TripMapScreen';
+import { ExpensesScreen } from '@/screens/ExpensesScreen';
+import { AddExpenseScreen } from '@/screens/AddExpenseScreen';
 import type { HomeStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<HomeStackParamList>();
@@ -47,6 +49,8 @@ export function HomeStackNavigator() {
       <Stack.Screen name="EditReservation" component={EditReservationScreen} />
       <Stack.Screen name="ScanReservation" component={ScanReservationScreen} />
       <Stack.Screen name="TripMap" component={TripMapScreen} />
+      <Stack.Screen name="Expenses" component={ExpensesScreen} />
+      <Stack.Screen name="AddExpense" component={AddExpenseScreen} />
     </Stack.Navigator>
   );
 }
