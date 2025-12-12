@@ -7,7 +7,8 @@
 
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
+import { File } from 'expo-file-system';
+import { Buffer } from 'buffer';
 
 // ============================================
 // TYPES
@@ -122,12 +123,17 @@ export async function pickImage(useCamera = false): Promise<ImageInfo | null> {
 
 /**
  * Lee un archivo y lo convierte a base64
+ * Usa la nueva API de expo-file-system (SDK 52+)
  */
 export async function readFileAsBase64(uri: string): Promise<string> {
   try {
-    const base64 = await FileSystem.readAsStringAsync(uri, {
-      encoding: 'base64',
-    });
+    // Usar la nueva API de FileSystem con File class (SDK 52+)
+    const file = new File(uri);
+    const arrayBuffer = await file.arrayBuffer();
+
+    // Convertir ArrayBuffer a base64 usando Buffer (incluido en React Native)
+    const buffer = Buffer.from(arrayBuffer);
+    const base64 = buffer.toString('base64');
 
     return base64;
   } catch (error) {

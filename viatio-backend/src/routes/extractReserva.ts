@@ -9,13 +9,20 @@ const router = Router();
  * Extrae datos estructurados de una imagen de reserva usando Gemini Vision
  */
 router.post(
-  '/extract-reserva',
+  '/',
   async (req: Request<{}, {}, ExtractReservaRequest>, res: Response<ExtractReservaResponse>): Promise<void> => {
     try {
       const { imageBase64, mimeType = 'image/jpeg' } = req.body;
 
+      // Debug: Log del request
+      console.log('[extractReserva] Request body keys:', Object.keys(req.body));
+      console.log('[extractReserva] mimeType:', mimeType);
+      console.log('[extractReserva] imageBase64 type:', typeof imageBase64);
+      console.log('[extractReserva] imageBase64 length:', imageBase64?.length);
+
       // Validar entrada
       if (!imageBase64 || typeof imageBase64 !== 'string') {
+        console.error('[extractReserva] Validation failed - imageBase64:', imageBase64);
         res.status(400).json({
           success: false,
           error: 'Campo "imageBase64" requerido y debe ser string'
@@ -23,8 +30,16 @@ router.post(
         return;
       }
 
-      // Validar mimeType
-      const validMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      // Validar mimeType (Gemini Vision soporta imágenes y PDFs)
+      const validMimeTypes = [
+        'image/jpeg',
+        'image/jpg',
+        'image/png',
+        'image/webp',
+        'image/heic',
+        'image/heif',
+        'application/pdf'
+      ];
       if (mimeType && !validMimeTypes.includes(mimeType)) {
         res.status(400).json({
           success: false,

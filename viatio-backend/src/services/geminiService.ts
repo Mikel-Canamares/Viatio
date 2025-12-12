@@ -17,37 +17,79 @@ interface TripContext {
   destination?: string;
 }
 
-// Prompt del sistema para extracción de reservas
-const EXTRACT_RESERVA_PROMPT = `Eres un asistente que extrae información estructurada de imágenes de reservas de viaje.
-Analiza la imagen y extrae la siguiente información en formato JSON:
+// Prompt del sistema para extraccion de reservas
+const EXTRACT_RESERVA_PROMPT = `Eres un asistente que extrae informacion estructurada de imagenes de reservas de viaje.
+Analiza la imagen y extrae la siguiente informacion en formato JSON EXACTO:
 
 {
-  "tipo": "vuelo" | "hotel" | "restaurante" | "actividad" | "transporte" | "otro",
-  "titulo": "Nombre descriptivo de la reserva",
-  "fecha": "YYYY-MM-DD o null",
-  "hora": "HH:MM o null",
-  "ubicacion": "Ciudad, País o dirección específica o null",
-  "numeroReserva": "Código/número de confirmación o null",
-  "proveedor": "Nombre de la aerolínea/hotel/empresa o null",
-  "detalles": "Información adicional relevante",
-  "confianza": 0.0-1.0 (qué tan seguro estás de la extracción)
+  "categoria": "transport" | "accommodation" | "food" | "activity" | "other",
+  "nombre": "Nombre descriptivo de la reserva",
+  "proveedor": "Nombre de la aerolinea/hotel/restaurante/empresa o null",
+  "numeroConfirmacion": "Codigo/numero de confirmacion o null",
+  "fechaInicio": "YYYY-MM-DD o null",
+  "horaInicio": "HH:MM o null (formato 24h)",
+  "fechaFin": "YYYY-MM-DD o null (solo para hoteles o actividades de varios dias)",
+  "horaFin": "HH:MM o null (formato 24h)",
+  "ubicacion": "Ciudad, Pais o nombre del lugar o null",
+  "direccion": "Direccion completa o null",
+  "precio": numero o null (solo el valor numerico, sin simbolos),
+  "moneda": "EUR" | "USD" | "GBP" | etc. o null,
+  "notas": "Informacion adicional relevante o null",
+  "metadatos": {
+    // Para vuelos (transport aereo):
+    "aerolinea": "Nombre aerolinea",
+    "numeroVuelo": "Codigo vuelo",
+    "terminal": "Terminal",
+    "puerta": "Puerta embarque",
+    "asiento": "Numero asiento",
+    "clase": "economica/business/primera",
+
+    // Para hoteles (accommodation):
+    "tipoHabitacion": "Tipo habitacion",
+    "numNoches": numero,
+    "checkIn": "HH:MM",
+    "checkOut": "HH:MM",
+
+    // Para restaurantes (food):
+    "numPersonas": numero,
+    "tipoComida": "desayuno/comida/cena",
+
+    // Para actividades (activity):
+    "duracion": "2 horas / 1 dia / etc",
+    "incluye": ["elemento1", "elemento2"],
+
+    // General (cualquier categoria):
+    "contacto": "Nombre contacto",
+    "telefono": "Telefono",
+    "email": "Email",
+    "web": "URL sitio web",
+    "politicaCancelacion": "Texto politica"
+  },
+  "confianza": "alta" | "media" | "baja"
 }
 
-Si no encuentras cierta información, usa null. Sé preciso y devuelve SOLO el JSON, sin texto adicional.`;
+REGLAS IMPORTANTES:
+1. categoria debe ser EXACTAMENTE uno de: "transport", "accommodation", "food", "activity", "other"
+2. Si no encuentras informacion, usa null (no string vacio)
+3. Solo incluye en metadatos los campos relevantes para la categoria detectada
+4. fechas en formato ISO (YYYY-MM-DD), horas en formato 24h (HH:MM)
+5. precio debe ser solo numero, sin simbolos de moneda
+6. confianza: "alta" si todos los datos clave estan claros, "media" si faltan algunos, "baja" si es dificil leer
+7. Devuelve SOLO el JSON, sin texto adicional antes ni despues.`;
 
 // Prompt del sistema para el asistente de viaje
 const ASSISTANT_PROMPT = `Eres un asistente de viaje inteligente para la app Viatio.
-Tu función es ayudar al usuario con:
+Tu funciï¿½n es ayudar al usuario con:
 - Recomendaciones de lugares para visitar
 - Sugerencias de actividades
-- Información sobre destinos
-- Organización del itinerario
+- Informaciï¿½n sobre destinos
+- Organizaciï¿½n del itinerario
 - Consejos de viaje
 
-Sé conciso, amigable y útil. Usa el contexto del viaje si está disponible.`;
+Sï¿½ conciso, amigable y ï¿½til. Usa el contexto del viaje si estï¿½ disponible.`;
 
 /**
- * Servicio de integración con Gemini AI
+ * Servicio de integraciï¿½n con Gemini AI
  */
 export const geminiService = {
   /**
@@ -58,7 +100,11 @@ export const geminiService = {
     mimeType: string
   ): Promise<ReservaExtractedData> {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      // Usar gemini-2.0-flash-exp: Modelo experimental de Gemini 2.0 Flash
+      // - Soporta vision (imagenes y PDFs)
+      // - Mejor rendimiento y precision que 1.5
+      // - Gratuito durante preview
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
       const result = await model.generateContent([
         EXTRACT_RESERVA_PROMPT,
@@ -70,7 +116,7 @@ export const geminiService = {
         },
       ]);
 
-      const response = await result.response;
+      const response = result.response;
       const text = response.text();
 
       // Intentar parsear como JSON
@@ -80,8 +126,25 @@ export const geminiService = {
         const parsed = JSON.parse(cleanText);
 
         // Validar campos requeridos
-        if (!parsed.tipo || !parsed.titulo) {
-          throw new Error('Missing required fields in AI response');
+        if (!parsed.categoria || !parsed.nombre) {
+          throw new Error('Missing required fields in AI response: categoria and nombre are required');
+        }
+
+        // Validar que categoria sea valida
+        const validCategories = ['transport', 'accommodation', 'food', 'activity', 'other'];
+        if (!validCategories.includes(parsed.categoria)) {
+          parsed.categoria = 'other';
+        }
+
+        // Validar confianza
+        const validConfianza = ['alta', 'media', 'baja'];
+        if (!validConfianza.includes(parsed.confianza)) {
+          parsed.confianza = 'media';
+        }
+
+        // Asegurar que metadatos sea un objeto si existe
+        if (parsed.metadatos && typeof parsed.metadatos !== 'object') {
+          parsed.metadatos = undefined;
         }
 
         return parsed as ReservaExtractedData;
@@ -97,7 +160,7 @@ export const geminiService = {
   },
 
   /**
-   * Mantiene una conversación con el asistente de viaje usando Gemini
+   * Mantiene una conversaciï¿½n con el asistente de viaje usando Gemini
    */
   async chatAssistant(
     message: string,
@@ -105,9 +168,10 @@ export const geminiService = {
     conversationHistory?: ChatMessage[]
   ): Promise<string> {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      // Usar gemini-2.0-flash-exp para chat assistant
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
-      // Construir contexto adicional si existe información del viaje
+      // Construir contexto adicional si existe informaciï¿½n del viaje
       let contextPrompt = ASSISTANT_PROMPT;
       if (context) {
         const { tripName, destination, startDate, endDate } = context;
@@ -138,7 +202,7 @@ export const geminiService = {
         : message;
 
       const result = await chat.sendMessage(prompt);
-      const response = await result.response;
+      const response = result.response;
 
       return response.text();
     } catch (error) {

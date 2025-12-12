@@ -9,7 +9,7 @@ const router = Router();
  * Chat con el asistente de viaje usando Gemini
  */
 router.post(
-  '/assistant',
+  '/',
   async (req: Request<{}, {}, AssistantRequest>, res: Response<AssistantResponse>): Promise<void> => {
     try {
       const { message, context, conversationHistory } = req.body;

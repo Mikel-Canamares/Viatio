@@ -5,8 +5,7 @@
  * Usa Gemini AI a través del backend para procesar documentos y extraer datos estructurados.
  */
 
-import { buildOcrPrompt } from './geminiPrompt';
-import type { CreateReservaInput, CategoriaReserva } from '@/types/reserva';
+import type { CreateReservaInput } from '@/types/reserva';
 import { logError } from '@/utils/errorHandler';
 import { config } from '@/config/env';
 
@@ -40,37 +39,52 @@ export async function extractReservaFromImage(
       throw new Error('Backend URL not configured');
     }
 
+    console.log('[OCR] Backend URL:', config.backendUrl);
+    console.log('[OCR] imageBase64 type:', typeof imageBase64);
+    console.log('[OCR] imageBase64 length:', imageBase64.length);
+    console.log('[OCR] mimeType:', mimeType);
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+
+    const payload = {
+      imageBase64,
+      mimeType,
+    };
+
+    console.log('[OCR] Payload keys:', Object.keys(payload));
+    console.log('[OCR] Sending request to:', `${config.backendUrl}/api/extract-reserva`);
 
     const response = await fetch(`${config.backendUrl}/api/extract-reserva`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        image: imageBase64,
-        mimeType,
-        systemPrompt: buildOcrPrompt(),
-      }),
+      body: JSON.stringify(payload),
       signal: controller.signal,
     });
 
     clearTimeout(timeoutId);
 
+    console.log('[OCR] Response status:', response.status);
+
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('[OCR] Error response:', errorText);
+      throw new Error(`API error: ${response.status} - ${errorText}`);
     }
 
     const result = await response.json();
 
-    // Mapear respuesta a CreateReservaInput
-    const reservaData = mapOcrResponseToReserva(result);
+    // El backend ya devuelve los datos en el formato correcto
+    if (!result.success || !result.data) {
+      throw new Error(result.error || 'No data received from API');
+    }
 
     return {
       success: true,
-      data: reservaData,
-      confianza: result.confianza || 'media',
+      data: result.data,
+      confianza: result.data.confianza || 'media',
     };
   } catch (error) {
     logError(error, 'extractReservaFromImage');
@@ -81,35 +95,3 @@ export async function extractReservaFromImage(
   }
 }
 
-// ============================================
-// HELPERS
-// ============================================
-
-/**
- * Mapea la respuesta del OCR al formato CreateReservaInput
- */
-function mapOcrResponseToReserva(response: any): Partial<CreateReservaInput> {
-  return {
-    categoria: validateCategoria(response.categoria),
-    nombre: response.nombre || '',
-    proveedor: response.proveedor || undefined,
-    numeroConfirmacion: response.numeroConfirmacion || undefined,
-    fechaInicio: response.fechaInicio || undefined,
-    horaInicio: response.horaInicio || undefined,
-    fechaFin: response.fechaFin || undefined,
-    horaFin: response.horaFin || undefined,
-    ubicacion: response.ubicacion || undefined,
-    direccion: response.direccion || undefined,
-    precio: typeof response.precio === 'number' ? response.precio : undefined,
-    moneda: response.moneda || 'EUR',
-    metadatos: response.metadatos || undefined,
-  };
-}
-
-/**
- * Valida que la categoría sea válida, retorna 'other' si no lo es
- */
-function validateCategoria(cat: string): CategoriaReserva {
-  const valid: CategoriaReserva[] = ['transport', 'accommodation', 'food', 'activity', 'other'];
-  return valid.includes(cat as CategoriaReserva) ? (cat as CategoriaReserva) : 'other';
-}
