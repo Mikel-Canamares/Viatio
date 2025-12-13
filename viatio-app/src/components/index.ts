@@ -39,5 +39,12 @@ export type { EventoAgendaCalendario } from './DayEventsModal';
 export { ExpensesSummary } from './ExpensesSummary';
 export { ExpenseCategoryGroup } from './ExpenseCategoryGroup';
 
+// Componentes de Perfil/Configuración
+export { ProfileMenuItem } from './ProfileMenuItem';
+export { SectionTitle } from './SectionTitle';
+export { SelectItem } from './SelectItem';
+export type { SelectOption } from './SelectItem';
+export { Accordion } from './Accordion';
+
 // Los siguientes se crearán en fases posteriores:
 // export { EmptyState } from './EmptyState';

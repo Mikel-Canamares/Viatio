@@ -7,8 +7,9 @@
 
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { TripCalendarScreen, ProfileScreen } from '@/screens';
+import { TripCalendarScreen } from '@/screens';
 import { HomeStackNavigator } from './HomeStackNavigator';
+import { ProfileStackNavigator } from './ProfileStackNavigator';
 import type { RootTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -62,7 +63,7 @@ export function RootTabs() {
 
       <Tab.Screen
         name="Profile"
-        component={ProfileScreen}
+        component={ProfileStackNavigator}
         options={{
           tabBarLabel: 'Perfil',
           tabBarIcon: ({ color, size }) => (

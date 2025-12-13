@@ -80,6 +80,23 @@ export type HomeStackParamList = {
 };
 
 // ============================================
+// PROFILE STACK NAVIGATOR
+// ============================================
+/**
+ * ParamList para el stack de Profile (pantallas relacionadas con el perfil).
+ *
+ * Rutas disponibles:
+ * - ProfileMain: Pantalla principal del perfil
+ * - Settings: Configuración de la aplicación
+ * - Help: Centro de ayuda
+ */
+export type ProfileStackParamList = {
+  ProfileMain: undefined;
+  Settings: undefined;
+  Help: undefined;
+};
+
+// ============================================
 // STACK NAVIGATOR (TODO: se añadirá después)
 // ============================================
 /**
