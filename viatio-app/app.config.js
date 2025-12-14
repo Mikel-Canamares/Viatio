@@ -43,6 +43,7 @@ export default {
       EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
     },
     plugins: [
+      'expo-font',
       'expo-sqlite',
       [
         'expo-location',
