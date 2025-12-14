@@ -20,7 +20,6 @@ import {
   ScreenContainer,
   PageHeader,
   DocumentCard,
-  FloatingActionButton,
   PrimaryButton,
   Card,
 } from '@/components';
@@ -263,11 +262,15 @@ export default function TripDocumentsScreen({ route, navigation }: Props) {
           showsVerticalScrollIndicator={false}
           onRefresh={handleRefresh}
           refreshing={refreshing}
-          ListFooterComponent={<View style={styles.listFooter} />}
         />
       </ScreenContainer>
 
-      <FloatingActionButton onPress={handleAddDocument} />
+      {/* Botón fijo en la parte inferior */}
+      <View style={styles.buttonContainer}>
+        <PrimaryButton onPress={handleAddDocument}>
+          Añadir documento
+        </PrimaryButton>
+      </View>
     </View>
   );
 }
@@ -349,7 +352,12 @@ const styles = StyleSheet.create({
   itemContainer: {
     marginBottom: theme.spacing.md,
   },
-  listFooter: {
-    height: 80, // Espacio para el FAB
+  buttonContainer: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    paddingBottom: theme.spacing.lg,
+    backgroundColor: theme.colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
   },
 });

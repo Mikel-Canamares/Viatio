@@ -87,11 +87,15 @@ export type HomeStackParamList = {
  *
  * Rutas disponibles:
  * - ProfileMain: Pantalla principal del perfil
+ * - EditProfile: Editar información del perfil
+ * - NotificationsSettings: Configuración de notificaciones
  * - Settings: Configuración de la aplicación
  * - Help: Centro de ayuda
  */
 export type ProfileStackParamList = {
   ProfileMain: undefined;
+  EditProfile: undefined;
+  NotificationsSettings: undefined;
   Settings: undefined;
   Help: undefined;
 };

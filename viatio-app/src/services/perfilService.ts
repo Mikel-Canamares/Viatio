@@ -57,10 +57,12 @@ export async function getEstadisticasUsuario(
     const config = await getConfiguracionApp();
 
     // Sumar total gastado de todos los gastos del usuario
+    // Los gastos no tienen usuarioId directamente, se accede a través de viajes
     const resultGastos = await db.getAllAsync<{ total: number | null }>(
-      `SELECT SUM(monto) as total
-       FROM gastos
-       WHERE usuarioId = ?`,
+      `SELECT SUM(g.monto) as total
+       FROM gastos g
+       INNER JOIN viajes v ON g.viajeId = v.id
+       WHERE v.usuarioId = ?`,
       [usuarioId]
     );
 
@@ -159,11 +161,12 @@ export async function clearUserData(usuarioId: string): Promise<void> {
   try {
     const db = await getDatabase();
 
-    // Eliminar en orden correcto respetando foreign keys
-    await db.runAsync('DELETE FROM gastos WHERE usuarioId = ?', [usuarioId]);
-    await db.runAsync('DELETE FROM documentos WHERE usuarioId = ?', [usuarioId]);
-    await db.runAsync('DELETE FROM reservas WHERE usuarioId = ?', [usuarioId]);
-    await db.runAsync('DELETE FROM actividades WHERE usuarioId = ?', [usuarioId]);
+    // Solo eliminar viajes - el CASCADE DELETE eliminará automáticamente:
+    // - dias_viaje (ON DELETE CASCADE)
+    // - reservas (ON DELETE CASCADE)
+    // - lugares (ON DELETE CASCADE)
+    // - documentos (ON DELETE CASCADE)
+    // - gastos (ON DELETE CASCADE)
     await db.runAsync('DELETE FROM viajes WHERE usuarioId = ?', [usuarioId]);
 
     // Eliminar preferencias de AsyncStorage

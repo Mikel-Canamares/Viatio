@@ -1,7 +1,7 @@
 /**
  * FLOATING ACTION BUTTON (FAB)
  *
- * Botón circular flotante con icono.
+ * Botón flotante rectangular con icono.
  * Usado para acciones principales de la pantalla (añadir, crear, etc.)
  */
 
@@ -34,7 +34,7 @@ export function FloatingActionButton({
         style,
       ]}
     >
-      <Ionicons name={icon} size={28} color="#FFFFFF" />
+      <Ionicons name={icon} size={24} color="#1A1A1A" />
     </Pressable>
   );
 }
@@ -44,12 +44,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 96, // Sobre el bottom navigation
     right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    minWidth: 120,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderRadius: 16,
     backgroundColor: theme.colors.accent, // #FFC043
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
     // Sombra iOS
     shadowColor: '#FFC043',
     shadowOffset: { width: 0, height: 4 },
