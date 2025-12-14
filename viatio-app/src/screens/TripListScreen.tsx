@@ -13,7 +13,6 @@ import {
   ScreenContainer,
   PageHeader,
   TripCard,
-  FloatingActionButton,
   PrimaryButton,
 } from '@/components';
 import { useViajesStore } from '@/store';
@@ -120,8 +119,12 @@ export default function TripListScreen({ navigation }: Props) {
         style={styles.list}
       />
 
-      {/* Floating Action Button */}
-      <FloatingActionButton icon="add" onPress={handleCreateTrip} />
+      {/* Botón fijo en la parte inferior */}
+      <View style={styles.buttonContainer}>
+        <PrimaryButton onPress={handleCreateTrip}>
+          Añadir viaje
+        </PrimaryButton>
+      </View>
     </View>
   );
 }
@@ -170,9 +173,17 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: theme.spacing.lg,
     paddingTop: theme.spacing.md,
-    paddingBottom: 120, // Espacio para FAB
+    paddingBottom: theme.spacing.md,
   },
   separator: {
     height: theme.spacing.md,
+  },
+  buttonContainer: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    paddingBottom: theme.spacing.lg,
+    backgroundColor: theme.colors.background,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
   },
 });

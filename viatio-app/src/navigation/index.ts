@@ -14,4 +14,5 @@ export * from './types';
 export { RootNavigator } from './RootNavigator';
 export { RootTabs } from './RootTabs';
 export { HomeStackNavigator } from './HomeStackNavigator';
+export { ProfileStackNavigator } from './ProfileStackNavigator';
 export { AuthStackNavigator } from './AuthStackNavigator';

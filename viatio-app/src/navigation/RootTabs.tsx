@@ -7,8 +7,10 @@
 
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { TripCalendarScreen, ProfileScreen } from '@/screens';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TripCalendarScreen } from '@/screens';
 import { HomeStackNavigator } from './HomeStackNavigator';
+import { ProfileStackNavigator } from './ProfileStackNavigator';
 import type { RootTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -18,6 +20,8 @@ const Tab = createBottomTabNavigator<RootTabParamList>();
 // ============================================
 
 export function RootTabs() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -28,8 +32,8 @@ export function RootTabs() {
           backgroundColor: '#FFFFFF',
           borderTopColor: '#E5E5EA',
           borderTopWidth: 1,
-          height: 60,
-          paddingBottom: 8,
+          height: 60 + insets.bottom, // Ajustar altura según el safe area inferior
+          paddingBottom: insets.bottom, // Padding inferior dinámico
           paddingTop: 8,
         },
         tabBarLabelStyle: {
@@ -62,11 +66,11 @@ export function RootTabs() {
 
       <Tab.Screen
         name="Profile"
-        component={ProfileScreen}
+        component={ProfileStackNavigator}
         options={{
           tabBarLabel: 'Perfil',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
+            <Ionicons name="person-outline" size={size} color={color} />
           ),
         }}
       />

@@ -68,21 +68,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   buttonPrimary: {
-    backgroundColor: theme.colors.primaryLight, // #0066CC
+    backgroundColor: theme.colors.accent, // #FFC043
     paddingVertical: 16,
   },
   buttonSmall: {
-    backgroundColor: theme.colors.primaryLight, // #0066CC
+    backgroundColor: theme.colors.accent, // #FFC043
     paddingVertical: 12,
   },
   pressed: {
-    backgroundColor: theme.colors.primaryDark, // #0052A3
+    backgroundColor: theme.colors.accentHover, // #FFB400
   },
   disabled: {
     backgroundColor: '#D1D5DB',
   },
   text: {
-    color: '#FFFFFF',
+    color: '#1A1A1A',
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',

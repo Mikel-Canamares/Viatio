@@ -9,3 +9,4 @@
 
 export { useViajesStore } from './viajesStore';
 export { useGastosStore } from './gastosStore';
+export { useConfiguracionStore } from './useConfiguracionStore';

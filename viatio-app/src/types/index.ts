@@ -23,3 +23,17 @@ export type {
 } from './auth';
 
 export { mapFirebaseUser } from './auth';
+
+export type {
+  PerfilUsuario,
+  EstadisticasUsuario,
+  PreferenciasNotificaciones,
+  ConfiguracionApp,
+} from './perfil';
+
+export {
+  IDIOMAS_DISPONIBLES,
+  MONEDAS_DISPONIBLES,
+  DEFAULT_PREFERENCIAS_NOTIFICACIONES,
+  DEFAULT_CONFIGURACION_APP,
+} from './perfil';
