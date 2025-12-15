@@ -14,6 +14,8 @@ import {
   updateProfile,
   sendEmailVerification,
   sendPasswordResetEmail,
+  GoogleAuthProvider,
+  signInWithCredential,
 } from 'firebase/auth';
 import { auth } from '@/config/firebase';
 import { AuthUser, LoginCredentials, RegisterCredentials, mapFirebaseUser } from '@/types/auth';
@@ -39,6 +41,7 @@ interface AuthContextType {
   loading: boolean;
   error: AuthError | null;
   loginWithEmail: (credentials: LoginCredentials) => Promise<boolean>;
+  loginWithGoogle: (idToken: string) => Promise<boolean>;
   registerWithEmail: (credentials: RegisterCredentials) => Promise<boolean>;
   logout: () => Promise<void>;
   clearError: () => void;
@@ -81,6 +84,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         originalError: err,
       });
       logError(err, 'loginWithEmail');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loginWithGoogle = async (idToken: string): Promise<boolean> => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const credential = GoogleAuthProvider.credential(idToken);
+      await signInWithCredential(auth, credential);
+
+      return true;
+    } catch (err) {
+      const message = getUserFriendlyMessage(err);
+      setError({ message, originalError: err });
+      logError(err, 'loginWithGoogle');
       return false;
     } finally {
       setLoading(false);
@@ -189,6 +211,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         error,
         loginWithEmail,
+        loginWithGoogle,
         registerWithEmail,
         logout,
         clearError,
