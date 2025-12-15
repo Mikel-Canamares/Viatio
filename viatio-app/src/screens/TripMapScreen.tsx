@@ -509,7 +509,7 @@ export default function TripMapScreen() {
                     <View style={[styles.markerCircle, { backgroundColor: config.color }]}>
                       <Ionicons
                         name={config.icon as any}
-                        size={20}
+                        size={22}
                         color="#FFFFFF"
                       />
                     </View>
@@ -531,7 +531,7 @@ export default function TripMapScreen() {
                   <View style={[styles.markerCircle, { backgroundColor: theme.colors.primaryLight }]}>
                     <Ionicons
                       name="location"
-                      size={20}
+                      size={22}
                       color="#FFFFFF"
                     />
                   </View>
@@ -552,6 +552,7 @@ export default function TripMapScreen() {
           <Pressable
             style={styles.myLocationButton}
             onPress={handleCenterOnUserLocation}
+            hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
           >
             <Ionicons name="locate" size={24} color={theme.colors.primary} />
           </Pressable>
@@ -688,9 +689,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 20,
     right: 16,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
@@ -705,36 +706,39 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'flex-end',
   },
-  // Marcadores personalizados (forma de gota invertida - teardrop)
+  // Marcadores personalizados (pin con icono interior)
   markerContainer: {
     alignItems: 'center',
-    width: 40,
-    height: 50,
+    width: 44,
+    height: 56,
   },
   markerCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: '#FFFFFF',
+    // Sombra robusta para visibilidad en todos los dispositivos
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 10, // Android - sombra más pronunciada
   },
   markerTriangle: {
     width: 0,
     height: 0,
     backgroundColor: 'transparent',
     borderStyle: 'solid',
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderTopWidth: 10,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 12,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    marginTop: -2,
+    marginTop: -3,
+    // Sombra para el triángulo (solo Android)
+    elevation: 8,
   },
 });

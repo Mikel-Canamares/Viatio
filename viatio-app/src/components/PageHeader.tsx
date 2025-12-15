@@ -34,7 +34,7 @@ export function PageHeader({ title, onBack, rightElement }: PageHeaderProps) {
               styles.backButton,
               pressed && styles.backButtonPressed,
             ]}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
           >
             <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
           </Pressable>
@@ -70,8 +70,8 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 8,
