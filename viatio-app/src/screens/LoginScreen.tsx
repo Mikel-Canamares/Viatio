@@ -5,7 +5,7 @@
  * Incluye header con gradiente, logo y card de login.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -23,11 +23,13 @@ import { Input, PrimaryButton, SecondaryButton, LoadingOverlay } from '@/compone
 import { useAuth } from '@/context';
 import { theme } from '@/config';
 import type { AuthStackParamList } from '@/navigation/AuthStackNavigator';
+import { useGoogleAuth } from '@/services/auth/googleAuthService';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 export default function LoginScreen({ navigation }: Props) {
-  const { loginWithEmail, error, clearError, loading } = useAuth();
+  const { loginWithEmail, loginWithGoogle, error, clearError, loading } = useAuth();
+  const { request, response, promptAsync } = useGoogleAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -66,12 +68,31 @@ export default function LoginScreen({ navigation }: Props) {
     navigation.navigate('ForgotPassword');
   };
 
+  const handleGoogleLogin = async () => {
+    try {
+      await promptAsync();
+    } catch (error) {
+      console.error('Error al iniciar Google Sign-In:', error);
+      Alert.alert('Error', 'No se pudo iniciar sesión con Google. Intenta nuevamente.');
+    }
+  };
+
   const handleSocialLogin = (provider: string) => {
     Alert.alert(
       `Login con ${provider}`,
       'Esta funcionalidad estará disponible próximamente.'
     );
   };
+
+  // Manejar la respuesta del flujo OAuth de Google
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { authentication } = response;
+      if (authentication?.idToken) {
+        loginWithGoogle(authentication.idToken);
+      }
+    }
+  }, [response]);
 
   return (
     <KeyboardAvoidingView
@@ -184,7 +205,8 @@ export default function LoginScreen({ navigation }: Props) {
               {/* Botones sociales */}
               <View style={styles.socialButtons}>
                 <SecondaryButton
-                  onPress={() => handleSocialLogin('Google')}
+                  onPress={handleGoogleLogin}
+                  disabled={!request || loading}
                   style={styles.socialButton}
                 >
                   <Ionicons name="logo-google" size={20} color={theme.colors.text} />
