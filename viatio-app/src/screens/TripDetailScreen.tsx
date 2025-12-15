@@ -126,7 +126,11 @@ export default function TripDetailScreen({ navigation, route }: Props) {
           />
 
           {/* Botón back */}
-          <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+          >
             <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
           </Pressable>
 
@@ -276,9 +280,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 40,
     left: 16,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(0,0,0,0.3)',
     justifyContent: 'center',
     alignItems: 'center',

@@ -2,11 +2,13 @@
  * FIREBASE CONFIG
  *
  * Configuración de Firebase para autenticación y servicios backend.
- * Firebase JS SDK en React Native/Expo maneja la persistencia automáticamente.
+ * Se configura persistencia explícita con AsyncStorage para React Native.
  */
 
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+// @ts-expect-error - getReactNativePersistence existe en runtime pero tiene issues de tipos en Firebase 12
+import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -25,8 +27,10 @@ if (getApps().length === 0) {
   app = getApps()[0];
 }
 
-// Inicializar Auth
-// Nota: Firebase JS SDK maneja la persistencia automáticamente en React Native
-export const auth = getAuth(app);
+// Inicializar Auth con persistencia explícita para React Native
+// Se usa AsyncStorage para mantener la sesión entre cierres de app
+export const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage),
+});
 
 export { app };
