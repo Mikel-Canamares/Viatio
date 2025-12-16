@@ -34,9 +34,10 @@ export function PageHeader({ title, onBack, rightElement }: PageHeaderProps) {
               styles.backButton,
               pressed && styles.backButtonPressed,
             ]}
-            hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+            hitSlop={{ top: 40, bottom: 40, left: 40, right: 20 }}
+            android_ripple={{ color: 'rgba(255, 255, 255, 0.2)', borderless: false }}
           >
-            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+            <Ionicons name="arrow-back" size={26} color="#FFFFFF" />
           </Pressable>
         )}
 
@@ -70,15 +71,17 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary,
   },
   backButton: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: 10,
     marginRight: theme.spacing.sm,
+    marginLeft: -4, // Compensa el aumento de tamaño para mantener alineación
   },
   backButtonPressed: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    transform: [{ scale: 0.96 }],
   },
   title: {
     color: theme.colors.primaryForeground,
@@ -88,7 +91,7 @@ const styles = StyleSheet.create({
   titleCentered: {
     flex: 1,
     textAlign: 'center',
-    marginLeft: -48, // Compensa el botón de retroceso para centrar
+    marginLeft: -52, // Compensa el botón de retroceso para centrar (ahora 48px + 4px margin)
   },
   titleLeft: {
     flex: 1,

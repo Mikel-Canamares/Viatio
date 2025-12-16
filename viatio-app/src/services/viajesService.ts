@@ -43,6 +43,7 @@ export async function createViaje(
       presupuesto: input.presupuesto,
       moneda: input.moneda || 'EUR',
       numViajeros: input.numViajeros || 1,
+      archived: 0,
       createdAt: now,
       updatedAt: now,
     };
@@ -50,8 +51,8 @@ export async function createViaje(
     await db.runAsync(
       `INSERT INTO viajes (
         id, usuarioId, destino, fechaInicio, fechaFin, descripcion,
-        imagenUrl, presupuesto, moneda, numViajeros, createdAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        imagenUrl, presupuesto, moneda, numViajeros, archived, createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         viaje.id,
         viaje.usuarioId,
@@ -63,6 +64,7 @@ export async function createViaje(
         viaje.presupuesto ?? null,
         viaje.moneda,
         viaje.numViajeros,
+        viaje.archived,
         viaje.createdAt,
         viaje.updatedAt,
       ]

@@ -3,6 +3,7 @@
  *
  * Tarjeta para mostrar un viaje en la lista.
  * Incluye imagen, destino, fechas y badge de días restantes.
+ * Soporta swipe para acciones (archivar/borrar).
  */
 
 import { View, Text, StyleSheet, Image } from 'react-native';
@@ -11,6 +12,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { format, differenceInDays, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Card } from './Card';
+import { SwipeableCard } from './SwipeableCard';
+import { SwipeActions } from './SwipeActions';
 import type { Viaje } from '@/types/viaje';
 import { theme } from '@/config';
 
@@ -20,9 +23,24 @@ interface TripCardProps {
 
   /** Callback al presionar la tarjeta */
   onPress: () => void;
+
+  /** Callback al archivar/desarchivar (opcional) */
+  onArchive?: () => void;
+
+  /** Callback al borrar */
+  onDelete: () => void;
+
+  /** Si el viaje está archivado (para mostrar "Desarchivar" en lugar de "Archivar") */
+  isArchived?: boolean;
 }
 
-export function TripCard({ viaje, onPress }: TripCardProps) {
+export function TripCard({
+  viaje,
+  onPress,
+  onArchive,
+  onDelete,
+  isArchived = false,
+}: TripCardProps) {
   // Validar y formatear fechas
   const fechaInicio = new Date(viaje.fechaInicio);
   const fechaFin = new Date(viaje.fechaFin);
@@ -40,7 +58,8 @@ export function TripCard({ viaje, onPress }: TripCardProps) {
   const diasRestantes = fechasValidas ? differenceInDays(fechaInicio, hoy) : 0;
   const esFuturo = diasRestantes > 0;
 
-  return (
+  // Contenido de la tarjeta (reutilizable)
+  const cardContent = (
     <Card onPress={onPress} padding={0} style={styles.card}>
       {/* Imagen o placeholder */}
       {viaje.imagenUrl ? (
@@ -84,6 +103,26 @@ export function TripCard({ viaje, onPress }: TripCardProps) {
         )}
       </View>
     </Card>
+  );
+
+  // Si no hay acciones, retornar solo la tarjeta
+  if (!onArchive && !onDelete) {
+    return cardContent;
+  }
+
+  // Si hay acciones, envolver con SwipeableCard
+  return (
+    <SwipeableCard
+      renderRightActions={() => (
+        <SwipeActions
+          onArchive={onArchive}
+          onDelete={onDelete}
+          isArchived={isArchived}
+        />
+      )}
+    >
+      {cardContent}
+    </SwipeableCard>
   );
 }
 

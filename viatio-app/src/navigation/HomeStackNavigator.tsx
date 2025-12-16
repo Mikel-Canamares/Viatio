@@ -20,6 +20,7 @@ import TripReservationsScreen from '@/screens/TripReservationsScreen';
 import AddReservationScreen from '@/screens/AddReservationScreen';
 import ReservationDetailScreen from '@/screens/ReservationDetailScreen';
 import TripMapScreen from '@/screens/TripMapScreen';
+import ArchivedTripsScreen from '@/screens/ArchivedTripsScreen';
 import { ExpensesScreen } from '@/screens/ExpensesScreen';
 import { AddExpenseScreen } from '@/screens/AddExpenseScreen';
 import type { HomeStackParamList } from './types';
@@ -38,6 +39,7 @@ export function HomeStackNavigator() {
       }}
     >
       <Stack.Screen name="TripList" component={TripListScreen} />
+      <Stack.Screen name="ArchivedTrips" component={ArchivedTripsScreen} />
       <Stack.Screen name="CreateTrip" component={CreateTripScreen} />
       <Stack.Screen name="TripDetail" component={TripDetailScreen} />
       <Stack.Screen name="TripAgenda" component={TripAgendaScreen} />

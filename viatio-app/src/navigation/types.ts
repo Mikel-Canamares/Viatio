@@ -60,6 +60,7 @@ export type RootTabParamList = {
  */
 export type HomeStackParamList = {
   TripList: undefined;
+  ArchivedTrips: undefined;
   CreateTrip: undefined;
   TripDetail: { viajeId: string };
   TripAgenda: { viajeId: string };

@@ -19,6 +19,7 @@ export interface Viaje {
   presupuesto?: number;
   moneda: string;
   numViajeros: number;
+  archived: number;
   createdAt: string;
   updatedAt: string;
 }

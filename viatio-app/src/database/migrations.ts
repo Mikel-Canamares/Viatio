@@ -86,9 +86,13 @@ export async function runMigrations(
     await migrateToV4(db);
   }
 
+  if (currentVersion < 5) {
+    await migrateToV5(db);
+  }
+
   // Futuras migraciones se añadirán aquí:
-  // if (currentVersion < 5) {
-  //   await migrateToV5(db);
+  // if (currentVersion < 6) {
+  //   await migrateToV6(db);
   // }
 
   console.log('[Migrations] Migraciones completadas exitosamente');
@@ -244,15 +248,56 @@ async function migrateToV4(db: SQLite.SQLiteDatabase): Promise<void> {
   }
 }
 
+/**
+ * Migración a versión 5: Añadir campo archived a tabla viajes
+ * Permite archivar viajes sin eliminarlos permanentemente
+ */
+async function migrateToV5(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migrations] Ejecutando migración a v5...');
+
+  try {
+    // Verificar si la columna archived ya existe
+    const tableInfo = await db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(viajes);'
+    );
+
+    const columnExists = tableInfo.some(col => col.name === 'archived');
+
+    if (!columnExists) {
+      // Añadir campo archived solo si no existe
+      console.log('[Migrations] Añadiendo columna archived a viajes...');
+      await db.execAsync('ALTER TABLE viajes ADD COLUMN archived INTEGER DEFAULT 0;');
+
+      // Crear índice para archived
+      console.log('[Migrations] Creando índice para archived...');
+      await db.execAsync('CREATE INDEX IF NOT EXISTS idx_viajes_archived ON viajes(archived);');
+    } else {
+      console.log('[Migrations] Columna archived ya existe, omitiendo...');
+    }
+
+    // Registrar migración
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'INSERT INTO _migrations (version, appliedAt) VALUES (?, ?)',
+      [5, now]
+    );
+
+    console.log('[Migrations] Migración a v5 completada');
+  } catch (error) {
+    console.error('[Migrations] Error en migración a v5:', error);
+    throw error;
+  }
+}
+
 // ============================================
 // MIGRACIONES FUTURAS
 // ============================================
 
 /**
- * Ejemplo de migración futura (v3 -> v4)
+ * Ejemplo de migración futura (v5 -> v6)
  *
- * async function migrateToV4(db: SQLite.SQLiteDatabase): Promise<void> {
- *   console.log('[Migrations] Ejecutando migración a v4...');
+ * async function migrateToV6(db: SQLite.SQLiteDatabase): Promise<void> {
+ *   console.log('[Migrations] Ejecutando migración a v6...');
  *
  *   try {
  *     // Verificar si la columna ya existe
@@ -270,12 +315,12 @@ async function migrateToV4(db: SQLite.SQLiteDatabase): Promise<void> {
  *     const now = new Date().toISOString();
  *     await db.runAsync(
  *       'INSERT INTO _migrations (version, appliedAt) VALUES (?, ?)',
- *       [4, now]
+ *       [6, now]
  *     );
  *
- *     console.log('[Migrations] Migración a v4 completada');
+ *     console.log('[Migrations] Migración a v6 completada');
  *   } catch (error) {
- *     console.error('[Migrations] Error en migración a v4:', error);
+ *     console.error('[Migrations] Error en migración a v6:', error);
  *     throw error;
  *   }
  * }

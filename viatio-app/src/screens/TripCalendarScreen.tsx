@@ -123,12 +123,14 @@ export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
       const monthEnd = startOfDay(new Date(month.getFullYear(), month.getMonth() + 1, 0));
 
       const viajesUsuario = await getViajesByUsuario(user.uid);
-      setViajes(viajesUsuario);
+      // Filtrar solo viajes NO archivados
+      const viajesActivos = viajesUsuario.filter((v) => v.archived === 0);
+      setViajes(viajesActivos);
 
       const eventosMap = new Map<string, EventoAgendaCalendario[]>();
 
       await Promise.all(
-        viajesUsuario.map(async (viaje) => {
+        viajesActivos.map(async (viaje) => {
           const viajeInicio = startOfDay(new Date(viaje.fechaInicio));
           const viajeFin = startOfDay(new Date(viaje.fechaFin));
           const intersectsMonth = viajeFin >= monthStart && viajeInicio <= monthEnd;

@@ -9,7 +9,7 @@
 // VERSIÓN DEL ESQUEMA
 // ============================================
 
-export const CURRENT_SCHEMA_VERSION = 4;
+export const CURRENT_SCHEMA_VERSION = 5;
 
 // ============================================
 // CREACIÓN DE TABLAS
@@ -27,6 +27,7 @@ const CREATE_VIAJES_TABLE = `
     presupuesto REAL,
     moneda TEXT DEFAULT 'EUR',
     numViajeros INTEGER DEFAULT 1,
+    archived INTEGER DEFAULT 0,
     createdAt TEXT NOT NULL,
     updatedAt TEXT NOT NULL
   );
@@ -162,6 +163,11 @@ const INDEX_VIAJES_FECHAS = `
   ON viajes(fechaInicio, fechaFin);
 `;
 
+const INDEX_VIAJES_ARCHIVED = `
+  CREATE INDEX IF NOT EXISTS idx_viajes_archived
+  ON viajes(archived);
+`;
+
 const INDEX_DIAS_VIAJE = `
   CREATE INDEX IF NOT EXISTS idx_dias_viajeId
   ON dias_viaje(viajeId);
@@ -235,6 +241,7 @@ const INDEX_GASTOS_RESERVA = `
 export const CREATE_INDEXES_SQL = [
   INDEX_VIAJES_USUARIO,
   INDEX_VIAJES_FECHAS,
+  INDEX_VIAJES_ARCHIVED,
   INDEX_DIAS_VIAJE,
   INDEX_DIAS_FECHA,
   INDEX_RESERVAS_VIAJE,

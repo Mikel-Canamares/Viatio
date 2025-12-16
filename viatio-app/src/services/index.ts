@@ -17,6 +17,15 @@ export {
   repairViajesSinDias,
 } from './viajesService';
 
+export {
+  archiveViaje,
+  unarchiveViaje,
+  autoArchiveFinishedTrips,
+  deleteViajeFiles,
+  deleteViajeCompletely,
+  getViajeRelatedCounts,
+} from './archiveService';
+
 export { getReservaById, updateReserva } from './reservasService';
 
 export {

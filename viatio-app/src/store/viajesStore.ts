@@ -8,6 +8,7 @@
 import { create } from 'zustand';
 import type { Viaje, CreateViajeInput, UpdateViajeInput } from '@/types/viaje';
 import * as viajesService from '@/services/viajesService';
+import * as archiveService from '@/services/archiveService';
 
 // ============================================
 // TIPOS
@@ -31,6 +32,9 @@ interface ViajesActions {
   /** Obtiene todos los viajes de un usuario */
   fetchViajes: (usuarioId: string) => Promise<void>;
 
+  /** Obtiene solo viajes archivados de un usuario */
+  fetchArchivedViajes: (usuarioId: string) => Promise<void>;
+
   /** Crea un nuevo viaje */
   addViaje: (input: CreateViajeInput, usuarioId: string) => Promise<Viaje | null>;
 
@@ -39,6 +43,15 @@ interface ViajesActions {
 
   /** Elimina un viaje */
   removeViaje: (id: string) => Promise<void>;
+
+  /** Archiva un viaje (ocultarlo sin eliminarlo) */
+  archiveViaje: (id: string) => Promise<void>;
+
+  /** Desarchiva un viaje (hacerlo visible de nuevo) */
+  unarchiveViaje: (id: string) => Promise<void>;
+
+  /** Elimina un viaje completamente (archivos + BD) */
+  deleteViajeCompletely: (id: string) => Promise<void>;
 
   /** Selecciona un viaje */
   selectViaje: (viaje: Viaje | null) => void;
@@ -58,14 +71,33 @@ export const useViajesStore = create<ViajesState & ViajesActions>((set) => ({
   loading: false,
   error: null,
 
-  // Obtener viajes del usuario
+  // Obtener viajes activos del usuario (solo no archivados)
   fetchViajes: async (usuarioId: string) => {
     set({ loading: true, error: null });
     try {
-      const viajes = await viajesService.getViajesByUsuario(usuarioId);
-      set({ viajes, loading: false });
+      // Auto-archivar viajes finalizados antes de cargar
+      await archiveService.autoArchiveFinishedTrips(usuarioId);
+
+      // Obtener solo viajes no archivados
+      const allViajes = await viajesService.getViajesByUsuario(usuarioId);
+      const activeViajes = allViajes.filter((v) => v.archived === 0);
+
+      set({ viajes: activeViajes, loading: false });
     } catch (error) {
       set({ error: 'Error al cargar viajes', loading: false });
+    }
+  },
+
+  // Obtener solo viajes archivados del usuario
+  fetchArchivedViajes: async (usuarioId: string) => {
+    set({ loading: true, error: null });
+    try {
+      const allViajes = await viajesService.getViajesByUsuario(usuarioId);
+      const archivedViajes = allViajes.filter((v) => v.archived === 1);
+
+      set({ viajes: archivedViajes, loading: false });
+    } catch (error) {
+      set({ error: 'Error al cargar viajes archivados', loading: false });
     }
   },
 
@@ -115,6 +147,58 @@ export const useViajesStore = create<ViajesState & ViajesActions>((set) => ({
 
   // Seleccionar viaje
   selectViaje: (viaje) => set({ selectedViaje: viaje }),
+
+  // Archivar viaje
+  archiveViaje: async (id) => {
+    try {
+      await archiveService.archiveViaje(id);
+      set((state) => ({
+        viajes: state.viajes.filter((v) => v.id !== id),
+        selectedViaje: state.selectedViaje?.id === id ? null : state.selectedViaje,
+      }));
+    } catch (error) {
+      set({ error: 'Error al archivar viaje' });
+    }
+  },
+
+  // Desarchivar viaje
+  unarchiveViaje: async (id) => {
+    try {
+      await archiveService.unarchiveViaje(id);
+
+      // Recargar el viaje desarchivado desde BD
+      const viajeDesarchivado = await viajesService.getViajeById(id);
+
+      if (viajeDesarchivado) {
+        set((state) => ({
+          // Eliminar de la lista actual (archivados) y añadir a viajes activos si no está
+          viajes: state.viajes.filter((v) => v.id !== id),
+          selectedViaje: state.selectedViaje?.id === id ? null : state.selectedViaje,
+        }));
+      } else {
+        // Si no se encuentra, solo quitarlo de la lista actual
+        set((state) => ({
+          viajes: state.viajes.filter((v) => v.id !== id),
+          selectedViaje: state.selectedViaje?.id === id ? null : state.selectedViaje,
+        }));
+      }
+    } catch (error) {
+      set({ error: 'Error al desarchivar viaje' });
+    }
+  },
+
+  // Eliminar viaje completamente
+  deleteViajeCompletely: async (id) => {
+    try {
+      await archiveService.deleteViajeCompletely(id);
+      set((state) => ({
+        viajes: state.viajes.filter((v) => v.id !== id),
+        selectedViaje: state.selectedViaje?.id === id ? null : state.selectedViaje,
+      }));
+    } catch (error) {
+      set({ error: 'Error al eliminar viaje' });
+    }
+  },
 
   // Limpiar error
   clearError: () => set({ error: null }),
