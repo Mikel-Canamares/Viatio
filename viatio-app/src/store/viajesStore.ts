@@ -112,7 +112,17 @@ export const useViajesStore = create<ViajesState & ViajesActions>((set) => ({
       }));
       return viaje;
     } catch (error) {
-      set({ error: 'Error al crear viaje', loading: false });
+      // Capturar mensaje de error específico
+      // No loguear errores de validación (DateOverlapError) ya que son esperados
+      const errorMessage = error instanceof Error ? error.message : 'Error al crear viaje';
+      const isValidationError = error instanceof Error && error.name === 'DateOverlapError';
+
+      // Solo loguear errores inesperados, no los de validación
+      if (!isValidationError) {
+        console.error('[ViajesStore] Error al crear viaje:', error);
+      }
+
+      set({ error: errorMessage, loading: false });
       return null;
     }
   },

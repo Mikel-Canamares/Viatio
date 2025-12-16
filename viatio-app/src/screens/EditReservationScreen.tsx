@@ -10,6 +10,8 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   Alert,
   ActivityIndicator,
@@ -27,6 +29,7 @@ import {
   DateInput,
   SectionHeader,
   PrimaryButton,
+  SubtypeSelector,
 } from '@/components';
 import { theme } from '@/config';
 import { useReservasStore } from '@/store/reservasStore';
@@ -34,8 +37,19 @@ import { useDocumentosStore } from '@/store/documentosStore';
 import { getViajeById } from '@/services';
 import { getReservaById, getDocumentoByReservaId } from '@/services/reservasService';
 import { updateDocumentoCategoria } from '@/services/documentosService';
-import { mapReservaToCategoriaDocumento } from '@/types/reserva';
-import type { CreateReservaInput, CategoriaReserva } from '@/types/reserva';
+import type {
+  CreateReservaInput,
+  CategoriaReserva,
+  SubtipoTransporte,
+  SubtipoAlojamiento,
+  SubtipoActividad,
+} from '@/types/reserva';
+import {
+  mapReservaToCategoriaDocumento,
+  SUBTIPOS_TRANSPORTE,
+  SUBTIPOS_ALOJAMIENTO,
+  SUBTIPOS_ACTIVIDAD,
+} from '@/types/reserva';
 import type { Viaje } from '@/types/viaje';
 import type { Documento } from '@/types/documento';
 import type { HomeStackParamList } from '@/navigation/types';
@@ -131,6 +145,16 @@ export default function EditReservationScreen({ route, navigation }: Props) {
     value: CreateReservaInput[K]
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const updateMetadata = <K extends keyof NonNullable<CreateReservaInput['metadatos']>>(
+    field: K,
+    value: NonNullable<CreateReservaInput['metadatos']>[K]
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      metadatos: { ...prev.metadatos, [field]: value },
+    }));
   };
 
   const handlePickDocument = async () => {
@@ -270,10 +294,11 @@ export default function EditReservationScreen({ route, navigation }: Props) {
         horaFin: formData.horaFin,
         ubicacion: formData.ubicacion,
         direccion: formData.direccion,
-        precio: formData.precio,
+        precio: formData.precio ? parseFloat(formData.precio as any) : undefined,
         moneda: formData.moneda || 'EUR',
         estadoPago: formData.estadoPago || 'pending',
         notas: formData.notas,
+        metadatos: formData.metadatos, // Incluir metadatos
         documentoId: newDocumentoId,
       };
 
@@ -303,10 +328,16 @@ export default function EditReservationScreen({ route, navigation }: Props) {
     <View style={styles.container}>
       <PageHeader title="Editar reserva" onBack={() => navigation.goBack()} />
       <ScreenContainer>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.formContent}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.formContent}
+            keyboardShouldPersistTaps="handled"
+          >
           <Card style={styles.formCard}>
             <SectionHeader title="Tipo de reserva" />
             <View style={styles.categoriaGrid}>
@@ -357,20 +388,93 @@ export default function EditReservationScreen({ route, navigation }: Props) {
               label="Nombre"
               value={formData.nombre || ''}
               onChangeText={(value) => updateField('nombre', value)}
-              placeholder="Ej: Vuelo Madrid - París"
+              placeholder={
+                formData.categoria === 'transport'
+                  ? 'Ej: Vuelo Madrid - París'
+                  : formData.categoria === 'accommodation'
+                  ? 'Ej: Hotel Ritz'
+                  : formData.categoria === 'food'
+                  ? 'Ej: Restaurante La Viña'
+                  : formData.categoria === 'activity'
+                  ? 'Ej: Tour por el Museo del Prado'
+                  : 'Nombre de la reserva'
+              }
             />
-            <Input
-              label="Proveedor"
-              value={formData.proveedor || ''}
-              onChangeText={(value) => updateField('proveedor', value)}
-              placeholder="Ej: Air France"
-            />
-            <Input
-              label="Número de confirmación"
-              value={formData.numeroConfirmacion || ''}
-              onChangeText={(value) => updateField('numeroConfirmacion', value)}
-              placeholder="ABC123456"
-            />
+
+            {/* Subtipo - Solo para Transport, Accommodation y Activity */}
+            {formData.categoria === 'transport' && (
+              <SubtypeSelector
+                label="Tipo de transporte"
+                options={SUBTIPOS_TRANSPORTE}
+                value={formData.metadatos?.subtipoTransporte}
+                onSelect={(value) => updateMetadata('subtipoTransporte', value as SubtipoTransporte)}
+              />
+            )}
+
+            {formData.categoria === 'accommodation' && (
+              <SubtypeSelector
+                label="Tipo de alojamiento"
+                options={SUBTIPOS_ALOJAMIENTO}
+                value={formData.metadatos?.subtipoAlojamiento}
+                onSelect={(value) => updateMetadata('subtipoAlojamiento', value as SubtipoAlojamiento)}
+              />
+            )}
+
+            {formData.categoria === 'activity' && (
+              <SubtypeSelector
+                label="Tipo de actividad"
+                options={SUBTIPOS_ACTIVIDAD}
+                value={formData.metadatos?.subtipoActividad}
+                onSelect={(value) => updateMetadata('subtipoActividad', value as SubtipoActividad)}
+              />
+            )}
+
+            {/* Proveedor - Oculto para food */}
+            {formData.categoria !== 'food' && (
+              <Input
+                label={
+                  formData.categoria === 'transport'
+                    ? 'Compañía'
+                    : formData.categoria === 'accommodation'
+                    ? 'Establecimiento'
+                    : formData.categoria === 'activity'
+                    ? 'Organizador'
+                    : 'Proveedor'
+                }
+                value={formData.proveedor || ''}
+                onChangeText={(value) => updateField('proveedor', value)}
+                placeholder={
+                  formData.categoria === 'transport'
+                    ? 'Ej: Renfe, Iberia...'
+                    : formData.categoria === 'accommodation'
+                    ? 'Ej: Hotel Ritz'
+                    : formData.categoria === 'activity'
+                    ? 'Ej: Free Tours Madrid'
+                    : 'Nombre del proveedor'
+                }
+              />
+            )}
+
+            {/* Contacto - Solo para Activity y Accommodation */}
+            {(formData.categoria === 'activity' || formData.categoria === 'accommodation') && (
+              <Input
+                label="Contacto"
+                value={formData.metadatos?.telefono || ''}
+                onChangeText={(value) => updateMetadata('telefono', value)}
+                placeholder="+34 600 000 000"
+                keyboardType="phone-pad"
+              />
+            )}
+
+            {/* Número de confirmación - Oculto para food */}
+            {formData.categoria !== 'food' && (
+              <Input
+                label="Número de confirmación"
+                value={formData.numeroConfirmacion || ''}
+                onChangeText={(value) => updateField('numeroConfirmacion', value)}
+                placeholder="ABC123456"
+              />
+            )}
           </Card>
 
           <Card style={styles.formCard}>
@@ -416,69 +520,101 @@ export default function EditReservationScreen({ route, navigation }: Props) {
           </Card>
 
           <Card style={styles.formCard}>
-            <SectionHeader title="Ubicación" />
+            <SectionHeader
+              title={
+                formData.categoria === 'activity'
+                  ? 'Punto de encuentro'
+                  : 'Ubicación'
+              }
+            />
             <Input
-              label="Nombre del lugar"
+              label={
+                formData.categoria === 'activity'
+                  ? 'Punto de encuentro'
+                  : 'Nombre del lugar'
+              }
               value={formData.ubicacion || ''}
               onChangeText={(value) => updateField('ubicacion', value)}
-              placeholder="Ej: Aeropuerto Charles de Gaulle"
+              placeholder={
+                formData.categoria === 'transport'
+                  ? 'Ej: Aeropuerto Charles de Gaulle'
+                  : formData.categoria === 'accommodation'
+                  ? 'Ej: Hotel Ritz Madrid'
+                  : formData.categoria === 'food'
+                  ? 'Ej: Restaurante La Viña'
+                  : formData.categoria === 'activity'
+                  ? 'Ej: Puerta del Sol'
+                  : 'Nombre del lugar'
+              }
             />
-            <Input
-              label="Dirección"
-              value={formData.direccion || ''}
-              onChangeText={(value) => updateField('direccion', value)}
-              placeholder="Dirección completa"
-            />
+            {/* Dirección - Mostrar para todos excepto activity */}
+            {formData.categoria !== 'activity' && (
+              <Input
+                label="Dirección"
+                value={formData.direccion || ''}
+                onChangeText={(value) => updateField('direccion', value)}
+                placeholder="Dirección completa"
+              />
+            )}
           </Card>
 
-          <Card style={styles.formCard}>
-            <SectionHeader title="Pago" />
-            <View style={styles.row}>
-              <View style={styles.halfWidth}>
-                <Input
-                  label="Precio"
-                  value={formData.precio?.toString() || ''}
-                  onChangeText={(value) =>
-                    updateField('precio', value ? parseFloat(value) : undefined)
-                  }
-                  placeholder="0.00"
-                  keyboardType="numeric"
-                />
+          {/* Pago - Oculto para food */}
+          {formData.categoria !== 'food' && (
+            <Card style={styles.formCard}>
+              <SectionHeader title="Pago" />
+              <View style={styles.row}>
+                <View style={styles.halfWidth}>
+                  <Input
+                    label="Precio"
+                    value={formData.precio?.toString() || ''}
+                    onChangeText={(value) => {
+                      // Solo permitir números y un punto decimal
+                      const filteredText = value.replace(/[^0-9.]/g, '');
+                      // Evitar múltiples puntos decimales
+                      const parts = filteredText.split('.');
+                      if (parts.length > 2) return;
+                      // Mantener como número pero permitir el punto decimal mientras se escribe
+                      updateField('precio', filteredText as any);
+                    }}
+                    placeholder="0.00"
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+                <View style={styles.halfWidth}>
+                  <Input
+                    label="Moneda"
+                    value={formData.moneda || 'EUR'}
+                    onChangeText={(value) => updateField('moneda', value)}
+                    placeholder="EUR"
+                  />
+                </View>
               </View>
-              <View style={styles.halfWidth}>
-                <Input
-                  label="Moneda"
-                  value={formData.moneda || 'EUR'}
-                  onChangeText={(value) => updateField('moneda', value)}
-                  placeholder="EUR"
-                />
-              </View>
-            </View>
-            <View style={styles.pickerContainer}>
-              <Text style={styles.inputLabel}>Estado del pago</Text>
-              <View style={styles.estadoGrid}>
-                {ESTADO_PAGO_OPTIONS.map((estado) => (
-                  <Pressable
-                    key={estado.value}
-                    onPress={() => updateField('estadoPago', estado.value as any)}
-                    style={[
-                      styles.estadoChip,
-                      formData.estadoPago === estado.value && styles.estadoChipActive,
-                    ]}
-                  >
-                    <Text
+              <View style={styles.pickerContainer}>
+                <Text style={styles.inputLabel}>Estado del pago</Text>
+                <View style={styles.estadoGrid}>
+                  {ESTADO_PAGO_OPTIONS.map((estado) => (
+                    <Pressable
+                      key={estado.value}
+                      onPress={() => updateField('estadoPago', estado.value as any)}
                       style={[
-                        styles.estadoText,
-                        formData.estadoPago === estado.value && styles.estadoTextActive,
+                        styles.estadoChip,
+                        formData.estadoPago === estado.value && styles.estadoChipActive,
                       ]}
                     >
-                      {estado.label}
-                    </Text>
-                  </Pressable>
-                ))}
+                      <Text
+                        style={[
+                          styles.estadoText,
+                          formData.estadoPago === estado.value && styles.estadoTextActive,
+                        ]}
+                      >
+                        {estado.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
               </View>
-            </View>
-          </Card>
+            </Card>
+          )}
 
           <Card style={styles.formCard}>
             <SectionHeader title="Notas" />
@@ -576,7 +712,8 @@ export default function EditReservationScreen({ route, navigation }: Props) {
               Guardar cambios
             </PrimaryButton>
           </View>
-        </ScrollView>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </ScreenContainer>
     </View>
   );

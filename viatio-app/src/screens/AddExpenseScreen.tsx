@@ -12,6 +12,8 @@ import {
   StyleSheet,
   TextInput,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   Alert,
   Modal,
@@ -231,12 +233,17 @@ export function AddExpenseScreen() {
     <ScreenContainer>
       <PageHeader title="Añadir gasto" onBack={handleBack} />
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
         {/* Input de monto grande */}
         <View style={styles.montoContainer}>
           <View style={styles.montoInputWrapper}>
@@ -332,7 +339,8 @@ export function AddExpenseScreen() {
 
         {/* Espacio para el botón fijo */}
         <View style={styles.bottomSpacer} />
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Botón fijo en la parte inferior */}
       <View style={styles.buttonContainer}>

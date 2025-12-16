@@ -423,12 +423,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   categoryLabel: {
     fontSize: 14,
     fontWeight: '500',
     color: theme.colors.text,
-    flex: 1,
+    flexShrink: 1,
+    flexWrap: 'wrap',
   },
   bottomSpacer: {
     height: 100,

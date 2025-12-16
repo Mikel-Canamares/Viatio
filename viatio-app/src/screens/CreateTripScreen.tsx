@@ -6,14 +6,22 @@
  */
 
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   PageHeader,
   Card,
   Input,
-  DateInput,
+  DateRangePicker,
   PrimaryButton,
   LoadingOverlay,
 } from '@/components';
@@ -25,7 +33,7 @@ import type { HomeStackParamList } from '@/navigation/types';
 type Props = NativeStackScreenProps<HomeStackParamList, 'CreateTrip'>;
 
 export default function CreateTripScreen({ navigation }: Props) {
-  const { addViaje, loading } = useViajesStore();
+  const { addViaje, loading, error: storeError, clearError } = useViajesStore();
   const { user } = useAuth();
 
   // Form state
@@ -80,6 +88,9 @@ export default function CreateTripScreen({ navigation }: Props) {
       return;
     }
 
+    // Limpiar error previo del store
+    clearError();
+
     const viaje = await addViaje(
       {
         destino: destino.trim(),
@@ -97,7 +108,9 @@ export default function CreateTripScreen({ navigation }: Props) {
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } else {
-      Alert.alert('Error', 'No se pudo crear el viaje. Inténtalo de nuevo.');
+      // Mostrar error específico del store (puede incluir info de solapamiento)
+      const errorMsg = storeError || 'No se pudo crear el viaje. Inténtalo de nuevo.';
+      Alert.alert('Error', errorMsg);
     }
   };
 
@@ -105,7 +118,16 @@ export default function CreateTripScreen({ navigation }: Props) {
     <>
       <View style={styles.container}>
         <PageHeader title="Nuevo viaje" onBack={() => navigation.goBack()} />
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        >
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
           {/* Card 1: Información básica */}
           <Card style={styles.card}>
             <View style={styles.sectionHeader}>
@@ -123,27 +145,17 @@ export default function CreateTripScreen({ navigation }: Props) {
               error={errors.destino}
             />
 
-            <View style={styles.row}>
-              <View style={styles.halfInput}>
-                <DateInput
-                  label="Fecha de inicio"
-                  value={fechaInicio}
-                  onChangeDate={setFechaInicio}
-                  placeholder="dd/mm/aaaa"
-                  error={errors.fechaInicio}
-                />
-              </View>
-              <View style={styles.halfInput}>
-                <DateInput
-                  label="Fecha de fin"
-                  value={fechaFin}
-                  onChangeDate={setFechaFin}
-                  placeholder="dd/mm/aaaa"
-                  error={errors.fechaFin}
-                  minDate={fechaInicio ? new Date(fechaInicio) : undefined}
-                />
-              </View>
-            </View>
+            <DateRangePicker
+              label="Fechas del viaje"
+              startDate={fechaInicio}
+              endDate={fechaFin}
+              onChangeRange={(range) => {
+                setFechaInicio(range.startDate);
+                setFechaFin(range.endDate);
+              }}
+              placeholder="Seleccionar fechas"
+              error={errors.fechaInicio || errors.fechaFin}
+            />
 
             <Input
               label="Descripción (opcional)"
@@ -167,9 +179,16 @@ export default function CreateTripScreen({ navigation }: Props) {
             <Input
               label="Presupuesto estimado (opcional)"
               value={presupuesto}
-              onChangeText={setPresupuesto}
+              onChangeText={(text) => {
+                // Permitir solo números y un punto decimal
+                const filteredText = text.replace(/[^0-9.]/g, '');
+                const parts = filteredText.split('.');
+                // Evitar múltiples puntos decimales
+                if (parts.length > 2) return;
+                setPresupuesto(filteredText);
+              }}
               placeholder="€"
-              keyboardType="numeric"
+              keyboardType="decimal-pad"
             />
 
             <Input
@@ -187,7 +206,8 @@ export default function CreateTripScreen({ navigation }: Props) {
               Crear viaje
             </PrimaryButton>
           </View>
-        </ScrollView>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </View>
 
       <LoadingOverlay visible={loading} message="Creando viaje..." />
@@ -231,13 +251,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#111827',
-  },
-  row: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-  },
-  halfInput: {
-    flex: 1,
   },
   buttonContainer: {
     paddingTop: theme.spacing.md,
