@@ -21,6 +21,7 @@ import { useAuth } from '@/context';
 import { getViajesByUsuario } from '@/services/viajesService';
 import { getReservasByViajeId } from '@/services/reservasService';
 import { useReservasStore } from '@/store/reservasStore';
+import { parseLocalDate, formatLocalDateISO, startOfLocalDay } from '@/utils';
 
 interface TripCalendarScreenProps {
   viajeId?: string;
@@ -43,12 +44,6 @@ const CATEGORIA_RESERVA_VALUES: CategoriaReserva[] = [
 
 const isCategoriaReserva = (value?: string): value is CategoriaReserva => {
   return value ? CATEGORIA_RESERVA_VALUES.includes(value as CategoriaReserva) : false;
-};
-
-const startOfDay = (date: Date) => {
-  const normalized = new Date(date);
-  normalized.setHours(0, 0, 0, 0);
-  return normalized;
 };
 
 export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
@@ -96,13 +91,8 @@ export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
     return days;
   };
 
-  // Formatear fecha a ISO (YYYY-MM-DD)
-  const formatDateISO = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const day = date.getDate();
-    return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-  };
+  // Formatear fecha a ISO (YYYY-MM-DD) usando la función utilitaria
+  const formatDateISO = formatLocalDateISO;
 
   const getSafeCategoria = (categoria?: string): CategoriaReserva => {
     return isCategoriaReserva(categoria) ? categoria : 'other';
@@ -119,8 +109,8 @@ export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
     setLoading(true);
 
     try {
-      const monthStart = startOfDay(new Date(month.getFullYear(), month.getMonth(), 1));
-      const monthEnd = startOfDay(new Date(month.getFullYear(), month.getMonth() + 1, 0));
+      const monthStart = startOfLocalDay(new Date(month.getFullYear(), month.getMonth(), 1));
+      const monthEnd = startOfLocalDay(new Date(month.getFullYear(), month.getMonth() + 1, 0));
 
       const viajesUsuario = await getViajesByUsuario(user.uid);
       // Filtrar solo viajes NO archivados
@@ -131,8 +121,8 @@ export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
 
       await Promise.all(
         viajesActivos.map(async (viaje) => {
-          const viajeInicio = startOfDay(new Date(viaje.fechaInicio));
-          const viajeFin = startOfDay(new Date(viaje.fechaFin));
+          const viajeInicio = parseLocalDate(viaje.fechaInicio);
+          const viajeFin = parseLocalDate(viaje.fechaFin);
           const intersectsMonth = viajeFin >= monthStart && viajeInicio <= monthEnd;
 
           if (!intersectsMonth) {
@@ -154,7 +144,7 @@ export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
               categoria: reserva.categoria,
             });
 
-            const fechaReserva = startOfDay(new Date(reserva.fechaInicio));
+            const fechaReserva = parseLocalDate(reserva.fechaInicio);
 
             console.log('[TripCalendarScreen] Fecha parseada:', {
               fechaReserva,
@@ -258,10 +248,10 @@ export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
 
   // Verificar si fecha esta dentro de algun viaje
   const isDateInAnyTrip = (date: Date): boolean => {
-    const target = startOfDay(date);
+    const target = startOfLocalDay(date);
     return viajes.some((viaje) => {
-      const inicio = startOfDay(new Date(viaje.fechaInicio));
-      const fin = startOfDay(new Date(viaje.fechaFin));
+      const inicio = parseLocalDate(viaje.fechaInicio);
+      const fin = parseLocalDate(viaje.fechaFin);
       return target >= inicio && target <= fin;
     });
   };

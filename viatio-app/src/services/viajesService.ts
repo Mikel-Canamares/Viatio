@@ -12,7 +12,7 @@ import type {
   UpdateViajeInput,
   ViajeStats,
 } from '@/types/viaje';
-import { logError } from '@/utils';
+import { logError, parseLocalDate, startOfLocalDay } from '@/utils';
 import { createDiasParaViaje, deleteDiasByViajeId } from './diasViajeService';
 
 // ============================================
@@ -367,15 +367,14 @@ export async function getViajeStats(viajeId: string): Promise<ViajeStats> {
       throw new Error('Viaje no encontrado');
     }
 
-    // Calcular días totales
-    const fechaInicio = new Date(viaje.fechaInicio);
-    const fechaFin = new Date(viaje.fechaFin);
+    // Calcular días totales (usar parseLocalDate para evitar problemas de zona horaria)
+    const fechaInicio = parseLocalDate(viaje.fechaInicio);
+    const fechaFin = parseLocalDate(viaje.fechaFin);
     const diasTotales =
       Math.ceil((fechaFin.getTime() - fechaInicio.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
     // Calcular días restantes (desde hoy)
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
+    const hoy = startOfLocalDay(new Date());
     const diasRestantes = Math.ceil(
       (fechaInicio.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24)
     );

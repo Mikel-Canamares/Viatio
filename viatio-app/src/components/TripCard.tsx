@@ -16,6 +16,7 @@ import { SwipeableCard } from './SwipeableCard';
 import { SwipeActions } from './SwipeActions';
 import type { Viaje } from '@/types/viaje';
 import { theme } from '@/config';
+import { parseLocalDate, startOfLocalDay } from '@/utils';
 
 interface TripCardProps {
   /** Viaje a mostrar */
@@ -41,9 +42,9 @@ export function TripCard({
   onDelete,
   isArchived = false,
 }: TripCardProps) {
-  // Validar y formatear fechas
-  const fechaInicio = new Date(viaje.fechaInicio);
-  const fechaFin = new Date(viaje.fechaFin);
+  // Validar y formatear fechas (parseLocalDate evita problemas de zona horaria)
+  const fechaInicio = parseLocalDate(viaje.fechaInicio);
+  const fechaFin = parseLocalDate(viaje.fechaFin);
 
   // Validar que las fechas sean válidas
   const fechasValidas = isValid(fechaInicio) && isValid(fechaFin);
@@ -53,8 +54,7 @@ export function TripCard({
     : 'Fechas no válidas';
 
   // Calcular días restantes (solo si las fechas son válidas)
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
+  const hoy = startOfLocalDay(new Date());
   const diasRestantes = fechasValidas ? differenceInDays(fechaInicio, hoy) : 0;
   const esFuturo = diasRestantes > 0;
 

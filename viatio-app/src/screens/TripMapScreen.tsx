@@ -16,6 +16,7 @@ import { PlaceSearchBar } from '@/components/PlaceSearchBar';
 import { PlaceDetailCard } from '@/components/PlaceDetailCard';
 import { AddToTripModal } from '@/components/AddToTripModal';
 import { SavedPlacesAccordion } from '@/components/SavedPlacesAccordion';
+import { MapMarker, SelectedPlaceMarker } from '@/components/MapMarker';
 import { PlaceResult } from '@/types/googlePlaces';
 import { Lugar, LUGAR_CATEGORIAS, CategoriaLugar } from '@/types/lugar';
 import {
@@ -118,6 +119,14 @@ export default function TripMapScreen() {
   const loadLugares = async () => {
     try {
       const data = await getLugaresByViajeId(viajeId);
+      console.log('[TripMapScreen] Lugares cargados:', data.length);
+      console.log('[TripMapScreen] Lugares con coordenadas:', data.filter(l => l.latitud && l.longitud).length);
+
+      // Log detallado de cada lugar
+      data.forEach(lugar => {
+        console.log(`[TripMapScreen] Lugar: ${lugar.nombre}, lat: ${lugar.latitud}, lng: ${lugar.longitud}, categoria: ${lugar.categoria}`);
+      });
+
       setLugares(data);
 
       // Centrar mapa en los lugares si hay
@@ -492,8 +501,12 @@ export default function TripMapScreen() {
           >
             {/* Marcadores de lugares guardados */}
             {lugares.map((lugar) => {
-              if (!lugar.latitud || !lugar.longitud) return null;
-              const config = LUGAR_CATEGORIAS[lugar.categoria] || LUGAR_CATEGORIAS.other;
+              if (!lugar.latitud || !lugar.longitud) {
+                console.log('[TripMapScreen] Lugar sin coordenadas, no se renderiza:', lugar.nombre);
+                return null;
+              }
+
+              console.log('[TripMapScreen] Renderizando marcador:', lugar.nombre, lugar.latitud, lugar.longitud);
 
               return (
                 <Marker
@@ -503,18 +516,11 @@ export default function TripMapScreen() {
                     longitude: lugar.longitud,
                   }}
                   title={lugar.nombre}
+                  description={lugar.descripcion}
                   onPress={() => handleSelectLugar(lugar)}
+                  anchor={{ x: 0.5, y: 0.5 }}
                 >
-                  <View style={styles.markerContainer}>
-                    <View style={[styles.markerCircle, { backgroundColor: config.color }]}>
-                      <Ionicons
-                        name={config.icon as any}
-                        size={22}
-                        color="#FFFFFF"
-                      />
-                    </View>
-                    <View style={[styles.markerTriangle, { borderTopColor: config.color }]} />
-                  </View>
+                  <MapMarker categoria={lugar.categoria} size={40} />
                 </Marker>
               );
             })}
@@ -526,17 +532,10 @@ export default function TripMapScreen() {
                   latitude: selectedPlace.latitude,
                   longitude: selectedPlace.longitude,
                 }}
+                title={selectedPlace.name}
+                anchor={{ x: 0.5, y: 0.5 }}
               >
-                <View style={styles.markerContainer}>
-                  <View style={[styles.markerCircle, { backgroundColor: theme.colors.primaryLight }]}>
-                    <Ionicons
-                      name="location"
-                      size={22}
-                      color="#FFFFFF"
-                    />
-                  </View>
-                  <View style={[styles.markerTriangle, { borderTopColor: theme.colors.primaryLight }]} />
-                </View>
+                <SelectedPlaceMarker color={theme.colors.primary} size={40} />
               </Marker>
             )}
           </MapView>
@@ -705,40 +704,5 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'flex-end',
-  },
-  // Marcadores personalizados (pin con icono interior)
-  markerContainer: {
-    alignItems: 'center',
-    width: 44,
-    height: 56,
-  },
-  markerCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-    // Sombra robusta para visibilidad en todos los dispositivos
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
-    elevation: 10, // Android - sombra más pronunciada
-  },
-  markerTriangle: {
-    width: 0,
-    height: 0,
-    backgroundColor: 'transparent',
-    borderStyle: 'solid',
-    borderLeftWidth: 8,
-    borderRightWidth: 8,
-    borderTopWidth: 12,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    marginTop: -3,
-    // Sombra para el triángulo (solo Android)
-    elevation: 8,
   },
 });

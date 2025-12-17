@@ -11,6 +11,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { theme } from '@/config';
+import { parseLocalDate } from '@/utils';
 
 interface DateInputProps {
   label: string;
@@ -33,8 +34,8 @@ export function DateInput({
 }: DateInputProps) {
   const [showPicker, setShowPicker] = useState(false);
 
-  // Convertir ISO string a Date o usar fecha actual
-  const dateValue = value ? new Date(value) : new Date();
+  // Convertir ISO string a Date o usar fecha actual (parseLocalDate evita problemas de zona horaria)
+  const dateValue = value ? parseLocalDate(value) : new Date();
 
   // Formatear fecha para mostrar
   const displayValue = value

@@ -7,7 +7,8 @@
 
 import { getDatabase, generateId, getCurrentTimestamp } from '@/database';
 import { DiaViaje } from '@/types/diaViaje';
-import { eachDayOfInterval, parseISO } from 'date-fns';
+import { eachDayOfInterval } from 'date-fns';
+import { parseLocalDate, formatLocalDateISO } from '@/utils';
 
 /**
  * Crea un DiaViaje para cada día del rango de fechas del viaje
@@ -21,15 +22,15 @@ export async function createDiasParaViaje(
   const dias: DiaViaje[] = [];
 
   try {
-    // Generar array de fechas usando date-fns
-    const inicio = parseISO(fechaInicio);
-    const fin = parseISO(fechaFin);
+    // Generar array de fechas usando date-fns (parseLocalDate evita problemas de zona horaria)
+    const inicio = parseLocalDate(fechaInicio);
+    const fin = parseLocalDate(fechaFin);
     const fechas = eachDayOfInterval({ start: inicio, end: fin });
 
     // Crear un día para cada fecha
     for (const fecha of fechas) {
       const id = generateId();
-      const fechaISO = fecha.toISOString().split('T')[0]; // YYYY-MM-DD
+      const fechaISO = formatLocalDateISO(fecha); // YYYY-MM-DD en hora local
       const now = getCurrentTimestamp();
 
       const dia: DiaViaje = {
