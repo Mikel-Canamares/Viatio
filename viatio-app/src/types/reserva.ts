@@ -8,7 +8,17 @@ export type CategoriaReserva = 'transport' | 'accommodation' | 'food' | 'activit
 
 export type EstadoPago = 'pending' | 'partial' | 'paid';
 
+// Subtipos por categoría
+export type SubtipoTransporte = 'plane' | 'train' | 'bus' | 'ferry' | 'taxi' | 'other';
+export type SubtipoAlojamiento = 'hotel' | 'aparthotel' | 'apartment' | 'room' | 'camping' | 'other';
+export type SubtipoActividad = 'museum' | 'tour' | 'sports' | 'culture' | 'nature' | 'adventure' | 'other';
+
 export interface ReservaMetadatos {
+  // Subtipos específicos
+  subtipoTransporte?: SubtipoTransporte;
+  subtipoAlojamiento?: SubtipoAlojamiento;
+  subtipoActividad?: SubtipoActividad;
+
   // Transport
   aerolinea?: string;
   numeroVuelo?: string;
@@ -61,6 +71,7 @@ export interface Reserva {
   notas?: string;
   metadatos?: ReservaMetadatos;
   documentoId?: string; // ID del documento asociado (opcional)
+  lugarId?: string; // ID del lugar asociado (opcional, creado automáticamente)
   createdAt: string;
   updatedAt: string;
 }
@@ -86,6 +97,8 @@ export interface CreateReservaInput {
   notas?: string;
   metadatos?: ReservaMetadatos;
   documentoId?: string; // ID del documento asociado (opcional)
+  lugarId?: string; // ID del lugar asociado (opcional)
+  autoCreateLugar?: boolean; // Flag para controlar creación automática de lugar (default: true)
 }
 
 export const RESERVA_CATEGORIAS: Record<CategoriaReserva, { label: string; icon: string }> = {
@@ -94,6 +107,35 @@ export const RESERVA_CATEGORIAS: Record<CategoriaReserva, { label: string; icon:
   food: { label: 'Restaurante', icon: 'restaurant' },
   activity: { label: 'Actividad', icon: 'ticket' },
   other: { label: 'Otro', icon: 'ellipsis-horizontal' },
+};
+
+// Opciones de subtipos con iconos
+export const SUBTIPOS_TRANSPORTE: Record<SubtipoTransporte, { label: string; icon: string }> = {
+  plane: { label: 'Avión', icon: 'airplane' },
+  train: { label: 'Tren', icon: 'train' },
+  bus: { label: 'Autobús', icon: 'bus' },
+  ferry: { label: 'Ferry', icon: 'boat' },
+  taxi: { label: 'Taxi', icon: 'car' },
+  other: { label: 'Otros', icon: 'ellipsis-horizontal' },
+};
+
+export const SUBTIPOS_ALOJAMIENTO: Record<SubtipoAlojamiento, { label: string; icon: string }> = {
+  hotel: { label: 'Hotel', icon: 'business' },
+  aparthotel: { label: 'Apartahotel', icon: 'business-outline' },
+  apartment: { label: 'Apartamento', icon: 'home' },
+  room: { label: 'Habitación', icon: 'bed' },
+  camping: { label: 'Camping', icon: 'bonfire' },
+  other: { label: 'Otros', icon: 'ellipsis-horizontal' },
+};
+
+export const SUBTIPOS_ACTIVIDAD: Record<SubtipoActividad, { label: string; icon: string }> = {
+  museum: { label: 'Museo', icon: 'images' },
+  tour: { label: 'Tour', icon: 'walk' },
+  sports: { label: 'Deportes', icon: 'football' },
+  culture: { label: 'Cultura', icon: 'library' },
+  nature: { label: 'Naturaleza', icon: 'leaf' },
+  adventure: { label: 'Aventura', icon: 'trail-sign' },
+  other: { label: 'Otros', icon: 'ellipsis-horizontal' },
 };
 
 /**

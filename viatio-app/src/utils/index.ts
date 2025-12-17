@@ -18,3 +18,19 @@ export {
 } from './errorHandler';
 
 export type { AppError } from './errorHandler';
+
+export {
+  normalizeString,
+  stringSimilarity,
+  jaroWinklerSimilarity,
+  combinedSimilarity,
+  fuzzyContains,
+  extractKeywords,
+  keywordSimilarity,
+} from './stringSimilarity';
+
+export {
+  getDeviceLanguageCode,
+  getDeviceLocale,
+  isDeviceLanguage,
+} from './localization';

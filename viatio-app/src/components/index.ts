@@ -14,6 +14,7 @@ export { SecondaryButton } from './SecondaryButton';
 export { Card } from './Card';
 export { Input } from './Input';
 export { DateInput } from './DateInput';
+export { DateRangePicker } from './DateRangePicker';
 export { CategoryBadge, CATEGORY_COLORS, getCategoryConfig } from './CategoryBadge';
 export type { CategoryType } from './CategoryBadge';
 export { SectionHeader } from './SectionHeader';
@@ -23,12 +24,14 @@ export { LoadingOverlay } from './LoadingOverlay';
 export { TripCard } from './TripCard';
 export { default as ReservationCard } from './ReservationCard';
 export { default as DocumentCard } from './DocumentCard';
+export { SubtypeSelector } from './SubtypeSelector';
 
 // Componentes de Google Places (Fase 11)
 export { PlaceSearchBar } from './PlaceSearchBar';
 export { PlaceDetailCard } from './PlaceDetailCard';
 export { AddToTripModal } from './AddToTripModal';
 export { SavedPlacesAccordion } from './SavedPlacesAccordion';
+export { PlaceMatchNotification, useHandlePlaceMatch } from './PlaceMatchNotification';
 
 // Componentes de Calendario
 export { CalendarDay } from './CalendarDay';

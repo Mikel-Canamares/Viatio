@@ -46,6 +46,7 @@ export default {
       'expo-font',
       'expo-sqlite',
       'expo-web-browser',
+      'expo-localization',
       [
         'expo-location',
         {

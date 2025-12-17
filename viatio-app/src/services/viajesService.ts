@@ -16,6 +16,61 @@ import { logError } from '@/utils';
 import { createDiasParaViaje, deleteDiasByViajeId } from './diasViajeService';
 
 // ============================================
+// VALIDACIONES
+// ============================================
+
+/**
+ * Verifica si existe solapamiento de fechas con viajes existentes
+ * Retorna el viaje con el que solapa si hay conflicto, null si no hay conflicto
+ */
+export async function checkDateOverlap(
+  usuarioId: string,
+  fechaInicio: string,
+  fechaFin: string,
+  excludeViajeId?: string
+): Promise<Viaje | null> {
+  try {
+    const db = await getDatabase();
+
+    // Query para encontrar viajes que solapen con el rango de fechas
+    // Un viaje solapa si:
+    // 1. Su fecha inicio está entre nuestras fechas
+    // 2. Su fecha fin está entre nuestras fechas
+    // 3. Nuestras fechas están completamente dentro del viaje existente
+    let query = `
+      SELECT * FROM viajes
+      WHERE usuarioId = ?
+      AND archived = 0
+      AND (
+        (fechaInicio <= ? AND fechaFin >= ?)
+        OR (fechaInicio <= ? AND fechaFin >= ?)
+        OR (fechaInicio >= ? AND fechaFin <= ?)
+      )
+    `;
+    const params: any[] = [
+      usuarioId,
+      fechaInicio, fechaInicio,  // Caso 1: El nuevo inicio cae dentro de un viaje existente
+      fechaFin, fechaFin,         // Caso 2: El nuevo fin cae dentro de un viaje existente
+      fechaInicio, fechaFin       // Caso 3: El nuevo viaje envuelve completamente a uno existente
+    ];
+
+    // Si estamos editando, excluir el viaje actual
+    if (excludeViajeId) {
+      query += ' AND id != ?';
+      params.push(excludeViajeId);
+    }
+
+    const viajesConflicto = await db.getAllAsync<Viaje>(query, params);
+
+    // Retornar el primer viaje con conflicto, si existe
+    return viajesConflicto.length > 0 ? viajesConflicto[0] : null;
+  } catch (error) {
+    logError(error, 'checkDateOverlap');
+    throw new Error('Error al verificar solapamiento de fechas');
+  }
+}
+
+// ============================================
 // CREAR
 // ============================================
 
@@ -26,6 +81,22 @@ export async function createViaje(
   input: CreateViajeInput,
   usuarioId: string
 ): Promise<Viaje> {
+  // Validar solapamiento de fechas ANTES del try/catch principal
+  const conflicto = await checkDateOverlap(usuarioId, input.fechaInicio, input.fechaFin);
+  if (conflicto) {
+    // Formatear fechas para mostrar de forma elegante (dd/MM/yyyy)
+    const formatearFecha = (fecha: string) => {
+      const [year, month, day] = fecha.split('-');
+      return `${day}/${month}/${year}`;
+    };
+
+    const error = new Error(
+      `Ya existe un viaje a "${conflicto.destino}" programado del ${formatearFecha(conflicto.fechaInicio)} al ${formatearFecha(conflicto.fechaFin)}.\n\nPor favor, selecciona otras fechas para tu nuevo viaje.`
+    );
+    error.name = 'DateOverlapError';
+    throw error;
+  }
+
   try {
     const db = await getDatabase();
 

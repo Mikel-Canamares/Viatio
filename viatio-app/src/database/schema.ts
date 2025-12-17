@@ -9,7 +9,7 @@
 // VERSIÓN DEL ESQUEMA
 // ============================================
 
-export const CURRENT_SCHEMA_VERSION = 5;
+export const CURRENT_SCHEMA_VERSION = 6;
 
 // ============================================
 // CREACIÓN DE TABLAS
@@ -68,11 +68,13 @@ const CREATE_RESERVAS_TABLE = `
     notas TEXT,
     metadatos TEXT,
     documentoId TEXT,
+    lugarId TEXT,
     createdAt TEXT NOT NULL,
     updatedAt TEXT NOT NULL,
     FOREIGN KEY (viajeId) REFERENCES viajes(id) ON DELETE CASCADE,
     FOREIGN KEY (diaId) REFERENCES dias_viaje(id) ON DELETE SET NULL,
-    FOREIGN KEY (documentoId) REFERENCES documentos(id) ON DELETE SET NULL
+    FOREIGN KEY (documentoId) REFERENCES documentos(id) ON DELETE SET NULL,
+    FOREIGN KEY (lugarId) REFERENCES lugares(id) ON DELETE SET NULL
   );
 `;
 
@@ -238,6 +240,26 @@ const INDEX_GASTOS_RESERVA = `
   ON gastos(reservaId);
 `;
 
+const INDEX_LUGARES_GOOGLE_PLACE = `
+  CREATE INDEX IF NOT EXISTS idx_lugares_googlePlaceId
+  ON lugares(googlePlaceId);
+`;
+
+const INDEX_LUGARES_COORDS = `
+  CREATE INDEX IF NOT EXISTS idx_lugares_coords
+  ON lugares(latitud, longitud);
+`;
+
+const INDEX_RESERVAS_LUGAR = `
+  CREATE INDEX IF NOT EXISTS idx_reservas_lugarId
+  ON reservas(lugarId);
+`;
+
+const INDEX_RESERVAS_COORDS = `
+  CREATE INDEX IF NOT EXISTS idx_reservas_coords
+  ON reservas(latitud, longitud);
+`;
+
 export const CREATE_INDEXES_SQL = [
   INDEX_VIAJES_USUARIO,
   INDEX_VIAJES_FECHAS,
@@ -247,8 +269,12 @@ export const CREATE_INDEXES_SQL = [
   INDEX_RESERVAS_VIAJE,
   INDEX_RESERVAS_DIA,
   INDEX_RESERVAS_CATEGORIA,
+  INDEX_RESERVAS_LUGAR,
+  INDEX_RESERVAS_COORDS,
   INDEX_LUGARES_VIAJE,
   INDEX_LUGARES_DIA,
+  INDEX_LUGARES_GOOGLE_PLACE,
+  INDEX_LUGARES_COORDS,
   INDEX_DOCUMENTOS_VIAJE,
   INDEX_DOCUMENTOS_CATEGORIA,
   INDEX_GASTOS_VIAJE,

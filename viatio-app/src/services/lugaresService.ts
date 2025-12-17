@@ -370,3 +370,117 @@ export async function deleteLugar(id: string): Promise<boolean> {
     return false;
   }
 }
+
+// ============================================
+// BÚSQUEDAS ESPECIALIZADAS PARA MATCHING
+// ============================================
+
+/**
+ * Busca un lugar por su Google Place ID
+ */
+export async function findLugarByGooglePlaceId(
+  viajeId: string,
+  googlePlaceId: string
+): Promise<Lugar | null> {
+  try {
+    const db = await getDatabase();
+    const row = await db.getFirstAsync<any>(
+      'SELECT * FROM lugares WHERE viajeId = ? AND googlePlaceId = ? LIMIT 1',
+      [viajeId, googlePlaceId]
+    );
+
+    return row ? rowToLugar(row) : null;
+  } catch (error) {
+    logError(error, 'findLugarByGooglePlaceId');
+    return null;
+  }
+}
+
+/**
+ * Busca lugares cercanos a unas coordenadas (dentro de un radio en metros)
+ * Usa la fórmula de Haversine para calcular distancia
+ */
+export async function findLugaresNearCoordinates(
+  viajeId: string,
+  latitude: number,
+  longitude: number,
+  radiusMeters: number = 100
+): Promise<Lugar[]> {
+  try {
+    const db = await getDatabase();
+
+    // Obtener todos los lugares del viaje que tengan coordenadas
+    const rows = await db.getAllAsync<any>(
+      'SELECT * FROM lugares WHERE viajeId = ? AND latitud IS NOT NULL AND longitud IS NOT NULL',
+      [viajeId]
+    );
+
+    if (rows.length === 0) return [];
+
+    // Filtrar por distancia usando Haversine
+    const lugaresConDistancia = rows
+      .map((row) => {
+        const lugar = rowToLugar(row);
+        const distance = calculateDistance(
+          latitude,
+          longitude,
+          lugar.latitud!,
+          lugar.longitud!
+        );
+        return { lugar, distance };
+      })
+      .filter((item) => item.distance <= radiusMeters)
+      .sort((a, b) => a.distance - b.distance);
+
+    return lugaresConDistancia.map((item) => item.lugar);
+  } catch (error) {
+    logError(error, 'findLugaresNearCoordinates');
+    return [];
+  }
+}
+
+/**
+ * Calcula la distancia entre dos coordenadas usando la fórmula de Haversine
+ * Retorna distancia en metros
+ */
+function calculateDistance(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const R = 6371e3; // Radio de la Tierra en metros
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c; // Distancia en metros
+}
+
+/**
+ * Busca lugares por nombre (búsqueda fuzzy)
+ */
+export async function findLugaresByName(
+  viajeId: string,
+  searchTerm: string
+): Promise<Lugar[]> {
+  try {
+    const db = await getDatabase();
+    const rows = await db.getAllAsync<any>(
+      'SELECT * FROM lugares WHERE viajeId = ? AND nombre LIKE ? ORDER BY nombre ASC',
+      [viajeId, `%${searchTerm}%`]
+    );
+
+    return rows.map(rowToLugar);
+  } catch (error) {
+    logError(error, 'findLugaresByName');
+    return [];
+  }
+}

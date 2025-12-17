@@ -10,6 +10,8 @@ import {
   View,
   Text,
   StyleSheet,
+  ScrollView,
+  KeyboardAvoidingView,
   Image,
   Pressable,
   Alert,
@@ -231,10 +233,19 @@ export default function EditProfileScreen({ navigation }: Props) {
   };
 
   return (
-    <ScreenContainer scroll>
+    <ScreenContainer>
       <PageHeader title="Editar perfil" onBack={handleBack} />
 
-      <View style={styles.content}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+        >
         {/* Card de Avatar */}
         <Card style={styles.avatarCard}>
           <View style={styles.avatarContainer}>
@@ -297,7 +308,8 @@ export default function EditProfileScreen({ navigation }: Props) {
         >
           Guardar cambios
         </PrimaryButton>
-      </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </ScreenContainer>
   );
 }

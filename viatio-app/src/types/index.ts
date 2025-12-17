@@ -37,3 +37,14 @@ export {
   DEFAULT_PREFERENCIAS_NOTIFICACIONES,
   DEFAULT_CONFIGURACION_APP,
 } from './perfil';
+
+export type {
+  PlaceMatchResult,
+  PlaceMatchType,
+  AutoPlaceCreationOptions,
+  PlaceMatchingConfig,
+  GeoCoordinates,
+  ScoredPlace,
+} from './placeMatching';
+
+export { DEFAULT_PLACE_MATCHING_CONFIG, DEFAULT_AUTO_CREATION_OPTIONS } from './placeMatching';
