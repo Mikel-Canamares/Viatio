@@ -25,6 +25,7 @@ import { getViajeById, getViajeStats } from '@/services';
 import type { Viaje, ViajeStats } from '@/types/viaje';
 import { theme } from '@/config';
 import type { HomeStackParamList } from '@/navigation/types';
+import { parseLocalDate } from '@/utils';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'TripDetail'>;
 
@@ -101,7 +102,7 @@ export default function TripDetailScreen({ navigation, route }: Props) {
     );
   }
 
-  const fechasFormateadas = `${format(new Date(viaje.fechaInicio), 'd MMM', { locale: es })} – ${format(new Date(viaje.fechaFin), 'd MMM', { locale: es })}`;
+  const fechasFormateadas = `${format(parseLocalDate(viaje.fechaInicio), 'd MMM', { locale: es })} – ${format(parseLocalDate(viaje.fechaFin), 'd MMM', { locale: es })}`;
 
   return (
     <ScreenContainer>

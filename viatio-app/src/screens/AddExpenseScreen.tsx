@@ -28,6 +28,7 @@ import { ScreenContainer } from '@/components/ScreenContainer';
 import { PageHeader } from '@/components/PageHeader';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { useGastosStore } from '@/store/gastosStore';
+import { parseLocalDate } from '@/utils';
 import { CategoriaGasto, GASTO_CATEGORIAS } from '@/types/gasto';
 import { getViajeById } from '@/services';
 import type { Viaje } from '@/types/viaje';
@@ -91,9 +92,9 @@ export function AddExpenseScreen() {
 
       setViaje(viajeData);
 
-      // Generar lista de días del viaje
-      const fechaInicio = new Date(viajeData.fechaInicio);
-      const fechaFin = new Date(viajeData.fechaFin);
+      // Generar lista de días del viaje (parseLocalDate evita problemas de zona horaria)
+      const fechaInicio = parseLocalDate(viajeData.fechaInicio);
+      const fechaFin = parseLocalDate(viajeData.fechaFin);
       const totalDias = differenceInDays(fechaFin, fechaInicio) + 1;
 
       const dias: DiaViaje[] = [];

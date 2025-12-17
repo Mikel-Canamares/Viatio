@@ -36,6 +36,7 @@ import { useDocumentosStore } from '@/store/documentosStore';
 import { getViajeById, pickDocument, pickImage } from '@/services';
 import { detectTipoArchivo } from '@/services/documentosService';
 import { confirmPlaceSuggestion, mapReservaCategoriaToLugarCategoria } from '@/services/placeMatchingService';
+import { parseLocalDate } from '@/utils';
 import type {
   CreateReservaInput,
   CategoriaReserva,
@@ -564,8 +565,8 @@ export default function AddReservationScreen({ route, navigation }: Props) {
                   label="Fecha inicio"
                   value={formData.fechaInicio || ''}
                   onChangeDate={(value) => updateField('fechaInicio', value)}
-                  minDate={viaje ? new Date(viaje.fechaInicio) : undefined}
-                  maxDate={viaje ? new Date(viaje.fechaFin) : undefined}
+                  minDate={viaje ? parseLocalDate(viaje.fechaInicio) : undefined}
+                  maxDate={viaje ? parseLocalDate(viaje.fechaFin) : undefined}
                 />
               </View>
               <View style={styles.halfWidth}>
@@ -583,8 +584,8 @@ export default function AddReservationScreen({ route, navigation }: Props) {
                   label="Fecha fin (opcional)"
                   value={formData.fechaFin || ''}
                   onChangeDate={(value) => updateField('fechaFin', value)}
-                  minDate={viaje ? new Date(viaje.fechaInicio) : undefined}
-                  maxDate={viaje ? new Date(viaje.fechaFin) : undefined}
+                  minDate={viaje ? parseLocalDate(viaje.fechaInicio) : undefined}
+                  maxDate={viaje ? parseLocalDate(viaje.fechaFin) : undefined}
                 />
               </View>
               <View style={styles.halfWidth}>

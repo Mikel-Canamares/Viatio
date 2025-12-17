@@ -34,3 +34,11 @@ export {
   getDeviceLocale,
   isDeviceLanguage,
 } from './localization';
+
+export {
+  parseLocalDate,
+  formatLocalDateISO,
+  startOfLocalDay,
+  isSameDay,
+  isDateInRange,
+} from './dateUtils';
