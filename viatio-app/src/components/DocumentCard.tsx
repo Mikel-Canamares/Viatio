@@ -9,6 +9,8 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Card } from './Card';
+import { SwipeableCard } from './SwipeableCard';
+import { SwipeActionsDocument } from './SwipeActionsDocument';
 import { theme } from '@/config';
 import type { Documento } from '@/types/documento';
 import { DOCUMENTO_CATEGORIAS } from '@/types/documento';
@@ -21,7 +23,7 @@ import { formatFileSize } from '@/services/fileService';
 interface DocumentCardProps {
   documento: Documento;
   onPress: () => void;
-  onDownload?: () => void;
+  onEdit?: () => void;
   onDelete?: () => void;
 }
 
@@ -74,11 +76,12 @@ function getTypeBadgeStyles(tipo: string): {
 // COMPONENT
 // ============================================
 
-export default function DocumentCard({ documento, onPress, onDownload, onDelete }: DocumentCardProps) {
+export default function DocumentCard({ documento, onPress, onEdit, onDelete }: DocumentCardProps) {
   const categoryConfig = DOCUMENTO_CATEGORIAS[documento.categoria];
   const typeBadge = getTypeBadgeStyles(documento.tipoArchivo);
 
-  return (
+  // Contenido de la tarjeta (reutilizable)
+  const cardContent = (
     <Card style={styles.card}>
       <Pressable onPress={onPress} style={styles.pressable}>
         {/* Row principal */}
@@ -124,43 +127,6 @@ export default function DocumentCard({ documento, onPress, onDownload, onDelete 
               </Text>
             </View>
           </View>
-
-          {/* Botones de acción */}
-          <View style={styles.actionsContainer}>
-            {/* Botón download */}
-            {onDownload && (
-              <Pressable
-                onPress={(e) => {
-                  e.stopPropagation();
-                  onDownload();
-                }}
-                style={styles.actionButton}
-              >
-                <Ionicons
-                  name="download-outline"
-                  size={20}
-                  color={theme.colors.primaryLight}
-                />
-              </Pressable>
-            )}
-
-            {/* Botón delete */}
-            {onDelete && (
-              <Pressable
-                onPress={(e) => {
-                  e.stopPropagation();
-                  onDelete();
-                }}
-                style={styles.actionButton}
-              >
-                <Ionicons
-                  name="trash-outline"
-                  size={20}
-                  color="#EF4444"
-                />
-              </Pressable>
-            )}
-          </View>
         </View>
 
         {/* Row inferior: fecha */}
@@ -169,6 +135,25 @@ export default function DocumentCard({ documento, onPress, onDownload, onDelete 
         </View>
       </Pressable>
     </Card>
+  );
+
+  // Si no hay acciones, retornar solo la tarjeta
+  if (!onEdit && !onDelete) {
+    return cardContent;
+  }
+
+  // Si hay acciones, envolver con SwipeableCard
+  return (
+    <SwipeableCard
+      renderRightActions={() => (
+        <SwipeActionsDocument
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
+      )}
+    >
+      {cardContent}
+    </SwipeableCard>
   );
 }
 
@@ -224,13 +209,6 @@ const styles = StyleSheet.create({
   fileSize: {
     fontSize: 14,
     color: theme.colors.textSecondary,
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  actionButton: {
-    padding: theme.spacing.sm,
   },
   bottomRow: {
     flexDirection: 'row',

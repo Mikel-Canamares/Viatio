@@ -222,6 +222,31 @@ export async function updateDocumentoCategoria(
   }
 }
 
+/**
+ * Actualiza el nombre de un documento
+ */
+export async function updateDocumentoNombre(
+  id: string,
+  nombre: string
+): Promise<boolean> {
+  try {
+    const db = await getDatabase();
+    const timestamp = getCurrentTimestamp();
+
+    await db.runAsync(
+      'UPDATE documentos SET nombre = ?, updatedAt = ? WHERE id = ?',
+      [nombre, timestamp, id]
+    );
+
+    console.log('[updateDocumentoNombre] Nombre actualizado:', { id, nombre });
+
+    return true;
+  } catch (error) {
+    logError(error, 'updateDocumentoNombre');
+    return false;
+  }
+}
+
 // ============================================
 // DELETE
 // ============================================

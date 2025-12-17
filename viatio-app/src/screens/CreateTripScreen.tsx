@@ -24,6 +24,7 @@ import {
   DateRangePicker,
   PrimaryButton,
   LoadingOverlay,
+  PlaceAutocompleteInput,
 } from '@/components';
 import { useViajesStore } from '@/store';
 import { useAuth } from '@/context';
@@ -137,7 +138,7 @@ export default function CreateTripScreen({ navigation }: Props) {
               <Text style={styles.sectionTitle}>Información básica</Text>
             </View>
 
-            <Input
+            <PlaceAutocompleteInput
               label="Destino"
               value={destino}
               onChangeText={setDestino}

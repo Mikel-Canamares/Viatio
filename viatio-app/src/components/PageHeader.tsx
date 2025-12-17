@@ -26,22 +26,7 @@ export function PageHeader({ title, onBack, rightElement }: PageHeaderProps) {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <View style={styles.container}>
-        {/* Botón de retroceso */}
-        {onBack && (
-          <Pressable
-            onPress={onBack}
-            style={({ pressed }) => [
-              styles.backButton,
-              pressed && styles.backButtonPressed,
-            ]}
-            hitSlop={{ top: 40, bottom: 40, left: 40, right: 20 }}
-            android_ripple={{ color: 'rgba(255, 255, 255, 0.2)', borderless: false }}
-          >
-            <Ionicons name="arrow-back" size={26} color="#FFFFFF" />
-          </Pressable>
-        )}
-
-        {/* Título */}
+        {/* Título centrado */}
         <Text
           style={[
             styles.title,
@@ -54,6 +39,20 @@ export function PageHeader({ title, onBack, rightElement }: PageHeaderProps) {
 
         {/* Elemento derecho */}
         {rightElement && <View style={styles.rightElement}>{rightElement}</View>}
+
+        {/* Botón de retroceso (absoluto para evitar superposición) */}
+        {onBack && (
+          <Pressable
+            onPress={onBack}
+            style={({ pressed }) => [
+              styles.backButton,
+              pressed && styles.backButtonPressed,
+            ]}
+            hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+          >
+            <Ionicons name="arrow-back" size={26} color="#FFFFFF" />
+          </Pressable>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -64,20 +63,23 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary,
   },
   container: {
+    position: 'relative',
     height: 56,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: theme.spacing.lg,
     backgroundColor: theme.colors.primary,
   },
   backButton: {
+    position: 'absolute',
+    left: theme.spacing.lg,
     width: 48,
     height: 48,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 10,
-    marginRight: theme.spacing.sm,
-    marginLeft: -4, // Compensa el aumento de tamaño para mantener alineación
+    borderRadius: 24,
+    zIndex: 10,
   },
   backButtonPressed: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
@@ -89,12 +91,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   titleCentered: {
-    flex: 1,
     textAlign: 'center',
-    marginLeft: -52, // Compensa el botón de retroceso para centrar (ahora 48px + 4px margin)
+    paddingHorizontal: 60, // Espacio para botones a los lados
   },
   titleLeft: {
     flex: 1,
+    paddingLeft: 60, // Espacio para el botón de retroceso
   },
   rightElement: {
     marginLeft: 'auto',

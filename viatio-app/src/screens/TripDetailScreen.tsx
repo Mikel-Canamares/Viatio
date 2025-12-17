@@ -167,8 +167,8 @@ export default function TripDetailScreen({ navigation, route }: Props) {
             {/* Agenda */}
             <Card onPress={() => handleNavigate('agenda')} style={styles.menuCard}>
               <View style={styles.menuRow}>
-                <View style={styles.iconContainer}>
-                  <Ionicons name="calendar-outline" size={24} color={theme.colors.primaryLight} />
+                <View style={[styles.iconContainer, styles.iconAgenda]}>
+                  <Ionicons name="calendar-outline" size={24} color="#0066CC" />
                 </View>
                 <View style={styles.menuTextContainer}>
                   <Text style={styles.menuTitle}>Agenda</Text>
@@ -181,8 +181,8 @@ export default function TripDetailScreen({ navigation, route }: Props) {
             {/* Reservas */}
             <Card onPress={() => handleNavigate('reservations')} style={styles.menuCard}>
               <View style={styles.menuRow}>
-                <View style={styles.iconContainer}>
-                  <Ionicons name="receipt-outline" size={24} color={theme.colors.primaryLight} />
+                <View style={[styles.iconContainer, styles.iconReservas]}>
+                  <Ionicons name="receipt-outline" size={24} color="#16A34A" />
                 </View>
                 <View style={styles.menuTextContainer}>
                   <Text style={styles.menuTitle}>Reservas</Text>
@@ -195,8 +195,8 @@ export default function TripDetailScreen({ navigation, route }: Props) {
             {/* Mapa */}
             <Card onPress={() => handleNavigate('map')} style={styles.menuCard}>
               <View style={styles.menuRow}>
-                <View style={styles.iconContainer}>
-                  <Ionicons name="map-outline" size={24} color={theme.colors.primaryLight} />
+                <View style={[styles.iconContainer, styles.iconMapa]}>
+                  <Ionicons name="map-outline" size={24} color="#9333EA" />
                 </View>
                 <View style={styles.menuTextContainer}>
                   <Text style={styles.menuTitle}>Mapa</Text>
@@ -209,8 +209,8 @@ export default function TripDetailScreen({ navigation, route }: Props) {
             {/* Documentos */}
             <Card onPress={() => handleNavigate('documents')} style={styles.menuCard}>
               <View style={styles.menuRow}>
-                <View style={styles.iconContainer}>
-                  <Ionicons name="document-outline" size={24} color={theme.colors.primaryLight} />
+                <View style={[styles.iconContainer, styles.iconDocumentos]}>
+                  <Ionicons name="document-outline" size={24} color="#EA580C" />
                 </View>
                 <View style={styles.menuTextContainer}>
                   <Text style={styles.menuTitle}>Documentos</Text>
@@ -223,8 +223,8 @@ export default function TripDetailScreen({ navigation, route }: Props) {
             {/* Gastos */}
             <Card onPress={() => handleNavigate('expenses')} style={styles.menuCard}>
               <View style={styles.menuRow}>
-                <View style={styles.iconContainer}>
-                  <Ionicons name="wallet-outline" size={24} color={theme.colors.primaryLight} />
+                <View style={[styles.iconContainer, styles.iconGastos]}>
+                  <Ionicons name="wallet-outline" size={24} color="#FFC043" />
                 </View>
                 <View style={styles.menuTextContainer}>
                   <Text style={styles.menuTitle}>Gastos</Text>
@@ -341,10 +341,25 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#DBEAFE',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: theme.spacing.md,
+  },
+  // Colores temáticos para cada sección
+  iconAgenda: {
+    backgroundColor: 'rgba(0, 102, 204, 0.1)', // Azul
+  },
+  iconReservas: {
+    backgroundColor: 'rgba(22, 163, 74, 0.1)', // Verde
+  },
+  iconMapa: {
+    backgroundColor: 'rgba(147, 51, 234, 0.1)', // Morado
+  },
+  iconDocumentos: {
+    backgroundColor: 'rgba(234, 88, 12, 0.1)', // Naranja
+  },
+  iconGastos: {
+    backgroundColor: 'rgba(255, 192, 67, 0.1)', // Amarillo
   },
   menuTextContainer: {
     flex: 1,

@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Pressable,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -41,7 +42,7 @@ const FILTROS: Array<{ key: CategoriaReserva | 'all'; label: string }> = [
 
 export default function TripReservationsScreen({ route, navigation }: Props) {
   const { viajeId } = route.params;
-  const { reservas, loading, fetchReservas } = useReservasStore();
+  const { reservas, loading, fetchReservas, removeReserva } = useReservasStore();
   const [filtroActivo, setFiltroActivo] = useState<CategoriaReserva | 'all'>('all');
 
   useEffect(() => {
@@ -100,6 +101,28 @@ export default function TripReservationsScreen({ route, navigation }: Props) {
 
   const handleNavigateToReservation = (reservaId: string) => {
     navigation.navigate('ReservationDetail', { viajeId, reservaId });
+  };
+
+  const handleEditReservation = (reserva: Reserva) => {
+    navigation.navigate('EditReservation', { reservaId: reserva.id });
+  };
+
+  const handleDeleteReservation = (reserva: Reserva) => {
+    Alert.alert(
+      'Eliminar reserva',
+      `¿Estás seguro de que quieres eliminar "${reserva.nombre}"?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            await removeReserva(reserva.id);
+            await loadReservas();
+          },
+        },
+      ]
+    );
   };
 
   const handleAddReservation = () => {
@@ -177,6 +200,8 @@ export default function TripReservationsScreen({ route, navigation }: Props) {
               <ReservationCard
                 reserva={item}
                 onPress={() => handleNavigateToReservation(item.id)}
+                onEdit={() => handleEditReservation(item)}
+                onDelete={() => handleDeleteReservation(item)}
               />
             )}
             renderSectionHeader={({ section }) => (

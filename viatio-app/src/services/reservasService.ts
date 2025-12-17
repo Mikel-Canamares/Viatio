@@ -113,10 +113,17 @@ export async function createReserva(
   // Auto-buscar/crear lugar si autoCreateLugar no es false y hay información de ubicación
   let placeMatch: PlaceMatchResult | undefined;
 
+  // Para accommodation y food: requiere nombre + dirección
+  // Para otras categorías: requiere ubicacion o dirección o coordenadas
+  const hasRequiredLocationData =
+    (reserva.categoria === 'accommodation' || reserva.categoria === 'food')
+      ? reserva.nombre && reserva.direccion
+      : input.ubicacion || input.direccion || (input.latitud && input.longitud);
+
   const shouldAutoCreatePlace =
     input.autoCreateLugar !== false &&
     !input.lugarId && // No buscar si ya tiene lugar asignado manualmente
-    (input.ubicacion || input.direccion || (input.latitud && input.longitud));
+    hasRequiredLocationData;
 
   if (shouldAutoCreatePlace) {
     try {

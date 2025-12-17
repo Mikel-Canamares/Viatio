@@ -76,6 +76,7 @@ export type HomeStackParamList = {
   TripMap: { viajeId: string };
   TripDocuments: { viajeId: string };
   AddDocument: { viajeId: string };
+  EditDocument: { documentoId: string; nombreActual: string };
   Expenses: { viajeId: string };
   AddExpense: { viajeId: string };
 };

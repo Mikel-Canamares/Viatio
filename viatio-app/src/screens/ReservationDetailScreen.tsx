@@ -23,7 +23,6 @@ import {
   PageHeader,
   Card,
   SectionHeader,
-  SecondaryButton,
   CategoryBadge,
 } from '@/components';
 import { theme } from '@/config';
@@ -61,7 +60,6 @@ export default function ReservationDetailScreen({ route, navigation }: Props) {
   const [reserva, setReserva] = useState<Reserva | null>(null);
   const [documento, setDocumento] = useState<Documento | null>(null);
   const [loading, setLoading] = useState(true);
-  const { removeReserva } = useReservasStore();
 
   useEffect(() => {
     loadReserva();
@@ -98,28 +96,6 @@ export default function ReservationDetailScreen({ route, navigation }: Props) {
       await Clipboard.setStringAsync(reserva.numeroConfirmacion);
       Alert.alert('Copiado', 'Número de confirmación copiado al portapapeles');
     }
-  };
-
-  const handleEdit = () => {
-    navigation.navigate('EditReservation', { reservaId: reserva!.id });
-  };
-
-  const handleDelete = () => {
-    Alert.alert(
-      'Eliminar reserva',
-      '¿Estás seguro de que quieres eliminar esta reserva?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: async () => {
-            await removeReserva(reservaId);
-            navigation.goBack();
-          },
-        },
-      ]
-    );
   };
 
   const formatFechaHora = (fecha?: string, hora?: string) => {
@@ -334,14 +310,6 @@ export default function ReservationDetailScreen({ route, navigation }: Props) {
               </Pressable>
             </View>
           )}
-
-          <View style={styles.actions}>
-            <SecondaryButton onPress={handleEdit}>Editar reserva</SecondaryButton>
-            <Pressable onPress={handleDelete} style={styles.deleteButton}>
-              <Ionicons name="trash-outline" size={20} color="#EF4444" />
-              <Text style={styles.deleteButtonText}>Eliminar reserva</Text>
-            </Pressable>
-          </View>
         </ScrollView>
       </ScreenContainer>
     </View>
@@ -355,7 +323,7 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingTop: theme.spacing.md,
-    paddingBottom: theme.spacing.xl * 2,
+    paddingBottom: theme.spacing.xl,
   },
   loadingContainer: {
     flex: 1,
@@ -517,26 +485,5 @@ const styles = StyleSheet.create({
   documentMeta: {
     fontSize: 13,
     color: theme.colors.textMuted,
-  },
-  actions: {
-    gap: theme.spacing.md,
-    marginTop: theme.spacing.md,
-  },
-  deleteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#FEE2E2',
-    backgroundColor: '#FEF2F2',
-  },
-  deleteButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#EF4444',
   },
 });

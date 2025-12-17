@@ -11,6 +11,7 @@ import {
   createDocumento,
   getDocumentosByViajeId,
   deleteDocumento,
+  updateDocumentoNombre,
 } from '@/services/documentosService';
 import { logError } from '@/utils/errorHandler';
 
@@ -27,6 +28,7 @@ interface DocumentosState {
 interface DocumentosActions {
   fetchDocumentos: (viajeId: string) => Promise<void>;
   addDocumento: (input: CreateDocumentoInput, sourceUri: string) => Promise<Documento | null>;
+  updateDocumento: (id: string, nombre: string) => Promise<boolean>;
   removeDocumento: (id: string) => Promise<void>;
   clearDocumentos: () => void;
   clearError: () => void;
@@ -80,6 +82,30 @@ export const useDocumentosStore = create<DocumentosStore>((set) => ({
       logError(error, 'addDocumento');
       set({ error: 'Error al guardar documento', loading: false });
       return null;
+    }
+  },
+
+  /**
+   * Actualiza el nombre de un documento
+   */
+  updateDocumento: async (id: string, nombre: string) => {
+    try {
+      const success = await updateDocumentoNombre(id, nombre);
+      if (success) {
+        set((state) => ({
+          documentos: state.documentos.map((d) =>
+            d.id === id ? { ...d, nombre } : d
+          ),
+        }));
+        return true;
+      } else {
+        set({ error: 'Error al actualizar documento' });
+        return false;
+      }
+    } catch (error) {
+      logError(error, 'updateDocumento');
+      set({ error: 'Error al actualizar documento' });
+      return false;
     }
   },
 
