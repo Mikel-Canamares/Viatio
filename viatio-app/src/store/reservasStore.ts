@@ -6,6 +6,7 @@
 
 import { create } from 'zustand';
 import { Reserva, CreateReservaInput, CategoriaReserva } from '@/types/reserva';
+import type { PlaceMatchResult } from '@/types/placeMatching';
 import * as reservasService from '@/services/reservasService';
 
 interface ReservasState {
@@ -18,7 +19,7 @@ interface ReservasState {
 interface ReservasActions {
   fetchReservas: (viajeId: string) => Promise<void>;
   fetchReservasByCategoria: (viajeId: string, categoria: CategoriaReserva) => Promise<void>;
-  addReserva: (input: CreateReservaInput) => Promise<Reserva | null>;
+  addReserva: (input: CreateReservaInput) => Promise<{ reserva: Reserva; placeMatch?: PlaceMatchResult } | null>;
   updateReserva: (id: string, input: Partial<CreateReservaInput>) => Promise<void>;
   removeReserva: (id: string) => Promise<void>;
   selectReserva: (reserva: Reserva | null) => void;
@@ -57,14 +58,14 @@ export const useReservasStore = create<ReservasState & ReservasActions>((set) =>
   addReserva: async (input) => {
     set({ loading: true, error: null });
     try {
-      const reserva = await reservasService.createReserva(input);
+      const result = await reservasService.createReserva(input);
       set((state) => ({
-        reservas: [...state.reservas, reserva].sort((a, b) =>
+        reservas: [...state.reservas, result.reserva].sort((a, b) =>
           (a.fechaInicio || '').localeCompare(b.fechaInicio || '')
         ),
         loading: false,
       }));
-      return reserva;
+      return result;
     } catch (error) {
       set({ error: 'Error al crear reserva', loading: false });
       return null;

@@ -8,11 +8,15 @@ import { getDatabase, generateId, getCurrentTimestamp } from '@/database';
 import { Reserva, CreateReservaInput, CategoriaReserva } from '@/types/reserva';
 import { createGasto, getGastoByReservaId, updateGasto, deleteGastoByReservaId } from './gastosService';
 import { mapReservaToCategoriaGasto } from '@/types/gasto';
+import { findOrCreateLugarFromReserva, linkReservaToLugar } from './placeMatchingService';
+import type { PlaceMatchResult } from '@/types/placeMatching';
 
 /**
- * Crea una nueva reserva
+ * Crea una nueva reserva y opcionalmente busca/crea lugar asociado
  */
-export async function createReserva(input: CreateReservaInput): Promise<Reserva> {
+export async function createReserva(
+  input: CreateReservaInput
+): Promise<{ reserva: Reserva; placeMatch?: PlaceMatchResult }> {
   const db = await getDatabase();
   const now = getCurrentTimestamp();
 
@@ -37,6 +41,7 @@ export async function createReserva(input: CreateReservaInput): Promise<Reserva>
     estadoPago: input.estadoPago || 'pending',
     notas: input.notas,
     metadatos: input.metadatos,
+    lugarId: input.lugarId,
     createdAt: now,
     updatedAt: now,
   };
@@ -46,8 +51,8 @@ export async function createReserva(input: CreateReservaInput): Promise<Reserva>
       id, viajeId, diaId, categoria, nombre, proveedor, numeroConfirmacion,
       fechaInicio, horaInicio, fechaFin, horaFin, ubicacion, direccion,
       latitud, longitud, precio, moneda, estadoPago, notas, metadatos,
-      documentoId, createdAt, updatedAt
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      documentoId, lugarId, createdAt, updatedAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       reserva.id,
       reserva.viajeId,
@@ -70,6 +75,7 @@ export async function createReserva(input: CreateReservaInput): Promise<Reserva>
       reserva.notas || null,
       reserva.metadatos ? JSON.stringify(reserva.metadatos) : null,
       input.documentoId || null,
+      reserva.lugarId || null,
       reserva.createdAt,
       reserva.updatedAt,
     ]
@@ -85,7 +91,7 @@ export async function createReserva(input: CreateReservaInput): Promise<Reserva>
   ) {
     try {
       const categoriaGasto = mapReservaToCategoriaGasto(reserva.categoria);
-      const montoGasto = reserva.estadoPago === 'partial' ? reserva.precio / 2 : reserva.precio; // Si es parcial, asumimos 50%
+      const montoGasto = reserva.estadoPago === 'partial' ? reserva.precio / 2 : reserva.precio;
 
       await createGasto({
         viajeId: reserva.viajeId,
@@ -101,11 +107,41 @@ export async function createReserva(input: CreateReservaInput): Promise<Reserva>
       console.log('[ReservasService] Gasto auto-creado para reserva:', reserva.id);
     } catch (error) {
       console.error('[ReservasService] Error al auto-crear gasto:', error);
-      // No lanzamos error para no bloquear la creación de la reserva
     }
   }
 
-  return reserva;
+  // Auto-buscar/crear lugar si autoCreateLugar no es false y hay información de ubicación
+  let placeMatch: PlaceMatchResult | undefined;
+
+  const shouldAutoCreatePlace =
+    input.autoCreateLugar !== false &&
+    !input.lugarId && // No buscar si ya tiene lugar asignado manualmente
+    (input.ubicacion || input.direccion || (input.latitud && input.longitud));
+
+  if (shouldAutoCreatePlace) {
+    try {
+      console.log('[ReservasService] Iniciando búsqueda automática de lugar...');
+      placeMatch = await findOrCreateLugarFromReserva(reserva, {
+        showConfirmation: false,
+        notifyUser: true,
+        threshold: 80,
+        maxDistanceMeters: 100,
+      });
+
+      // Si se encontró/creó lugar con alta confianza, vincular automáticamente
+      if (placeMatch.type === 'exact' && placeMatch.lugar) {
+        await linkReservaToLugar(reserva.id, placeMatch.lugar.id);
+        reserva.lugarId = placeMatch.lugar.id;
+        console.log('[ReservasService] Reserva vinculada automáticamente a lugar:', placeMatch.lugar.nombre);
+      }
+    } catch (error) {
+      console.error('[ReservasService] Error en auto-creación de lugar:', error);
+      // No fallar la creación de reserva por esto
+      placeMatch = undefined;
+    }
+  }
+
+  return { reserva, placeMatch };
 }
 
 /**
@@ -256,6 +292,10 @@ export async function updateReserva(
   if (input.documentoId !== undefined) {
     fields.push('documentoId = ?');
     values.push(input.documentoId);
+  }
+  if (input.lugarId !== undefined) {
+    fields.push('lugarId = ?');
+    values.push(input.lugarId);
   }
 
   fields.push('updatedAt = ?');

@@ -31,6 +31,7 @@ export { PlaceSearchBar } from './PlaceSearchBar';
 export { PlaceDetailCard } from './PlaceDetailCard';
 export { AddToTripModal } from './AddToTripModal';
 export { SavedPlacesAccordion } from './SavedPlacesAccordion';
+export { PlaceMatchNotification, useHandlePlaceMatch } from './PlaceMatchNotification';
 
 // Componentes de Calendario
 export { CalendarDay } from './CalendarDay';

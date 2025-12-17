@@ -543,19 +543,20 @@ export default function EditReservationScreen({ route, navigation }: Props) {
                   : formData.categoria === 'food'
                   ? 'Ej: Restaurante La Viña'
                   : formData.categoria === 'activity'
-                  ? 'Ej: Puerta del Sol'
+                  ? 'Ej: Entrada principal del museo'
                   : 'Nombre del lugar'
               }
             />
-            {/* Dirección - Mostrar para todos excepto activity */}
-            {formData.categoria !== 'activity' && (
-              <Input
-                label="Dirección"
-                value={formData.direccion || ''}
-                onChangeText={(value) => updateField('direccion', value)}
-                placeholder="Dirección completa"
-              />
-            )}
+            <Input
+              label={formData.categoria === 'activity' ? 'Dirección' : 'Dirección'}
+              value={formData.direccion || ''}
+              onChangeText={(value) => updateField('direccion', value)}
+              placeholder={
+                formData.categoria === 'activity'
+                  ? 'Ej: Paseo del Prado, s/n, Madrid'
+                  : 'Dirección completa'
+              }
+            />
           </Card>
 
           {/* Pago - Oculto para food */}

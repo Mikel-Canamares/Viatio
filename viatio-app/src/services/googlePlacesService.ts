@@ -1,5 +1,6 @@
 import { GooglePlace, PlaceResult, mapPriceLevel } from '@/types/googlePlaces';
 import { logError } from '@/utils/errorHandler';
+import { getDeviceLanguageCode } from '@/utils/localization';
 
 const API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 const BASE_URL = 'https://places.googleapis.com/v1';
@@ -103,9 +104,11 @@ export async function searchPlacesByText(
 
     console.log('[Places] Buscando:', query);
 
+    const languageCode = getDeviceLanguageCode();
+
     const body: any = {
       textQuery: query,
-      languageCode: 'es',
+      languageCode: languageCode,
       maxResultCount: options?.maxResults || 10,
     };
 
@@ -166,6 +169,8 @@ export async function searchNearbyPlaces(
 
     console.log('[Places] Buscando cerca de:', latitude, longitude);
 
+    const languageCode = getDeviceLanguageCode();
+
     const response = await fetch(`${BASE_URL}/places:searchNearby`, {
       method: 'POST',
       headers: {
@@ -181,7 +186,7 @@ export async function searchNearbyPlaces(
           },
         },
         maxResultCount: maxResults,
-        languageCode: 'es',
+        languageCode: languageCode,
       }),
     });
 
@@ -214,7 +219,9 @@ export async function getPlaceDetails(placeId: string): Promise<PlaceResult | nu
 
     console.log('[Places] Obteniendo detalles de:', placeId);
 
-    const response = await fetch(`${BASE_URL}/places/${placeId}`, {
+    const languageCode = getDeviceLanguageCode();
+
+    const response = await fetch(`${BASE_URL}/places/${placeId}?languageCode=${languageCode}`, {
       method: 'GET',
       headers: {
         'X-Goog-Api-Key': API_KEY,

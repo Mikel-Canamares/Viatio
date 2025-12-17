@@ -3,7 +3,8 @@
     "allow": [
       "Bash(npx kill-port:*)",
       "Bash(npx tsc:*)",
-      "Bash(npm run start:*)"
+      "Bash(npm run start:*)",
+      "Bash(npx expo:*)"
     ]
   }
 }

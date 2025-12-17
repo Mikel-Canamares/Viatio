@@ -28,12 +28,14 @@ import {
   SectionHeader,
   PrimaryButton,
   SubtypeSelector,
+  useHandlePlaceMatch,
 } from '@/components';
 import { theme } from '@/config';
 import { useReservasStore } from '@/store/reservasStore';
 import { useDocumentosStore } from '@/store/documentosStore';
 import { getViajeById, pickDocument, pickImage } from '@/services';
 import { detectTipoArchivo } from '@/services/documentosService';
+import { confirmPlaceSuggestion, mapReservaCategoriaToLugarCategoria } from '@/services/placeMatchingService';
 import type {
   CreateReservaInput,
   CategoriaReserva,
@@ -49,6 +51,7 @@ import {
 } from '@/types/reserva';
 import type { Viaje } from '@/types/viaje';
 import type { HomeStackParamList } from '@/navigation/types';
+import type { PlaceResult } from '@/types/googlePlaces';
 
 interface AttachedFile {
   uri: string;
@@ -79,6 +82,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
   const { viajeId, prefillData, scannedFiles } = route.params;
   const { addReserva, loading } = useReservasStore();
   const { addDocumento } = useDocumentosStore();
+  const { handlePlaceMatch } = useHandlePlaceMatch();
 
   // Debug: Log de datos recibidos
   console.log('[AddReservation] viajeId:', viajeId);
@@ -218,6 +222,29 @@ export default function AddReservationScreen({ route, navigation }: Props) {
 
       const result = await addReserva(input);
       if (result) {
+        // Manejar el resultado del place matching
+        if (result.placeMatch) {
+          handlePlaceMatch(
+            result.placeMatch,
+            // onConfirmSuggestion: cuando el usuario confirma una sugerencia
+            async (placeResult: PlaceResult) => {
+              const categoria = mapReservaCategoriaToLugarCategoria(result.reserva.categoria);
+              const diaId = result.reserva.diaId ?? undefined;
+              await confirmPlaceSuggestion(
+                result.reserva.id,
+                viajeId,
+                diaId,
+                placeResult,
+                categoria
+              );
+            },
+            // onReject: no hacer nada
+            undefined,
+            // onNavigateToMap: navegar al mapa (si tienes la navegación disponible)
+            undefined
+          );
+        }
+
         navigation.goBack();
       } else {
         Alert.alert('Error', 'No se pudo crear la reserva');
@@ -595,19 +622,20 @@ export default function AddReservationScreen({ route, navigation }: Props) {
                   : formData.categoria === 'food'
                   ? 'Ej: Restaurante La Viña'
                   : formData.categoria === 'activity'
-                  ? 'Ej: Puerta del Sol'
+                  ? 'Ej: Entrada principal del museo'
                   : 'Nombre del lugar'
               }
             />
-            {/* Dirección - Mostrar para todos excepto activity (ya está incluido en punto de encuentro) */}
-            {formData.categoria !== 'activity' && (
-              <Input
-                label="Dirección"
-                value={formData.direccion || ''}
-                onChangeText={(value) => updateField('direccion', value)}
-                placeholder="Dirección completa"
-              />
-            )}
+            <Input
+              label={formData.categoria === 'activity' ? 'Dirección' : 'Dirección'}
+              value={formData.direccion || ''}
+              onChangeText={(value) => updateField('direccion', value)}
+              placeholder={
+                formData.categoria === 'activity'
+                  ? 'Ej: Paseo del Prado, s/n, Madrid'
+                  : 'Dirección completa'
+              }
+            />
           </Card>
 
           {/* Pago - Oculto para food */}

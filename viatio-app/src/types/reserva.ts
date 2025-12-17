@@ -71,6 +71,7 @@ export interface Reserva {
   notas?: string;
   metadatos?: ReservaMetadatos;
   documentoId?: string; // ID del documento asociado (opcional)
+  lugarId?: string; // ID del lugar asociado (opcional, creado automáticamente)
   createdAt: string;
   updatedAt: string;
 }
@@ -96,6 +97,8 @@ export interface CreateReservaInput {
   notas?: string;
   metadatos?: ReservaMetadatos;
   documentoId?: string; // ID del documento asociado (opcional)
+  lugarId?: string; // ID del lugar asociado (opcional)
+  autoCreateLugar?: boolean; // Flag para controlar creación automática de lugar (default: true)
 }
 
 export const RESERVA_CATEGORIAS: Record<CategoriaReserva, { label: string; icon: string }> = {

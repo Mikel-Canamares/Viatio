@@ -90,10 +90,9 @@ export async function runMigrations(
     await migrateToV5(db);
   }
 
-  // Futuras migraciones se añadirán aquí:
-  // if (currentVersion < 6) {
-  //   await migrateToV6(db);
-  // }
+  if (currentVersion < 6) {
+    await migrateToV6(db);
+  }
 
   console.log('[Migrations] Migraciones completadas exitosamente');
 }
@@ -289,39 +288,46 @@ async function migrateToV5(db: SQLite.SQLiteDatabase): Promise<void> {
   }
 }
 
-// ============================================
-// MIGRACIONES FUTURAS
-// ============================================
-
 /**
- * Ejemplo de migración futura (v5 -> v6)
- *
- * async function migrateToV6(db: SQLite.SQLiteDatabase): Promise<void> {
- *   console.log('[Migrations] Ejecutando migración a v6...');
- *
- *   try {
- *     // Verificar si la columna ya existe
- *     const tableInfo = await db.getAllAsync<{ name: string }>(
- *       'PRAGMA table_info(tabla);'
- *     );
- *
- *     const columnExists = tableInfo.some(col => col.name === 'nuevoCampo');
- *
- *     if (!columnExists) {
- *       await db.execAsync('ALTER TABLE tabla ADD COLUMN nuevoCampo TEXT;');
- *     }
- *
- *     // Registrar migración
- *     const now = new Date().toISOString();
- *     await db.runAsync(
- *       'INSERT INTO _migrations (version, appliedAt) VALUES (?, ?)',
- *       [6, now]
- *     );
- *
- *     console.log('[Migrations] Migración a v6 completada');
- *   } catch (error) {
- *     console.error('[Migrations] Error en migración a v6:', error);
- *     throw error;
- *   }
- * }
+ * Migración a versión 6: Añadir campo lugarId a tabla reservas e índices para matching
+ * Permite vincular reservas con lugares automáticamente usando Google Places API
  */
+async function migrateToV6(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migrations] Ejecutando migración a v6...');
+
+  try {
+    // Verificar si la columna lugarId ya existe en reservas
+    const reservasInfo = await db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(reservas);'
+    );
+
+    const lugarIdExists = reservasInfo.some(col => col.name === 'lugarId');
+
+    if (!lugarIdExists) {
+      console.log('[Migrations] Añadiendo columna lugarId a reservas...');
+      await db.execAsync('ALTER TABLE reservas ADD COLUMN lugarId TEXT;');
+    } else {
+      console.log('[Migrations] Columna lugarId ya existe, omitiendo...');
+    }
+
+    // Crear índices para optimizar búsquedas de matching
+    console.log('[Migrations] Creando índices para place matching...');
+
+    await db.execAsync('CREATE INDEX IF NOT EXISTS idx_reservas_lugarId ON reservas(lugarId);');
+    await db.execAsync('CREATE INDEX IF NOT EXISTS idx_reservas_coords ON reservas(latitud, longitud);');
+    await db.execAsync('CREATE INDEX IF NOT EXISTS idx_lugares_googlePlaceId ON lugares(googlePlaceId);');
+    await db.execAsync('CREATE INDEX IF NOT EXISTS idx_lugares_coords ON lugares(latitud, longitud);');
+
+    // Registrar migración
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'INSERT INTO _migrations (version, appliedAt) VALUES (?, ?)',
+      [6, now]
+    );
+
+    console.log('[Migrations] Migración a v6 completada');
+  } catch (error) {
+    console.error('[Migrations] Error en migración a v6:', error);
+    throw error;
+  }
+}
