@@ -17,10 +17,14 @@ export interface DiaViaje {
 export interface EventoAgenda {
   id: string;
   tipo: 'reserva' | 'lugar';
+  reservaId?: string; // ID de la reserva si tipo === 'reserva'
   hora?: string;
   titulo: string;
   subtitulo?: string;
   categoria?: string;
+  iconName: string; // Nombre del icono Ionicons
+  iconColor: string; // Color del icono
+  iconBgColor: string; // Color de fondo del icono
   ubicacion?: string;
 }
 

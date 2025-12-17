@@ -262,3 +262,74 @@ export async function getPlaceAtCoordinates(
     return null;
   }
 }
+
+// ============================================
+// AUTOCOMPLETADO DE LUGARES (SOLO CIUDADES Y PAÍSES)
+// ============================================
+
+export interface AutocompleteSuggestion {
+  placeId: string;
+  description: string;
+  mainText: string;
+  secondaryText: string;
+  types: string[];
+}
+
+export async function autocompleteDestinations(
+  input: string
+): Promise<AutocompleteSuggestion[]> {
+  try {
+    if (!API_KEY) {
+      console.error('[Places] API Key no configurada');
+      return [];
+    }
+
+    // No buscar si el input es muy corto
+    if (!input || input.trim().length < 2) {
+      return [];
+    }
+
+    console.log('[Places] Autocompletando:', input);
+
+    const languageCode = getDeviceLanguageCode();
+
+    const response = await fetch(`${BASE_URL}/places:autocomplete`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': API_KEY,
+      },
+      body: JSON.stringify({
+        input: input.trim(),
+        languageCode: languageCode,
+        // Filtrar solo ciudades y regiones/países
+        includedPrimaryTypes: ['locality', 'administrative_area_level_1', 'country'],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[Places] Error en autocomplete:', response.status, errorText);
+      return [];
+    }
+
+    const data = await response.json();
+    console.log('[Places] Sugerencias:', data.suggestions?.length || 0);
+
+    if (!data.suggestions || data.suggestions.length === 0) {
+      return [];
+    }
+
+    // Convertir sugerencias al formato deseado
+    return data.suggestions.map((suggestion: any) => ({
+      placeId: suggestion.placePrediction?.placeId || '',
+      description: suggestion.placePrediction?.text?.text || '',
+      mainText: suggestion.placePrediction?.structuredFormat?.mainText?.text || '',
+      secondaryText: suggestion.placePrediction?.structuredFormat?.secondaryText?.text || '',
+      types: suggestion.placePrediction?.types || [],
+    }));
+  } catch (error) {
+    logError(error, 'googlePlacesService.autocompleteDestinations');
+    return [];
+  }
+}

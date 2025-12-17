@@ -13,6 +13,7 @@ import {
   TripAgendaScreen,
   TripDocumentsScreen,
   AddDocumentScreen,
+  EditDocumentScreen,
   EditReservationScreen,
   ScanReservationScreen,
 } from '@/screens';
@@ -46,6 +47,7 @@ export function HomeStackNavigator() {
       <Stack.Screen name="TripReservations" component={TripReservationsScreen} />
       <Stack.Screen name="TripDocuments" component={TripDocumentsScreen} />
       <Stack.Screen name="AddDocument" component={AddDocumentScreen} />
+      <Stack.Screen name="EditDocument" component={EditDocumentScreen} />
       <Stack.Screen name="AddReservation" component={AddReservationScreen} />
       <Stack.Screen name="ReservationDetail" component={ReservationDetailScreen} />
       <Stack.Screen name="EditReservation" component={EditReservationScreen} />

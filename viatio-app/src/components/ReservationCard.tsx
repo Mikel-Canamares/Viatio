@@ -9,12 +9,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Card } from './Card';
+import { SwipeableCard } from './SwipeableCard';
+import { SwipeActionsReservation } from './SwipeActionsReservation';
 import { theme } from '@/config';
 import { Reserva, RESERVA_CATEGORIAS } from '@/types/reserva';
 
 interface ReservationCardProps {
   reserva: Reserva;
   onPress: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }
 
 const CATEGORIA_COLORS: Record<
@@ -34,7 +38,7 @@ const ESTADO_PAGO_CONFIG = {
   paid: { label: 'Pagado', color: '#10B981', bg: '#D1FAE5' },
 };
 
-export default function ReservationCard({ reserva, onPress }: ReservationCardProps) {
+export default function ReservationCard({ reserva, onPress, onEdit, onDelete }: ReservationCardProps) {
   const categoriaInfo = RESERVA_CATEGORIAS[reserva.categoria];
   const colors = CATEGORIA_COLORS[reserva.categoria];
   const estadoPagoInfo = ESTADO_PAGO_CONFIG[reserva.estadoPago];
@@ -47,7 +51,8 @@ export default function ReservationCard({ reserva, onPress }: ReservationCardPro
     }
   };
 
-  return (
+  // Contenido de la tarjeta (reutilizable)
+  const cardContent = (
     <Card style={styles.card}>
       <Pressable onPress={onPress} style={styles.pressable}>
         <View style={styles.mainRow}>
@@ -99,6 +104,25 @@ export default function ReservationCard({ reserva, onPress }: ReservationCardPro
         )}
       </Pressable>
     </Card>
+  );
+
+  // Si no hay acciones, retornar solo la tarjeta
+  if (!onEdit && !onDelete) {
+    return cardContent;
+  }
+
+  // Si hay acciones, envolver con SwipeableCard
+  return (
+    <SwipeableCard
+      renderRightActions={() => (
+        <SwipeActionsReservation
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
+      )}
+    >
+      {cardContent}
+    </SwipeableCard>
   );
 }
 

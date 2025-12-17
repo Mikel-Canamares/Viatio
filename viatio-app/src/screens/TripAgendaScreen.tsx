@@ -13,9 +13,8 @@ import {
   SectionList,
   ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ScreenContainer, PageHeader, Card } from '@/components';
+import { ScreenContainer, PageHeader, AgendaCard } from '@/components';
 import { theme } from '@/config';
 import { getAgendaByViajeId } from '@/services/agendaService';
 import type { DiaAgenda, EventoAgenda } from '@/types/diaViaje';
@@ -70,43 +69,21 @@ export default function TripAgendaScreen({ route, navigation }: Props) {
     </View>
   );
 
+  const handleEventPress = (item: EventoAgenda) => {
+    // Solo navegar si es una reserva
+    if (item.tipo === 'reserva' && item.reservaId) {
+      navigation.navigate('ReservationDetail', {
+        viajeId,
+        reservaId: item.reservaId,
+      });
+    }
+  };
+
   const renderEvent = ({ item }: { item: EventoAgenda }) => (
-    <Card style={styles.eventCard}>
-      <View style={styles.eventRow}>
-        {/* Hora a la izquierda */}
-        <View style={styles.timeContainer}>
-          {item.hora ? (
-            <Text style={styles.timeText}>{item.hora}</Text>
-          ) : (
-            <Text style={styles.timeTextEmpty}>--:--</Text>
-          )}
-        </View>
-
-        {/* Contenido del evento */}
-        <View style={styles.eventDetails}>
-          {item.categoria && (
-            <View style={styles.categoryBadge}>
-              <Text style={styles.categoryText}>{item.categoria}</Text>
-            </View>
-          )}
-
-          <Text style={styles.eventTitle}>{item.titulo}</Text>
-
-          {item.subtitulo && (
-            <Text style={styles.eventSubtitle}>{item.subtitulo}</Text>
-          )}
-
-          {item.ubicacion && (
-            <View style={styles.locationRow}>
-              <Ionicons name="location-outline" size={14} color={theme.colors.textMuted} />
-              <Text style={styles.locationText} numberOfLines={1}>
-                {item.ubicacion}
-              </Text>
-            </View>
-          )}
-        </View>
-      </View>
-    </Card>
+    <AgendaCard
+      evento={item}
+      onPress={() => handleEventPress(item)}
+    />
   );
 
   const renderEmptyDay = ({ section }: { section: AgendaSection }) => {
@@ -183,64 +160,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: theme.colors.textMuted,
     textTransform: 'capitalize',
-  },
-  eventCard: {
-    padding: theme.spacing.md,
-  },
-  eventRow: {
-    flexDirection: 'row',
-    gap: theme.spacing.md,
-  },
-  timeContainer: {
-    minWidth: 50,
-    paddingTop: 2,
-  },
-  timeText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: theme.colors.primaryLight,
-  },
-  timeTextEmpty: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: theme.colors.textMuted,
-  },
-  eventDetails: {
-    flex: 1,
-    gap: 4,
-  },
-  categoryBadge: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    alignSelf: 'flex-start',
-    marginBottom: 4,
-  },
-  categoryText: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
-    fontWeight: '500',
-  },
-  eventTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.colors.text,
-  },
-  eventSubtitle: {
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-  },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
-  locationText: {
-    fontSize: 13,
-    color: theme.colors.textMuted,
-    flex: 1,
   },
   emptyCard: {
     paddingVertical: theme.spacing.md,

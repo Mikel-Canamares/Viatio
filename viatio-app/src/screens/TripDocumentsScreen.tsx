@@ -25,7 +25,7 @@ import {
 } from '@/components';
 import { theme } from '@/config';
 import { useDocumentosStore } from '@/store/documentosStore';
-import { openDocument, shareDocument } from '@/utils/documentViewer';
+import { openDocument } from '@/utils/documentViewer';
 import type { Documento, CategoriaDocumento } from '@/types/documento';
 import { DOCUMENTO_CATEGORIAS } from '@/types/documento';
 import type { HomeStackParamList } from '@/navigation/types';
@@ -89,13 +89,11 @@ export default function TripDocumentsScreen({ route, navigation }: Props) {
     }
   };
 
-  const handleDownloadDocument = async (documento: Documento) => {
-    try {
-      await shareDocument(documento);
-    } catch (error) {
-      // El error ya se maneja en shareDocument con Alert
-      console.error('[TripDocuments] Error sharing document:', error);
-    }
+  const handleEditDocument = (documento: Documento) => {
+    navigation.navigate('EditDocument', {
+      documentoId: documento.id,
+      nombreActual: documento.nombre,
+    });
   };
 
   const handleAddDocument = () => {
@@ -238,7 +236,7 @@ export default function TripDocumentsScreen({ route, navigation }: Props) {
       <DocumentCard
         documento={item}
         onPress={() => handleViewDocument(item)}
-        onDownload={() => handleDownloadDocument(item)}
+        onEdit={() => handleEditDocument(item)}
         onDelete={() => handleDeleteDocument(item)}
       />
     </View>

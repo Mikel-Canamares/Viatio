@@ -21,6 +21,7 @@ export { default as TripDetailScreen } from './TripDetailScreen';
 export { default as TripAgendaScreen } from './TripAgendaScreen';
 export { default as TripDocumentsScreen } from './TripDocumentsScreen';
 export { default as AddDocumentScreen } from './AddDocumentScreen';
+export { default as EditDocumentScreen } from './EditDocumentScreen';
 export { default as EditReservationScreen } from './EditReservationScreen';
 export { default as ScanReservationScreen } from './ScanReservationScreen';
 export { default as TripCalendarScreen } from './TripCalendarScreen';

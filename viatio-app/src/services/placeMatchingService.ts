@@ -61,8 +61,15 @@ function buildSearchQuery(reserva: Reserva): string {
     parts.push(reserva.nombre);
   }
 
-  // Para actividades: incluir ubicación Y dirección (más contexto = mejor matching)
-  if (reserva.categoria === 'activity') {
+  // Para accommodation y food: usar solo nombre + dirección
+  // Para transport y activity: usar ubicacion + dirección
+  if (reserva.categoria === 'accommodation' || reserva.categoria === 'food') {
+    // Solo añadir dirección (nombre ya se agregó arriba)
+    if (reserva.direccion) {
+      parts.push(reserva.direccion);
+    }
+  } else if (reserva.categoria === 'activity') {
+    // Para actividades: incluir ubicación Y dirección (más contexto = mejor matching)
     if (reserva.ubicacion) {
       parts.push(reserva.ubicacion);
     }
@@ -70,7 +77,7 @@ function buildSearchQuery(reserva: Reserva): string {
       parts.push(reserva.direccion);
     }
   } else {
-    // Para otras categorías: priorizar ubicacion, sino direccion
+    // Para transporte y otras: priorizar ubicacion, sino direccion
     if (reserva.ubicacion) {
       parts.push(reserva.ubicacion);
     } else if (reserva.direccion) {
@@ -260,15 +267,19 @@ export async function findOrCreateLugarFromReserva(
   console.log('[PlaceMatching] Iniciando búsqueda para reserva:', reserva.nombre);
 
   // PASO 1: Validar que la reserva tenga suficiente información
+  // Para accommodation y food: requiere nombre + dirección
+  // Para transport y activity: requiere ubicacion o dirección o coordenadas
   const hasLocationInfo =
-    reserva.ubicacion || reserva.direccion || (reserva.latitud && reserva.longitud);
+    (reserva.categoria === 'accommodation' || reserva.categoria === 'food')
+      ? reserva.nombre && reserva.direccion
+      : reserva.ubicacion || reserva.direccion || (reserva.latitud && reserva.longitud);
 
   if (!hasLocationInfo) {
-    console.log('[PlaceMatching] Reserva sin información de ubicación, omitiendo matching');
+    console.log('[PlaceMatching] Reserva sin información de ubicación suficiente, omitiendo matching');
     return {
       type: 'none',
       confidence: 0,
-      message: 'La reserva no tiene información de ubicación',
+      message: 'La reserva no tiene información de ubicación suficiente',
     };
   }
 

@@ -27,6 +27,7 @@ import {
   Card,
   Input,
   DateInput,
+  TimeInput,
   SectionHeader,
   PrimaryButton,
   SubtypeSelector,
@@ -430,14 +431,22 @@ export default function EditReservationScreen({ route, navigation }: Props) {
               />
             )}
 
-            {/* Proveedor - Oculto para food */}
-            {formData.categoria !== 'food' && (
+            {/* Dirección - Para accommodation y food */}
+            {(formData.categoria === 'accommodation' || formData.categoria === 'food') && (
+              <Input
+                label="Dirección"
+                value={formData.direccion || ''}
+                onChangeText={(value) => updateField('direccion', value)}
+                placeholder="Dirección completa"
+              />
+            )}
+
+            {/* Proveedor - Oculto para food y accommodation */}
+            {formData.categoria !== 'food' && formData.categoria !== 'accommodation' && (
               <Input
                 label={
                   formData.categoria === 'transport'
                     ? 'Compañía'
-                    : formData.categoria === 'accommodation'
-                    ? 'Establecimiento'
                     : formData.categoria === 'activity'
                     ? 'Organizador'
                     : 'Proveedor'
@@ -447,8 +456,6 @@ export default function EditReservationScreen({ route, navigation }: Props) {
                 placeholder={
                   formData.categoria === 'transport'
                     ? 'Ej: Renfe, Iberia...'
-                    : formData.categoria === 'accommodation'
-                    ? 'Ej: Hotel Ritz'
                     : formData.categoria === 'activity'
                     ? 'Ej: Free Tours Madrid'
                     : 'Nombre del proveedor'
@@ -491,10 +498,10 @@ export default function EditReservationScreen({ route, navigation }: Props) {
                 />
               </View>
               <View style={styles.halfWidth}>
-                <Input
+                <TimeInput
                   label="Hora inicio"
                   value={formData.horaInicio || ''}
-                  onChangeText={(value) => updateField('horaInicio', value)}
+                  onChangeTime={(value) => updateField('horaInicio', value)}
                   placeholder="10:00"
                 />
               </View>
@@ -510,55 +517,54 @@ export default function EditReservationScreen({ route, navigation }: Props) {
                 />
               </View>
               <View style={styles.halfWidth}>
-                <Input
+                <TimeInput
                   label="Hora fin"
                   value={formData.horaFin || ''}
-                  onChangeText={(value) => updateField('horaFin', value)}
+                  onChangeTime={(value) => updateField('horaFin', value)}
                   placeholder="18:00"
                 />
               </View>
             </View>
           </Card>
 
-          <Card style={styles.formCard}>
-            <SectionHeader
-              title={
-                formData.categoria === 'activity'
-                  ? 'Punto de encuentro'
-                  : 'Ubicación'
-              }
-            />
-            <Input
-              label={
-                formData.categoria === 'activity'
-                  ? 'Punto de encuentro'
-                  : 'Nombre del lugar'
-              }
-              value={formData.ubicacion || ''}
-              onChangeText={(value) => updateField('ubicacion', value)}
-              placeholder={
-                formData.categoria === 'transport'
-                  ? 'Ej: Aeropuerto Charles de Gaulle'
-                  : formData.categoria === 'accommodation'
-                  ? 'Ej: Hotel Ritz Madrid'
-                  : formData.categoria === 'food'
-                  ? 'Ej: Restaurante La Viña'
-                  : formData.categoria === 'activity'
-                  ? 'Ej: Entrada principal del museo'
-                  : 'Nombre del lugar'
-              }
-            />
-            <Input
-              label={formData.categoria === 'activity' ? 'Dirección' : 'Dirección'}
-              value={formData.direccion || ''}
-              onChangeText={(value) => updateField('direccion', value)}
-              placeholder={
-                formData.categoria === 'activity'
-                  ? 'Ej: Paseo del Prado, s/n, Madrid'
-                  : 'Dirección completa'
-              }
-            />
-          </Card>
+          {/* Ubicación - Solo para transport y activity */}
+          {(formData.categoria === 'transport' || formData.categoria === 'activity') && (
+            <Card style={styles.formCard}>
+              <SectionHeader
+                title={
+                  formData.categoria === 'activity'
+                    ? 'Punto de encuentro'
+                    : 'Ubicación'
+                }
+              />
+              <Input
+                label={
+                  formData.categoria === 'activity'
+                    ? 'Punto de encuentro'
+                    : 'Nombre del lugar'
+                }
+                value={formData.ubicacion || ''}
+                onChangeText={(value) => updateField('ubicacion', value)}
+                placeholder={
+                  formData.categoria === 'transport'
+                    ? 'Ej: Aeropuerto Charles de Gaulle'
+                    : formData.categoria === 'activity'
+                    ? 'Ej: Entrada principal del museo'
+                    : 'Nombre del lugar'
+                }
+              />
+              <Input
+                label="Dirección"
+                value={formData.direccion || ''}
+                onChangeText={(value) => updateField('direccion', value)}
+                placeholder={
+                  formData.categoria === 'activity'
+                    ? 'Ej: Paseo del Prado, s/n, Madrid'
+                    : 'Dirección completa'
+                }
+              />
+            </Card>
+          )}
 
           {/* Pago - Oculto para food */}
           {formData.categoria !== 'food' && (

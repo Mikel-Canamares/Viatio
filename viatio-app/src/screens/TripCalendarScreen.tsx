@@ -168,10 +168,14 @@ export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
             const evento: EventoAgendaCalendario = {
               id: reserva.id,
               tipo: 'reserva',
+              reservaId: reserva.id,
               hora: reserva.horaInicio || undefined,
               titulo: reserva.nombre,
               subtitulo: reserva.proveedor,
               categoria,
+              iconName: 'ellipsis-horizontal', // Icono placeholder para calendario
+              iconColor: '#6B7280',
+              iconBgColor: '#F3F4F6',
               ubicacion: reserva.ubicacion || reserva.direccion,
               tieneReserva: true,
               tieneDocumento: Boolean(reserva.documentoId),
