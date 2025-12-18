@@ -14,6 +14,7 @@ import type {
 } from '@/types/viaje';
 import { logError, parseLocalDate, startOfLocalDay } from '@/utils';
 import { createDiasParaViaje, deleteDiasByViajeId } from './diasViajeService';
+import { getIconicPhotoForDestination } from './googlePlacesService';
 
 // ============================================
 // VALIDACIONES
@@ -103,14 +104,39 @@ export async function createViaje(
     const id = generateId();
     const now = getCurrentTimestamp();
 
+    // Intentar obtener foto icónica del destino si hay placeId
+    let imagenUrl = input.imagenUrl;
+    if (input.destinoPlaceId && !imagenUrl) {
+      try {
+        console.log('[ViajesService] Obteniendo foto icónica para:', input.destino);
+
+        // Usar nueva función que busca landmarks icónicos primero
+        const photoUrl = await getIconicPhotoForDestination(
+          input.destino,
+          input.destinoPlaceId
+        );
+
+        if (photoUrl) {
+          imagenUrl = photoUrl;
+          console.log('[ViajesService] ✓ Foto icónica obtenida');
+        } else {
+          console.log('[ViajesService] No se encontró foto para este destino');
+        }
+      } catch (error) {
+        // No es crítico si falla, simplemente no tendremos foto
+        console.warn('[ViajesService] Error al obtener foto del destino:', error);
+      }
+    }
+
     const viaje: Viaje = {
       id,
       usuarioId,
       destino: input.destino,
+      destinoPlaceId: input.destinoPlaceId,
       fechaInicio: input.fechaInicio,
       fechaFin: input.fechaFin,
       descripcion: input.descripcion,
-      imagenUrl: input.imagenUrl,
+      imagenUrl,
       presupuesto: input.presupuesto,
       moneda: input.moneda || 'EUR',
       numViajeros: input.numViajeros || 1,
@@ -121,13 +147,14 @@ export async function createViaje(
 
     await db.runAsync(
       `INSERT INTO viajes (
-        id, usuarioId, destino, fechaInicio, fechaFin, descripcion,
+        id, usuarioId, destino, destinoPlaceId, fechaInicio, fechaFin, descripcion,
         imagenUrl, presupuesto, moneda, numViajeros, archived, createdAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         viaje.id,
         viaje.usuarioId,
         viaje.destino,
+        viaje.destinoPlaceId ?? null,
         viaje.fechaInicio,
         viaje.fechaFin,
         viaje.descripcion ?? null,

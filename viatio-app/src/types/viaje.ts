@@ -12,6 +12,7 @@ export interface Viaje {
   id: string;
   usuarioId: string;
   destino: string;
+  destinoPlaceId?: string;
   fechaInicio: string;
   fechaFin: string;
   descripcion?: string;
@@ -29,6 +30,7 @@ export interface Viaje {
  */
 export interface CreateViajeInput {
   destino: string;
+  destinoPlaceId?: string;
   fechaInicio: string;
   fechaFin: string;
   descripcion?: string;

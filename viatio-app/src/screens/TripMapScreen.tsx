@@ -19,6 +19,7 @@ import { SavedPlacesAccordion } from '@/components/SavedPlacesAccordion';
 import { MapMarker, SelectedPlaceMarker } from '@/components/MapMarker';
 import { PlaceResult } from '@/types/googlePlaces';
 import { Lugar, LUGAR_CATEGORIAS, CategoriaLugar } from '@/types/lugar';
+import { Viaje } from '@/types/viaje';
 import {
   searchNearbyPlaces,
   getPlaceDetails,
@@ -29,6 +30,7 @@ import {
   deleteLugar,
   toggleVisitado,
 } from '@/services/lugaresService';
+import { getViajeById } from '@/services/viajesService';
 import { theme } from '@/config/theme';
 
 type RouteParams = {
@@ -54,6 +56,7 @@ export default function TripMapScreen() {
   const mapRef = useRef<MapView>(null);
 
   // Estados
+  const [viaje, setViaje] = useState<Viaje | null>(null);
   const [lugares, setLugares] = useState<Lugar[]>([]);
   const [selectedPlace, setSelectedPlace] = useState<PlaceResult | null>(null);
   const [showPlaceCard, setShowPlaceCard] = useState(false);
@@ -65,11 +68,59 @@ export default function TripMapScreen() {
   const [region, setRegion] = useState<Region>(DEFAULT_REGION);
   const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
+  const [initialMapCentered, setInitialMapCentered] = useState(false);
 
-  // Solicitar permisos de ubicación al montar
+  // Cargar viaje y centrar mapa en destino al montar
   useEffect(() => {
+    loadViajeAndCenterMap();
     requestLocationPermission();
   }, []);
+
+  // Cargar viaje y centrar mapa en el destino
+  const loadViajeAndCenterMap = async () => {
+    try {
+      console.log('[TripMapScreen] Cargando viaje:', viajeId);
+      const viajeData = await getViajeById(viajeId);
+
+      if (!viajeData) {
+        console.error('[TripMapScreen] Viaje no encontrado');
+        return;
+      }
+
+      setViaje(viajeData);
+      console.log('[TripMapScreen] Viaje cargado:', viajeData.destino, 'PlaceId:', viajeData.destinoPlaceId);
+
+      // Si el viaje tiene destinoPlaceId, obtener coordenadas y centrar mapa
+      if (viajeData.destinoPlaceId) {
+        console.log('[TripMapScreen] Obteniendo coordenadas del destino...');
+        const destinoDetails = await getPlaceDetails(viajeData.destinoPlaceId);
+
+        if (destinoDetails) {
+          const destinoRegion: Region = {
+            latitude: destinoDetails.latitude,
+            longitude: destinoDetails.longitude,
+            latitudeDelta: 0.1, // Zoom amplio para ver la ciudad completa
+            longitudeDelta: 0.1,
+          };
+
+          console.log('[TripMapScreen] ✓ Centrando mapa en:', viajeData.destino, destinoRegion);
+          setRegion(destinoRegion);
+          setInitialMapCentered(true);
+
+          // Animar al destino con delay para asegurar que el mapa está montado
+          setTimeout(() => {
+            mapRef.current?.animateToRegion(destinoRegion, 1000);
+          }, 500);
+        } else {
+          console.log('[TripMapScreen] No se pudieron obtener coordenadas del destino');
+        }
+      } else {
+        console.log('[TripMapScreen] Viaje sin destinoPlaceId, usando región por defecto');
+      }
+    } catch (error) {
+      console.error('[TripMapScreen] Error cargando viaje:', error);
+    }
+  };
 
   // Solicitar permisos de ubicación
   const requestLocationPermission = async () => {
@@ -85,18 +136,7 @@ export default function TripMapScreen() {
         });
 
         setUserLocation(location);
-
-        // Si no hay lugares guardados, centrar en la ubicación del usuario
-        if (lugares.length === 0) {
-          const newRegion: Region = {
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
-          };
-          setRegion(newRegion);
-          mapRef.current?.animateToRegion(newRegion, 500);
-        }
+        console.log('[TripMapScreen] Ubicación del usuario obtenida');
       } else {
         setHasLocationPermission(false);
         Alert.alert(
@@ -129,8 +169,10 @@ export default function TripMapScreen() {
 
       setLugares(data);
 
-      // Centrar mapa en los lugares si hay
-      if (data.length > 0) {
+      // Solo centrar mapa en lugares si:
+      // 1. Hay lugares guardados
+      // 2. Ya se hizo el centrado inicial en el destino (para no interferir con el centrado automático)
+      if (data.length > 0 && initialMapCentered) {
         const newRegion = calculateRegion(data);
         setRegion(newRegion);
         mapRef.current?.animateToRegion(newRegion, 500);

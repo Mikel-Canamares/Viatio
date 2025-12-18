@@ -64,6 +64,7 @@ function googlePlaceToResult(place: GooglePlace): PlaceResult {
     primaryType: place.primaryType,
     primaryTypeLabel: place.primaryTypeDisplayName?.text,
     photoReference: place.photos?.[0]?.name,
+    photoReferences: place.photos?.map(photo => photo.name) || [],
     isOpen: place.currentOpeningHours?.openNow,
     openingHours: place.currentOpeningHours?.weekdayDescriptions,
     phone: place.nationalPhoneNumber || place.internationalPhoneNumber,
@@ -331,5 +332,86 @@ export async function autocompleteDestinations(
   } catch (error) {
     logError(error, 'googlePlacesService.autocompleteDestinations');
     return [];
+  }
+}
+
+// ============================================
+// OBTENER FOTO ICÓNICA DE DESTINO
+// ============================================
+
+/**
+ * Obtiene la foto más icónica de un destino usando una estrategia en cascada:
+ * 1. Buscar landmarks icónicos del destino (ej: "Torre Eiffel París")
+ * 2. Si falla, obtener múltiples fotos del destino y devolver la primera
+ * 3. Fallback: null si no hay fotos disponibles
+ */
+export async function getIconicPhotoForDestination(
+  destinationName: string,
+  placeId?: string
+): Promise<string | null> {
+  try {
+    if (!API_KEY) {
+      console.error('[Places] API Key no configurada');
+      return null;
+    }
+
+    console.log('[Places] Buscando foto icónica para:', destinationName);
+
+    // ESTRATEGIA 1: Buscar landmark icónico del destino
+    const landmarkQueries = [
+      `${destinationName} landmark iconic`,
+      `${destinationName} monument`,
+      `${destinationName} tourist attraction`,
+    ];
+
+    for (const query of landmarkQueries) {
+      try {
+        console.log('[Places] Intentando búsqueda:', query);
+        const landmarks = await searchPlacesByText(query, { maxResults: 3 });
+
+        // Buscar el landmark con mejor rating y que tenga foto
+        const bestLandmark = landmarks.find(
+          (place) =>
+            place.photoReference &&
+            place.rating &&
+            place.rating >= 4.0 &&
+            place.totalRatings &&
+            place.totalRatings > 100
+        );
+
+        if (bestLandmark?.photoReference) {
+          console.log('[Places] ✓ Landmark icónico encontrado:', bestLandmark.name);
+          return getPhotoUrl(bestLandmark.photoReference, 800);
+        }
+
+        // Si no hay uno con buen rating, tomar el primero con foto
+        if (landmarks[0]?.photoReference) {
+          console.log('[Places] ✓ Landmark encontrado:', landmarks[0].name);
+          return getPhotoUrl(landmarks[0].photoReference, 800);
+        }
+      } catch (error) {
+        console.warn('[Places] Error en búsqueda de landmark:', query, error);
+        // Continuar con siguiente query
+      }
+    }
+
+    // ESTRATEGIA 2: Si tenemos placeId, obtener fotos del destino original
+    if (placeId) {
+      console.log('[Places] Obteniendo fotos del destino original:', placeId);
+      const placeDetails = await getPlaceDetails(placeId);
+
+      if (placeDetails?.photoReferences && placeDetails.photoReferences.length > 0) {
+        // Tomar la primera foto disponible
+        console.log('[Places] ✓ Foto del destino encontrada');
+        return getPhotoUrl(placeDetails.photoReferences[0], 800);
+      }
+    }
+
+    // ESTRATEGIA 3: Fallback - No se encontró foto
+    console.log('[Places] ✗ No se encontró foto icónica para el destino');
+    return null;
+  } catch (error) {
+    logError(error, 'googlePlacesService.getIconicPhotoForDestination');
+    return null;
   }
 }

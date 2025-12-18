@@ -8,10 +8,33 @@
 
 import { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Modal } from 'react-native';
-import { Calendar, DateData } from 'react-native-calendars';
+import { Calendar, DateData, LocaleConfig } from 'react-native-calendars';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { theme } from '@/config';
+
+// Configurar localización en español
+LocaleConfig.locales['es'] = {
+  monthNames: [
+    'Enero',
+    'Febrero',
+    'Marzo',
+    'Abril',
+    'Mayo',
+    'Junio',
+    'Julio',
+    'Agosto',
+    'Septiembre',
+    'Octubre',
+    'Noviembre',
+    'Diciembre'
+  ],
+  monthNamesShort: ['Ene.', 'Feb.', 'Mar.', 'Abr.', 'May.', 'Jun.', 'Jul.', 'Ago.', 'Sep.', 'Oct.', 'Nov.', 'Dic.'],
+  dayNames: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
+  dayNamesShort: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
+  today: 'Hoy'
+};
+LocaleConfig.defaultLocale = 'es';
 
 interface DateRange {
   startDate: string; // ISO string (YYYY-MM-DD)
@@ -182,6 +205,7 @@ export function DateRangePicker({
               onDayPress={handleDayPress}
               markingType="period"
               markedDates={getMarkedDates()}
+              firstDay={1}
               theme={{
                 todayTextColor: theme.colors.primaryLight,
                 arrowColor: theme.colors.primaryLight,

@@ -9,7 +9,7 @@
 // VERSIÓN DEL ESQUEMA
 // ============================================
 
-export const CURRENT_SCHEMA_VERSION = 6;
+export const CURRENT_SCHEMA_VERSION = 7;
 
 // ============================================
 // CREACIÓN DE TABLAS
@@ -20,6 +20,7 @@ const CREATE_VIAJES_TABLE = `
     id TEXT PRIMARY KEY NOT NULL,
     usuarioId TEXT NOT NULL,
     destino TEXT NOT NULL,
+    destinoPlaceId TEXT,
     fechaInicio TEXT NOT NULL,
     fechaFin TEXT NOT NULL,
     descripcion TEXT,

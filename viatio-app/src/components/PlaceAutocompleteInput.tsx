@@ -12,7 +12,6 @@ import {
   TextInput,
   StyleSheet,
   Pressable,
-  TouchableOpacity,
   FlatList,
   ActivityIndicator,
 } from 'react-native';
@@ -30,6 +29,9 @@ interface PlaceAutocompleteInputProps {
   /** Función que se ejecuta cuando cambia el texto */
   onChangeText: (text: string) => void;
 
+  /** Función que se ejecuta cuando se selecciona un lugar de las sugerencias */
+  onPlaceSelect?: (placeId: string, description: string) => void;
+
   /** Placeholder del input */
   placeholder?: string;
 
@@ -41,6 +43,7 @@ export function PlaceAutocompleteInput({
   label,
   value,
   onChangeText,
+  onPlaceSelect,
   placeholder,
   error,
 }: PlaceAutocompleteInputProps) {
@@ -49,6 +52,7 @@ export function PlaceAutocompleteInput({
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const justSelected = useRef(false);
 
   // Función para buscar sugerencias con debouncing
   const searchSuggestions = useCallback(async (query: string) => {
@@ -67,6 +71,12 @@ export function PlaceAutocompleteInput({
 
   // Efecto para debouncing de búsqueda
   useEffect(() => {
+    // Si acabamos de seleccionar una sugerencia, no buscar
+    if (justSelected.current) {
+      justSelected.current = false;
+      return;
+    }
+
     if (debounceTimer.current) {
       clearTimeout(debounceTimer.current);
     }
@@ -84,9 +94,22 @@ export function PlaceAutocompleteInput({
 
   // Manejar selección de sugerencia
   const handleSelectSuggestion = (suggestion: AutocompleteSuggestion) => {
-    onChangeText(suggestion.description);
+    console.log('[PlaceAutocomplete] Sugerencia seleccionada:', suggestion.description);
+
+    // Marcar que acabamos de seleccionar para evitar nueva búsqueda
+    justSelected.current = true;
+
+    // Ocultar sugerencias PRIMERO para evitar que se reabran
     setShowSuggestions(false);
     setSuggestions([]);
+
+    // Actualizar el texto del input
+    onChangeText(suggestion.description);
+
+    // Notificar la selección con placeId si hay callback
+    if (onPlaceSelect) {
+      onPlaceSelect(suggestion.placeId, suggestion.description);
+    }
   };
 
   // Determinar estilo del borde según estado
@@ -141,8 +164,8 @@ export function PlaceAutocompleteInput({
           }}
           onBlur={() => {
             setIsFocused(false);
-            // Delay mayor para permitir clic en sugerencia
-            setTimeout(() => setShowSuggestions(false), 300);
+            // Delay para permitir que el onPress de la sugerencia se ejecute primero
+            setTimeout(() => setShowSuggestions(false), 200);
           }}
           autoCapitalize="words"
           autoCorrect={false}
@@ -180,10 +203,10 @@ export function PlaceAutocompleteInput({
             data={suggestions}
             keyExtractor={(item) => item.placeId}
             scrollEnabled={false}
+            keyboardShouldPersistTaps="always"
             renderItem={({ item }) => (
-              <TouchableOpacity
+              <Pressable
                 style={styles.suggestionItem}
-                activeOpacity={0.7}
                 onPress={() => handleSelectSuggestion(item)}
               >
                 <Ionicons
@@ -200,7 +223,7 @@ export function PlaceAutocompleteInput({
                     </Text>
                   )}
                 </View>
-              </TouchableOpacity>
+              </Pressable>
             )}
           />
         </View>

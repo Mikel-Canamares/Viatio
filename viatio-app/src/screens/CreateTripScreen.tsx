@@ -39,6 +39,7 @@ export default function CreateTripScreen({ navigation }: Props) {
 
   // Form state
   const [destino, setDestino] = useState('');
+  const [destinoPlaceId, setDestinoPlaceId] = useState<string | undefined>(undefined);
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin, setFechaFin] = useState('');
   const [descripcion, setDescripcion] = useState('');
@@ -79,6 +80,12 @@ export default function CreateTripScreen({ navigation }: Props) {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Manejar selección de lugar desde el autocompletado
+  const handlePlaceSelect = (placeId: string, description: string) => {
+    setDestinoPlaceId(placeId);
+    console.log('[CreateTrip] Lugar seleccionado:', description, 'ID:', placeId);
+  };
+
   const handleCreate = async () => {
     if (!validate()) {
       return;
@@ -95,6 +102,7 @@ export default function CreateTripScreen({ navigation }: Props) {
     const viaje = await addViaje(
       {
         destino: destino.trim(),
+        destinoPlaceId: destinoPlaceId,
         fechaInicio,
         fechaFin,
         descripcion: descripcion.trim() || undefined,
@@ -127,7 +135,7 @@ export default function CreateTripScreen({ navigation }: Props) {
           <ScrollView
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="always"
           >
           {/* Card 1: Información básica */}
           <Card style={styles.card}>
@@ -142,6 +150,7 @@ export default function CreateTripScreen({ navigation }: Props) {
               label="Destino"
               value={destino}
               onChangeText={setDestino}
+              onPlaceSelect={handlePlaceSelect}
               placeholder="Ej: París, Francia"
               error={errors.destino}
             />

@@ -74,7 +74,8 @@ export interface PlaceResult {
   types: string[];
   primaryType?: string;
   primaryTypeLabel?: string;
-  photoReference?: string; // Para construir URL de foto
+  photoReference?: string; // Para construir URL de foto (primera foto)
+  photoReferences?: string[]; // Array de todas las fotos disponibles
   isOpen?: boolean;
   openingHours?: string[];
   phone?: string;

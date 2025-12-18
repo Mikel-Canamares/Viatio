@@ -94,6 +94,10 @@ export async function runMigrations(
     await migrateToV6(db);
   }
 
+  if (currentVersion < 7) {
+    await migrateToV7(db);
+  }
+
   console.log('[Migrations] Migraciones completadas exitosamente');
 }
 
@@ -328,6 +332,42 @@ async function migrateToV6(db: SQLite.SQLiteDatabase): Promise<void> {
     console.log('[Migrations] Migración a v6 completada');
   } catch (error) {
     console.error('[Migrations] Error en migración a v6:', error);
+    throw error;
+  }
+}
+
+/**
+ * Migración a versión 7: Añadir campo destinoPlaceId a tabla viajes
+ * Permite almacenar el Google Place ID del destino para obtener fotos
+ */
+async function migrateToV7(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migrations] Ejecutando migración a v7...');
+
+  try {
+    // Verificar si la columna destinoPlaceId ya existe en viajes
+    const viajesInfo = await db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(viajes);'
+    );
+
+    const columnExists = viajesInfo.some(col => col.name === 'destinoPlaceId');
+
+    if (!columnExists) {
+      console.log('[Migrations] Añadiendo columna destinoPlaceId a viajes...');
+      await db.execAsync('ALTER TABLE viajes ADD COLUMN destinoPlaceId TEXT;');
+    } else {
+      console.log('[Migrations] Columna destinoPlaceId ya existe, omitiendo...');
+    }
+
+    // Registrar migración
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'INSERT INTO _migrations (version, appliedAt) VALUES (?, ?)',
+      [7, now]
+    );
+
+    console.log('[Migrations] Migración a v7 completada');
+  } catch (error) {
+    console.error('[Migrations] Error en migración a v7:', error);
     throw error;
   }
 }
