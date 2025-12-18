@@ -26,13 +26,39 @@ App movil (Expo + React Native) para planificar viajes con autenticacion por ema
 - Flag de desarrollo `CLEAR_DB_ON_START` en `App.tsx` permite limpiar datos locales al arrancar.
 
 ## Configuracion y arranque
+
+### 🚀 Inicio Rápido en Nuevo PC
+Si es tu primera vez configurando el proyecto en un nuevo PC, usa el **script automático**:
+
+**Windows:**
+```bash
+git clone <URL_REPO> Viatio
+cd Viatio
+setup-nuevo-pc.bat
+```
+
+**Mac/Linux:**
+```bash
+git clone <URL_REPO> Viatio
+cd Viatio
+chmod +x setup-nuevo-pc.sh
+./setup-nuevo-pc.sh
+```
+
+📖 Ver guía detallada en [INICIO_RAPIDO.md](./INICIO_RAPIDO.md) o [GUIA_MIGRACION.md](./GUIA_MIGRACION.md)
+
+---
+
+### 📝 Configuración Manual
+
 1) Prerrequisitos: Node 18+, npm, Expo CLI y dispositivos/emuladores configurados.
-2) Instalar dependencias: `cd viatio-app && npm install`.
+2) Instalar dependencias: `cd viatio-app && npm install` y `cd viatio-backend && npm install`.
 3) Variables de entorno (`viatio-app/.env.template` como base). La app lee variables con prefijo `EXPO_PUBLIC_`:
    - `EXPO_PUBLIC_FIREBASE_API_KEY`, `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN`, `EXPO_PUBLIC_FIREBASE_PROJECT_ID`, `EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET`, `EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`, `EXPO_PUBLIC_FIREBASE_APP_ID`
    - `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` (Maps/Places/Directions, tambien referenciado en `app.config.js`)
    - `EXPO_PUBLIC_BACKEND_URL` (endpoint que expone `/api/extract-reserva` para OCR con Gemini)
-4) Ejecutar en desarrollo: `npm start` (luego seleccionar plataforma), o `npm run android` / `npm run ios` / `npm run web`.
+4) Ejecutar backend: `cd viatio-backend && npm run dev`
+5) Ejecutar app: `cd viatio-app && npm start` (luego seleccionar plataforma), o `npm run android` / `npm run ios` / `npm run web`.
 
 ## Estructura de carpetas (clave)
 - `viatio-app/App.tsx`: bootstrap, init de base de datos y manejo de errores/estado de carga.
