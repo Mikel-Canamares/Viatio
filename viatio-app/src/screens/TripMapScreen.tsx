@@ -36,6 +36,7 @@ import { theme } from '@/config/theme';
 type RouteParams = {
   TripMap: {
     viajeId: string;
+    lugarId?: string;
   };
 };
 
@@ -52,7 +53,7 @@ const DEFAULT_REGION: Region = {
 export default function TripMapScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'TripMap'>>();
-  const { viajeId } = route.params;
+  const { viajeId, lugarId } = route.params;
   const mapRef = useRef<MapView>(null);
 
   // Estados
@@ -70,7 +71,7 @@ export default function TripMapScreen() {
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
   const [initialMapCentered, setInitialMapCentered] = useState(false);
 
-  // Cargar viaje y centrar mapa en destino al montar
+  // Cargar viaje y centrar mapa en destino al montar (solo si no viene de agenda)
   useEffect(() => {
     loadViajeAndCenterMap();
     requestLocationPermission();
@@ -90,8 +91,8 @@ export default function TripMapScreen() {
       setViaje(viajeData);
       console.log('[TripMapScreen] Viaje cargado:', viajeData.destino, 'PlaceId:', viajeData.destinoPlaceId);
 
-      // Si el viaje tiene destinoPlaceId, obtener coordenadas y centrar mapa
-      if (viajeData.destinoPlaceId) {
+      // SOLO centrar en destino si NO se proporcionó lugarId (navegación normal desde viaje)
+      if (!lugarId && viajeData.destinoPlaceId) {
         console.log('[TripMapScreen] Obteniendo coordenadas del destino...');
         const destinoDetails = await getPlaceDetails(viajeData.destinoPlaceId);
 
@@ -114,6 +115,9 @@ export default function TripMapScreen() {
         } else {
           console.log('[TripMapScreen] No se pudieron obtener coordenadas del destino');
         }
+      } else if (lugarId) {
+        console.log('[TripMapScreen] Navegación desde agenda con lugarId, omitiendo centrado en destino');
+        setInitialMapCentered(true); // Marcar como centrado para que loadLugares pueda proceder
       } else {
         console.log('[TripMapScreen] Viaje sin destinoPlaceId, usando región por defecto');
       }
@@ -169,10 +173,17 @@ export default function TripMapScreen() {
 
       setLugares(data);
 
-      // Solo centrar mapa en lugares si:
-      // 1. Hay lugares guardados
-      // 2. Ya se hizo el centrado inicial en el destino (para no interferir con el centrado automático)
-      if (data.length > 0 && initialMapCentered) {
+      // Si se proporciona lugarId, centrar en ese lugar específico
+      if (lugarId) {
+        const lugarSeleccionado = data.find(l => l.id === lugarId);
+        if (lugarSeleccionado) {
+          console.log('[TripMapScreen] Centrando en lugar desde agenda:', lugarSeleccionado.nombre);
+          await handleSelectLugar(lugarSeleccionado);
+        }
+      } else if (data.length > 0 && initialMapCentered) {
+        // Solo centrar mapa en lugares si:
+        // 1. Hay lugares guardados
+        // 2. Ya se hizo el centrado inicial en el destino (para no interferir con el centrado automático)
         const newRegion = calculateRegion(data);
         setRegion(newRegion);
         mapRef.current?.animateToRegion(newRegion, 500);

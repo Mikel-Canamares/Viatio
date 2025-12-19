@@ -26,6 +26,7 @@ export { TripCard } from './TripCard';
 export { default as ReservationCard } from './ReservationCard';
 export { default as DocumentCard } from './DocumentCard';
 export { default as AgendaCard } from './AgendaCard';
+export { default as NavigationChoiceModal } from './NavigationChoiceModal';
 export { SubtypeSelector } from './SubtypeSelector';
 export { SwipeableCard } from './SwipeableCard';
 export { SwipeActions } from './SwipeActions';

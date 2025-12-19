@@ -14,7 +14,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ScreenContainer, PageHeader, AgendaCard } from '@/components';
+import { ScreenContainer, PageHeader, AgendaCard, NavigationChoiceModal } from '@/components';
 import { theme } from '@/config';
 import { getAgendaByViajeId } from '@/services/agendaService';
 import type { DiaAgenda, EventoAgenda } from '@/types/diaViaje';
@@ -30,6 +30,8 @@ export default function TripAgendaScreen({ route, navigation }: Props) {
   const { viajeId } = route.params;
   const [agenda, setAgenda] = useState<AgendaSection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showChoiceModal, setShowChoiceModal] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<EventoAgenda | null>(null);
 
   useEffect(() => {
     loadAgenda();
@@ -70,11 +72,41 @@ export default function TripAgendaScreen({ route, navigation }: Props) {
   );
 
   const handleEventPress = (item: EventoAgenda) => {
-    // Solo navegar si es una reserva
     if (item.tipo === 'reserva' && item.reservaId) {
+      // Si la reserva tiene un lugar asociado, mostrar modal de elección
+      if (item.lugarId) {
+        setSelectedEvent(item);
+        setShowChoiceModal(true);
+      } else {
+        // Si no tiene lugar, navegar directo a la reserva
+        navigation.navigate('ReservationDetail', {
+          viajeId,
+          reservaId: item.reservaId,
+        });
+      }
+    } else if (item.tipo === 'lugar') {
+      // Navegar al mapa y centrar en el lugar
+      navigation.navigate('TripMap', {
+        viajeId,
+        lugarId: item.id, // Pasar el ID del lugar para centrarlo
+      });
+    }
+  };
+
+  const handleViewReservation = () => {
+    if (selectedEvent?.reservaId) {
       navigation.navigate('ReservationDetail', {
         viajeId,
-        reservaId: item.reservaId,
+        reservaId: selectedEvent.reservaId,
+      });
+    }
+  };
+
+  const handleViewMap = () => {
+    if (selectedEvent?.lugarId) {
+      navigation.navigate('TripMap', {
+        viajeId,
+        lugarId: selectedEvent.lugarId,
       });
     }
   };
@@ -127,6 +159,15 @@ export default function TripAgendaScreen({ route, navigation }: Props) {
           SectionSeparatorComponent={() => <View style={styles.daySeparator} />}
         />
       </ScreenContainer>
+
+      {/* Modal de elección de navegación */}
+      <NavigationChoiceModal
+        visible={showChoiceModal}
+        titulo={selectedEvent?.titulo || ''}
+        onClose={() => setShowChoiceModal(false)}
+        onViewReservation={handleViewReservation}
+        onViewMap={handleViewMap}
+      />
     </View>
   );
 }

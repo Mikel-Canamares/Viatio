@@ -18,6 +18,7 @@ export interface EventoAgenda {
   id: string;
   tipo: 'reserva' | 'lugar';
   reservaId?: string; // ID de la reserva si tipo === 'reserva'
+  lugarId?: string; // ID del lugar asociado (si la reserva tiene ubicación guardada)
   hora?: string;
   titulo: string;
   subtitulo?: string;

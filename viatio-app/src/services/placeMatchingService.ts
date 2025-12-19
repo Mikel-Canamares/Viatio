@@ -51,33 +51,124 @@ export function mapReservaCategoriaToLugarCategoria(
 // ============================================
 
 /**
+ * Palabras genéricas a filtrar del nombre de reservas de transporte
+ */
+const TRANSPORT_GENERIC_WORDS = [
+  'tren',
+  'train',
+  'vuelo',
+  'flight',
+  'avión',
+  'plane',
+  'autobús',
+  'bus',
+  'autocar',
+  'coach',
+  'ferry',
+  'barco',
+  'boat',
+  'taxi',
+  'uber',
+  'cabify',
+  'metro',
+  'subway',
+];
+
+/**
+ * Limpia el nombre de una reserva de transporte eliminando palabras genéricas
+ */
+function cleanTransportName(nombre: string): string {
+  const words = nombre.toLowerCase().split(/\s+/);
+  const filtered = words.filter(
+    (word) => !TRANSPORT_GENERIC_WORDS.includes(word.toLowerCase())
+  );
+  return filtered.join(' ').trim();
+}
+
+/**
+ * Obtiene el tipo de lugar según la categoría de la reserva
+ */
+function getPlaceTypeHint(categoria: string, nombre?: string): string {
+  if (categoria === 'transport') {
+    const nombreLower = nombre?.toLowerCase() || '';
+    if (nombreLower.includes('tren') || nombreLower.includes('train')) {
+      return 'train station';
+    }
+    if (nombreLower.includes('vuelo') || nombreLower.includes('flight') || nombreLower.includes('avión')) {
+      return 'airport';
+    }
+    if (nombreLower.includes('autobús') || nombreLower.includes('bus')) {
+      return 'bus station';
+    }
+    if (nombreLower.includes('ferry') || nombreLower.includes('barco')) {
+      return 'ferry terminal';
+    }
+    return 'transit station';
+  }
+  return '';
+}
+
+/**
  * Construye query de búsqueda inteligente para Google Places
  */
 function buildSearchQuery(reserva: Reserva): string {
   const parts: string[] = [];
 
-  // Nombre (siempre incluir si existe)
-  if (reserva.nombre) {
-    parts.push(reserva.nombre);
-  }
+  // TRANSPORTE: Estrategia especial
+  if (reserva.categoria === 'transport') {
+    // 1. Priorizar ubicación (estación/aeropuerto)
+    if (reserva.ubicacion) {
+      parts.push(reserva.ubicacion);
 
-  // Para accommodation y food: usar solo nombre + dirección
-  // Para transport y activity: usar ubicacion + dirección
-  if (reserva.categoria === 'accommodation' || reserva.categoria === 'food') {
-    // Solo añadir dirección (nombre ya se agregó arriba)
+      // 2. Añadir tipo de lugar para mejorar precisión
+      const placeType = getPlaceTypeHint(reserva.categoria, reserva.nombre);
+      if (placeType) {
+        parts.push(placeType);
+      }
+    } else if (reserva.nombre) {
+      // Si no hay ubicación, limpiar el nombre y buscar por él
+      const cleanedName = cleanTransportName(reserva.nombre);
+      if (cleanedName) {
+        parts.push(cleanedName);
+      }
+
+      const placeType = getPlaceTypeHint(reserva.categoria, reserva.nombre);
+      if (placeType) {
+        parts.push(placeType);
+      }
+    }
+
+    // 3. Añadir dirección si existe y no tenemos ubicación
+    if (!reserva.ubicacion && reserva.direccion) {
+      parts.push(reserva.direccion);
+    }
+  }
+  // ACCOMMODATION y FOOD: usar nombre + dirección
+  else if (reserva.categoria === 'accommodation' || reserva.categoria === 'food') {
+    if (reserva.nombre) {
+      parts.push(reserva.nombre);
+    }
     if (reserva.direccion) {
       parts.push(reserva.direccion);
     }
-  } else if (reserva.categoria === 'activity') {
-    // Para actividades: incluir ubicación Y dirección (más contexto = mejor matching)
+  }
+  // ACTIVITY: incluir todo el contexto
+  else if (reserva.categoria === 'activity') {
+    if (reserva.nombre) {
+      parts.push(reserva.nombre);
+    }
     if (reserva.ubicacion) {
       parts.push(reserva.ubicacion);
     }
     if (reserva.direccion) {
       parts.push(reserva.direccion);
     }
-  } else {
-    // Para transporte y otras: priorizar ubicacion, sino direccion
+  }
+  // OTRAS: usar lo que esté disponible
+  else {
+    if (reserva.nombre) {
+      parts.push(reserva.nombre);
+    }
     if (reserva.ubicacion) {
       parts.push(reserva.ubicacion);
     } else if (reserva.direccion) {
@@ -301,15 +392,64 @@ export async function findOrCreateLugarFromReserva(
     };
   }
 
-  // PASO 3: Buscar en Google Places API
-  const query = buildSearchQuery(reserva);
-  console.log('[PlaceMatching] Buscando en Google Places:', query);
+  // PASO 3: Buscar en Google Places API con estrategia de fallbacks
+  let placeResults: PlaceResult[] = [];
 
-  const placeResults = await searchPlacesByText(query, {
+  // BÚSQUEDA 1: Query principal
+  const primaryQuery = buildSearchQuery(reserva);
+  console.log('[PlaceMatching] Búsqueda primaria en Google Places:', primaryQuery);
+
+  placeResults = await searchPlacesByText(primaryQuery, {
     latitude: reserva.latitud,
     longitude: reserva.longitud,
     maxResults: 5,
   });
+
+  // FALLBACK: Si es transporte y no hay resultados o son pocos, intentar búsqueda alternativa
+  if (reserva.categoria === 'transport' && placeResults.length < 3) {
+    console.log('[PlaceMatching] Pocos resultados para transporte, intentando búsqueda alternativa');
+
+    // Crear queries alternativos
+    const alternativeQueries: string[] = [];
+
+    // Opción 1: Solo ubicación sin tipo
+    if (reserva.ubicacion) {
+      alternativeQueries.push(reserva.ubicacion);
+    }
+
+    // Opción 2: Solo nombre limpio
+    if (reserva.nombre) {
+      const cleanedName = cleanTransportName(reserva.nombre);
+      if (cleanedName && !alternativeQueries.includes(cleanedName)) {
+        alternativeQueries.push(cleanedName);
+      }
+    }
+
+    // Opción 3: Dirección sola si existe
+    if (reserva.direccion && !alternativeQueries.includes(reserva.direccion)) {
+      alternativeQueries.push(reserva.direccion);
+    }
+
+    // Probar cada query alternativo
+    for (const altQuery of alternativeQueries) {
+      if (!altQuery) continue;
+
+      console.log('[PlaceMatching] Intentando búsqueda alternativa:', altQuery);
+
+      const altResults = await searchPlacesByText(altQuery, {
+        latitude: reserva.latitud,
+        longitude: reserva.longitud,
+        maxResults: 5,
+      });
+
+      // Si encontramos mejores resultados, usarlos
+      if (altResults.length > placeResults.length) {
+        console.log('[PlaceMatching] Búsqueda alternativa encontró más resultados:', altResults.length);
+        placeResults = altResults;
+        break; // Usamos los primeros mejores resultados
+      }
+    }
+  }
 
   if (placeResults.length === 0) {
     console.log('[PlaceMatching] No se encontraron resultados en Google Places');

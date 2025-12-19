@@ -8,6 +8,7 @@
 import { DiaAgenda, EventoAgenda } from '@/types/diaViaje';
 import { getDiasByViajeId } from './diasViajeService';
 import { getReservasByViajeId } from './reservasService';
+import { getLugaresByViajeId } from './lugaresService';
 import {
   RESERVA_CATEGORIAS,
   Reserva,
@@ -15,6 +16,7 @@ import {
   SUBTIPOS_ALOJAMIENTO,
   SUBTIPOS_ACTIVIDAD,
 } from '@/types/reserva';
+import { Lugar, LUGAR_CATEGORIAS } from '@/types/lugar';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -54,14 +56,15 @@ function getIconForReserva(reserva: Reserva): string {
  * Retorna días con información formateada y eventos asociados
  */
 export async function getAgendaByViajeId(viajeId: string): Promise<DiaAgenda[]> {
-  const [dias, reservas] = await Promise.all([
+  const [dias, reservas, lugares] = await Promise.all([
     getDiasByViajeId(viajeId),
     getReservasByViajeId(viajeId),
+    getLugaresByViajeId(viajeId),
   ]);
 
   return dias.map((dia) => {
     const fecha = parseISO(dia.fecha);
-    const eventos = combinarEventos(reservas, [], dia.fecha);
+    const eventos = combinarEventos(reservas, lugares, dia.id, dia.fecha);
 
     return {
       dia,
@@ -78,7 +81,8 @@ export async function getAgendaByViajeId(viajeId: string): Promise<DiaAgenda[]> 
  */
 export function combinarEventos(
   reservas: Reserva[],
-  _lugares: any[],
+  lugares: Lugar[],
+  diaId: string,
   fecha: string
 ): EventoAgenda[] {
   const eventos: EventoAgenda[] = [];
@@ -95,6 +99,7 @@ export function combinarEventos(
         id: r.id,
         tipo: 'reserva',
         reservaId: r.id,
+        lugarId: r.lugarId, // Incluir lugarId si la reserva tiene un lugar asociado
         hora: r.horaInicio,
         titulo: r.nombre,
         subtitulo: r.proveedor,
@@ -106,19 +111,25 @@ export function combinarEventos(
       });
     });
 
-  // TODO: Filtrar y mapear lugares del día cuando se implementen
-  // lugares
-  //   .filter(l => l.fecha === fecha)
-  //   .forEach(l => {
-  //     eventos.push({
-  //       id: l.id,
-  //       tipo: 'lugar',
-  //       hora: l.hora,
-  //       titulo: l.nombre,
-  //       subtitulo: l.descripcion,
-  //       ubicacion: l.direccion,
-  //     });
-  //   });
+  // Filtrar y mapear lugares del día
+  lugares
+    .filter((l) => l.diaId === diaId)
+    .forEach((l) => {
+      const categoriaInfo = LUGAR_CATEGORIAS[l.categoria];
+
+      eventos.push({
+        id: l.id,
+        tipo: 'lugar',
+        hora: undefined, // Los lugares no tienen hora específica
+        titulo: l.nombre,
+        subtitulo: l.descripcion,
+        categoria: categoriaInfo.label,
+        iconName: categoriaInfo.icon,
+        iconColor: categoriaInfo.color,
+        iconBgColor: `${categoriaInfo.color}20`, // Color con 20% opacidad
+        ubicacion: l.direccion,
+      });
+    });
 
   // Ordenar por hora (eventos sin hora van al final)
   return eventos.sort((a, b) => {
