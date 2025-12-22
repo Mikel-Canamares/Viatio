@@ -98,6 +98,7 @@ export type ProfileStackParamList = {
   ProfileMain: undefined;
   EditProfile: undefined;
   NotificationsSettings: undefined;
+  NotificationsManagement: undefined;
   Settings: undefined;
   Help: undefined;
 };

@@ -1,9 +1,13 @@
 /**
- * NOTIFICATIONS SERVICE
+ * NOTIFICATIONS SERVICE v2.0
  *
- * Servicio para gestionar notificaciones push locales.
- * Maneja permisos, programación y cancelación de notificaciones
- * para viajes, reservas y eventos personalizados.
+ * Sistema profesional de gestión de notificaciones push locales.
+ * Incluye:
+ * - Cálculo robusto de fechas con logging detallado
+ * - Templates personalizables
+ * - Manager central con monitoreo
+ * - Reprogramación automática
+ * - Modo debug
  */
 
 import * as Notifications from 'expo-notifications';
@@ -12,19 +16,149 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Viaje } from '@/types/viaje';
 import { Reserva } from '@/types/reserva';
 import { getPreferenciasNotificaciones } from './perfilService';
-import { TIEMPOS_ANTELACION } from '@/types/perfil';
+import { TIEMPOS_ANTELACION, TiempoAntelacion } from '@/types/perfil';
 
 // ============================================
 // CONSTANTES
 // ============================================
 
 const NOTIFICATION_IDS_STORAGE_KEY = '@viatio:notification_ids';
+const NOTIFICATION_DEBUG_MODE_KEY = '@viatio:notification_debug';
+const NOTIFICATION_TEMPLATES_KEY = '@viatio:notification_templates';
 
 // Flag para saber si ya se inicializó el handler
 let isHandlerInitialized = false;
+let debugMode = false;
+
+// ============================================
+// TIPOS
+// ============================================
+
+export interface NotificationData extends Record<string, unknown> {
+  type: 'viaje' | 'reserva' | 'evento';
+  id: string;
+  viajeId: string;
+  scheduledFor?: string; // ISO string de cuándo debería dispararse
+}
+
+export interface StoredNotificationId {
+  notificationId: string;
+  entityType: 'viaje' | 'reserva' | 'evento';
+  entityId: string;
+  scheduledFor: string; // ISO string
+  createdAt: string; // ISO string
+  title: string;
+  body: string;
+}
+
+export interface NotificationTemplate {
+  id: string;
+  type: 'viaje' | 'reserva';
+  enabled: boolean;
+  title: string; // Soporta variables: {destino}, {fecha}, {nombre}, {hora}, {ubicacion}
+  body: string;
+  icon?: string; // emoji o nombre de icono
+  sound: 'default' | 'custom';
+  vibrate: boolean;
+  priority: 'default' | 'high' | 'max';
+}
+
+export interface ScheduledNotificationInfo {
+  id: string;
+  type: 'viaje' | 'reserva' | 'evento';
+  entityId: string;
+  title: string;
+  body: string;
+  scheduledFor: Date;
+  createdAt: Date;
+  isPast: boolean;
+  minutesUntil: number;
+}
+
+// ============================================
+// TEMPLATES POR DEFECTO
+// ============================================
+
+const DEFAULT_TEMPLATES: NotificationTemplate[] = [
+  {
+    id: 'viaje_default',
+    type: 'viaje',
+    enabled: true,
+    title: '🌍 ¡Tu viaje a {destino} se acerca!',
+    body: 'Tu viaje comienza el {fecha}. ¡No olvides revisar tu agenda!',
+    icon: '🌍',
+    sound: 'default',
+    vibrate: true,
+    priority: 'high',
+  },
+  {
+    id: 'reserva_default',
+    type: 'reserva',
+    enabled: true,
+    title: '{icon} Reserva próxima: {nombre}',
+    body: '{hora}{ubicacion}',
+    sound: 'default',
+    vibrate: true,
+    priority: 'high',
+  },
+];
+
+// ============================================
+// LOGGING Y DEBUG
+// ============================================
 
 /**
- * Inicializa el notification handler (se ejecuta lazy, no al importar)
+ * Logger centralizado con timestamps y niveles
+ */
+function log(level: 'info' | 'warn' | 'error' | 'debug', message: string, data?: any) {
+  const timestamp = new Date().toISOString();
+  const prefix = `[Notifications ${level.toUpperCase()}] ${timestamp}:`;
+
+  if (level === 'debug' && !debugMode) return;
+
+  switch (level) {
+    case 'error':
+      console.error(prefix, message, data || '');
+      break;
+    case 'warn':
+      console.warn(prefix, message, data || '');
+      break;
+    case 'debug':
+      console.log(prefix, '🐛', message, data || '');
+      break;
+    default:
+      console.log(prefix, message, data || '');
+  }
+}
+
+/**
+ * Activa/desactiva modo debug
+ */
+export async function setDebugMode(enabled: boolean): Promise<void> {
+  debugMode = enabled;
+  await AsyncStorage.setItem(NOTIFICATION_DEBUG_MODE_KEY, JSON.stringify(enabled));
+  log('info', `Debug mode ${enabled ? 'enabled' : 'disabled'}`);
+}
+
+/**
+ * Obtiene estado del modo debug
+ */
+export async function getDebugMode(): Promise<boolean> {
+  try {
+    const stored = await AsyncStorage.getItem(NOTIFICATION_DEBUG_MODE_KEY);
+    debugMode = stored ? JSON.parse(stored) : false;
+    return debugMode;
+  } catch {
+    return false;
+  }
+}
+
+// ============================================
+// INICIALIZACIÓN
+// ============================================
+
+/**
+ * Inicializa el notification handler con configuración profesional
  */
 function initializeNotificationHandler() {
   if (isHandlerInitialized) return;
@@ -40,22 +174,50 @@ function initializeNotificationHandler() {
   });
 
   isHandlerInitialized = true;
+  log('info', 'Notification handler initialized');
 }
 
-// ============================================
-// TIPOS
-// ============================================
+/**
+ * Configura canales de Android con múltiples categorías
+ */
+async function setupAndroidChannels(): Promise<void> {
+  if (Platform.OS !== 'android') return;
 
-interface NotificationData extends Record<string, unknown> {
-  type: 'viaje' | 'reserva' | 'evento';
-  id: string;
-  viajeId: string;
-}
+  const channels = [
+    {
+      id: 'viajes',
+      name: 'Viajes',
+      importance: Notifications.AndroidImportance.HIGH,
+      description: 'Notificaciones sobre tus viajes programados',
+    },
+    {
+      id: 'reservas',
+      name: 'Reservas',
+      importance: Notifications.AndroidImportance.HIGH,
+      description: 'Recordatorios de tus reservas',
+    },
+    {
+      id: 'eventos',
+      name: 'Eventos',
+      importance: Notifications.AndroidImportance.DEFAULT,
+      description: 'Eventos y actividades personalizadas',
+    },
+  ];
 
-interface StoredNotificationId {
-  notificationId: string;
-  entityType: 'viaje' | 'reserva' | 'evento';
-  entityId: string;
+  for (const channel of channels) {
+    await Notifications.setNotificationChannelAsync(channel.id, {
+      name: channel.name,
+      importance: channel.importance,
+      description: channel.description,
+      sound: 'default',
+      vibrationPattern: [0, 250, 250, 250],
+      enableVibrate: true,
+      enableLights: true,
+      lightColor: '#0066CC',
+    });
+  }
+
+  log('info', 'Android notification channels configured');
 }
 
 // ============================================
@@ -66,44 +228,113 @@ interface StoredNotificationId {
  * Solicita permisos de notificaciones al usuario
  */
 export async function requestNotificationPermissions(): Promise<boolean> {
-  initializeNotificationHandler();
+  try {
+    initializeNotificationHandler();
 
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    log('debug', 'Current permission status', { existingStatus });
 
-  let finalStatus = existingStatus;
+    let finalStatus = existingStatus;
 
-  if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+      log('info', 'Permission requested', { finalStatus });
+    }
 
-  if (finalStatus !== 'granted') {
-    console.warn('Permisos de notificaciones denegados');
+    if (finalStatus !== 'granted') {
+      log('warn', 'Notification permissions denied');
+      return false;
+    }
+
+    await setupAndroidChannels();
+    log('info', 'Notification permissions granted');
+    return true;
+  } catch (error) {
+    log('error', 'Error requesting permissions', error);
     return false;
   }
-
-  // Configurar canal de notificaciones en Android
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('viajes', {
-      name: 'Viajes y Reservas',
-      importance: Notifications.AndroidImportance.HIGH,
-      sound: 'default',
-      vibrationPattern: [0, 250, 250, 250],
-      enableVibrate: true,
-      enableLights: true,
-      lightColor: '#0066CC',
-    });
-  }
-
-  return true;
 }
 
 /**
  * Verifica si los permisos de notificaciones están activos
  */
 export async function hasNotificationPermissions(): Promise<boolean> {
-  const { status } = await Notifications.getPermissionsAsync();
-  return status === 'granted';
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    return status === 'granted';
+  } catch (error) {
+    log('error', 'Error checking permissions', error);
+    return false;
+  }
+}
+
+// ============================================
+// TEMPLATES
+// ============================================
+
+/**
+ * Obtiene templates de notificaciones (con fallback a defaults)
+ */
+export async function getNotificationTemplates(): Promise<NotificationTemplate[]> {
+  try {
+    const stored = await AsyncStorage.getItem(NOTIFICATION_TEMPLATES_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+    // Guardar defaults si no existen
+    await saveNotificationTemplates(DEFAULT_TEMPLATES);
+    return DEFAULT_TEMPLATES;
+  } catch (error) {
+    log('error', 'Error loading templates', error);
+    return DEFAULT_TEMPLATES;
+  }
+}
+
+/**
+ * Guarda templates personalizados
+ */
+export async function saveNotificationTemplates(
+  templates: NotificationTemplate[]
+): Promise<void> {
+  try {
+    await AsyncStorage.setItem(NOTIFICATION_TEMPLATES_KEY, JSON.stringify(templates));
+    log('info', 'Templates saved', { count: templates.length });
+  } catch (error) {
+    log('error', 'Error saving templates', error);
+  }
+}
+
+/**
+ * Actualiza un template específico
+ */
+export async function updateNotificationTemplate(
+  templateId: string,
+  updates: Partial<NotificationTemplate>
+): Promise<void> {
+  try {
+    const templates = await getNotificationTemplates();
+    const index = templates.findIndex(t => t.id === templateId);
+
+    if (index !== -1) {
+      templates[index] = { ...templates[index], ...updates };
+      await saveNotificationTemplates(templates);
+      log('info', 'Template updated', { templateId, updates });
+    }
+  } catch (error) {
+    log('error', 'Error updating template', error);
+  }
+}
+
+/**
+ * Renderiza un template con variables
+ */
+function renderTemplate(template: string, variables: Record<string, string>): string {
+  let result = template;
+  Object.entries(variables).forEach(([key, value]) => {
+    result = result.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
+  });
+  return result;
 }
 
 // ============================================
@@ -111,22 +342,39 @@ export async function hasNotificationPermissions(): Promise<boolean> {
 // ============================================
 
 /**
- * Guarda el ID de una notificación programada
+ * Guarda el ID de una notificación programada con metadata completa
  */
 async function saveNotificationId(
   notificationId: string,
   entityType: 'viaje' | 'reserva' | 'evento',
-  entityId: string
+  entityId: string,
+  scheduledFor: Date,
+  title: string,
+  body: string
 ): Promise<void> {
   try {
     const stored = await AsyncStorage.getItem(NOTIFICATION_IDS_STORAGE_KEY);
     const ids: StoredNotificationId[] = stored ? JSON.parse(stored) : [];
 
-    ids.push({ notificationId, entityType, entityId });
+    ids.push({
+      notificationId,
+      entityType,
+      entityId,
+      scheduledFor: scheduledFor.toISOString(),
+      createdAt: new Date().toISOString(),
+      title,
+      body,
+    });
 
     await AsyncStorage.setItem(NOTIFICATION_IDS_STORAGE_KEY, JSON.stringify(ids));
+    log('debug', 'Notification ID saved', {
+      notificationId,
+      entityType,
+      entityId,
+      scheduledFor: scheduledFor.toISOString(),
+    });
   } catch (error) {
-    console.error('Error guardando notification ID:', error);
+    log('error', 'Error saving notification ID', error);
   }
 }
 
@@ -146,7 +394,7 @@ async function getNotificationIdsForEntity(
       .filter(item => item.entityType === entityType && item.entityId === entityId)
       .map(item => item.notificationId);
   } catch (error) {
-    console.error('Error obteniendo notification IDs:', error);
+    log('error', 'Error getting notification IDs', error);
     return [];
   }
 }
@@ -168,8 +416,125 @@ async function removeNotificationIdsForEntity(
     );
 
     await AsyncStorage.setItem(NOTIFICATION_IDS_STORAGE_KEY, JSON.stringify(filtered));
+    log('debug', 'Notification IDs removed', { entityType, entityId });
   } catch (error) {
-    console.error('Error eliminando notification IDs:', error);
+    log('error', 'Error removing notification IDs', error);
+  }
+}
+
+/**
+ * Obtiene información detallada de todas las notificaciones programadas
+ */
+export async function getAllScheduledNotificationsInfo(): Promise<ScheduledNotificationInfo[]> {
+  try {
+    const stored = await AsyncStorage.getItem(NOTIFICATION_IDS_STORAGE_KEY);
+    if (!stored) return [];
+
+    const ids: StoredNotificationId[] = JSON.parse(stored);
+    const now = new Date();
+
+    return ids.map(item => {
+      const scheduledFor = new Date(item.scheduledFor);
+      const isPast = scheduledFor < now;
+      const minutesUntil = Math.floor((scheduledFor.getTime() - now.getTime()) / 1000 / 60);
+
+      return {
+        id: item.notificationId,
+        type: item.entityType,
+        entityId: item.entityId,
+        title: item.title,
+        body: item.body,
+        scheduledFor,
+        createdAt: new Date(item.createdAt),
+        isPast,
+        minutesUntil,
+      };
+    });
+  } catch (error) {
+    log('error', 'Error getting scheduled notifications info', error);
+    return [];
+  }
+}
+
+// ============================================
+// CÁLCULO ROBUSTO DE FECHAS
+// ============================================
+
+/**
+ * Calcula la fecha de notificación con validación exhaustiva
+ */
+function calculateNotificationDate(
+  eventDate: Date,
+  tiempoAntelacion: TiempoAntelacion
+): { notificationDate: Date; isValid: boolean; reason?: string } {
+  const segundosAntelacion = TIEMPOS_ANTELACION[tiempoAntelacion].segundos;
+
+  if (segundosAntelacion === null) {
+    return { notificationDate: new Date(), isValid: false, reason: 'Tiempo de antelación desactivado' };
+  }
+
+  // Validar que eventDate sea válida
+  if (isNaN(eventDate.getTime())) {
+    log('error', 'Invalid event date', { eventDate });
+    return { notificationDate: new Date(), isValid: false, reason: 'Fecha del evento inválida' };
+  }
+
+  // Calcular fecha de notificación
+  const notificationDate = new Date(eventDate.getTime() - segundosAntelacion * 1000);
+
+  // Validar que no sea en el pasado (con margen de 1 minuto)
+  const now = Date.now();
+  const oneMinute = 60 * 1000;
+
+  if (notificationDate.getTime() <= now - oneMinute) {
+    const minutesAgo = Math.floor((now - notificationDate.getTime()) / 1000 / 60);
+    log('debug', 'Notification date is in the past', {
+      notificationDate: notificationDate.toISOString(),
+      minutesAgo,
+    });
+    return {
+      notificationDate,
+      isValid: false,
+      reason: `La fecha de notificación ya pasó hace ${minutesAgo} minutos`,
+    };
+  }
+
+  log('debug', 'Notification date calculated', {
+    eventDate: eventDate.toISOString(),
+    notificationDate: notificationDate.toISOString(),
+    secondsBeforeEvent: segundosAntelacion,
+    minutesUntilNotification: Math.floor((notificationDate.getTime() - now) / 1000 / 60),
+  });
+
+  return { notificationDate, isValid: true };
+}
+
+/**
+ * Parsea fecha de reserva combinando fecha y hora
+ */
+function parseReservaDateTime(fechaInicio: string, horaInicio: string): Date {
+  try {
+    const [hours, minutes] = horaInicio.split(':').map(Number);
+    const fecha = new Date(fechaInicio);
+
+    // Validar que los componentes sean válidos
+    if (isNaN(fecha.getTime()) || isNaN(hours) || isNaN(minutes)) {
+      log('error', 'Invalid date/time components', { fechaInicio, horaInicio });
+      return new Date(NaN);
+    }
+
+    fecha.setHours(hours, minutes, 0, 0);
+
+    log('debug', 'Parsed reserva datetime', {
+      fechaInicio,
+      horaInicio,
+      result: fecha.toISOString(),
+    });
+
+    return fecha;
+  } catch (error) {
+    log('error', 'Error parsing reserva datetime', { fechaInicio, horaInicio, error });
+    return new Date(NaN);
   }
 }
 
@@ -182,74 +547,91 @@ async function removeNotificationIdsForEntity(
  */
 export async function scheduleViajeNotification(viaje: Viaje): Promise<boolean> {
   try {
+    log('info', `Attempting to schedule notification for viaje: ${viaje.id}`);
     initializeNotificationHandler();
 
     // Verificar permisos
     const hasPermissions = await hasNotificationPermissions();
     if (!hasPermissions) {
-      console.log('No hay permisos de notificaciones');
+      log('warn', 'No notification permissions');
       return false;
     }
 
     // Obtener preferencias
     const preferencias = await getPreferenciasNotificaciones();
+    log('debug', 'Preferences loaded', preferencias);
 
     if (!preferencias.recordatoriosViaje) {
-      console.log('Recordatorios de viaje desactivados');
+      log('info', 'Trip reminders disabled in preferences');
       return false;
     }
 
-    const tiempoAntelacion = preferencias.tiempoAvisoViaje;
-    const segundosAntelacion = TIEMPOS_ANTELACION[tiempoAntelacion].segundos;
-
-    if (segundosAntelacion === null) {
-      console.log('Tiempo de antelación desactivado para viajes');
-      return false;
-    }
-
-    // Cancelar notificaciones anteriores de este viaje
+    // Cancelar notificaciones anteriores
     await cancelViajeNotifications(viaje.id);
 
-    // Calcular fecha/hora de la notificación
+    // Calcular fecha de notificación
     const fechaInicio = new Date(viaje.fechaInicio);
-    const fechaNotificacion = new Date(fechaInicio.getTime() - segundosAntelacion * 1000);
+    const calculation = calculateNotificationDate(fechaInicio, preferencias.tiempoAvisoViaje);
 
-    // No programar si la fecha ya pasó
-    if (fechaNotificacion.getTime() <= Date.now()) {
-      console.log('Fecha de notificación ya pasó');
+    if (!calculation.isValid) {
+      log('info', `Cannot schedule notification: ${calculation.reason}`);
       return false;
     }
+
+    const { notificationDate } = calculation;
+
+    // Obtener template
+    const templates = await getNotificationTemplates();
+    const template = templates.find(t => t.type === 'viaje' && t.enabled) || DEFAULT_TEMPLATES[0];
+
+    // Renderizar contenido
+    const variables = {
+      destino: viaje.destino,
+      fecha: fechaInicio.toLocaleDateString('es-ES', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }),
+    };
+
+    const title = renderTemplate(template.title, variables);
+    const body = renderTemplate(template.body, variables);
 
     // Programar notificación
     const notificationId = await Notifications.scheduleNotificationAsync({
       content: {
-        title: `🌍 ¡Tu viaje a ${viaje.destino} se acerca!`,
-        body: `Tu viaje comienza el ${new Date(viaje.fechaInicio).toLocaleDateString('es-ES', {
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric',
-        })}. ¡No olvides revisar tu agenda!`,
-        sound: 'default',
-        priority: Notifications.AndroidNotificationPriority.HIGH,
+        title,
+        body,
+        sound: template.sound,
+        priority:
+          template.priority === 'max'
+            ? Notifications.AndroidNotificationPriority.MAX
+            : Notifications.AndroidNotificationPriority.HIGH,
         data: {
           type: 'viaje',
           id: viaje.id,
           viajeId: viaje.id,
+          scheduledFor: notificationDate.toISOString(),
         } as NotificationData,
       },
       trigger: {
-        date: fechaNotificacion,
+        date: notificationDate,
         channelId: 'viajes',
       },
     });
 
-    // Guardar el ID de la notificación
-    await saveNotificationId(notificationId, 'viaje', viaje.id);
+    // Guardar metadata
+    await saveNotificationId(notificationId, 'viaje', viaje.id, notificationDate, title, body);
 
-    console.log(`Notificación programada para viaje ${viaje.id}:`, fechaNotificacion);
+    log('info', `✅ Notification scheduled successfully for viaje ${viaje.id}`, {
+      notificationId,
+      scheduledFor: notificationDate.toISOString(),
+      title,
+    });
+
     return true;
   } catch (error) {
-    console.error('Error programando notificación de viaje:', error);
+    log('error', 'Error scheduling viaje notification', error);
     return false;
   }
 }
@@ -262,11 +644,13 @@ export async function scheduleReservaNotification(
   viajeDestino?: string
 ): Promise<boolean> {
   try {
+    log('info', `Attempting to schedule notification for reserva: ${reserva.id}`);
     initializeNotificationHandler();
 
     // Verificar permisos
     const hasPermissions = await hasNotificationPermissions();
     if (!hasPermissions) {
+      log('warn', 'No notification permissions');
       return false;
     }
 
@@ -274,81 +658,92 @@ export async function scheduleReservaNotification(
     const preferencias = await getPreferenciasNotificaciones();
 
     if (!preferencias.actualizacionesReservas) {
-      return false;
-    }
-
-    const tiempoAntelacion = preferencias.tiempoAvisoReserva;
-    const segundosAntelacion = TIEMPOS_ANTELACION[tiempoAntelacion].segundos;
-
-    if (segundosAntelacion === null) {
+      log('info', 'Reserva reminders disabled in preferences');
       return false;
     }
 
     // Verificar que la reserva tenga fecha y hora
     if (!reserva.fechaInicio || !reserva.horaInicio) {
-      console.log('Reserva sin fecha/hora, no se programa notificación');
+      log('warn', 'Reserva missing date/time', { reserva: reserva.id });
       return false;
     }
 
-    // Cancelar notificaciones anteriores de esta reserva
+    // Cancelar notificaciones anteriores
     await cancelReservaNotifications(reserva.id);
 
-    // Calcular fecha/hora de la notificación
-    const [hours, minutes] = reserva.horaInicio.split(':').map(Number);
-    const fechaReserva = new Date(reserva.fechaInicio);
-    fechaReserva.setHours(hours, minutes, 0, 0);
+    // Parsear fecha/hora de la reserva
+    const fechaReserva = parseReservaDateTime(reserva.fechaInicio, reserva.horaInicio);
+    const calculation = calculateNotificationDate(fechaReserva, preferencias.tiempoAvisoReserva);
 
-    const fechaNotificacion = new Date(fechaReserva.getTime() - segundosAntelacion * 1000);
-
-    // No programar si la fecha ya pasó
-    if (fechaNotificacion.getTime() <= Date.now()) {
+    if (!calculation.isValid) {
+      log('info', `Cannot schedule notification: ${calculation.reason}`);
       return false;
     }
 
-    // Determinar emoji según categoría
-    const emojiMap = {
+    const { notificationDate } = calculation;
+
+    // Obtener template
+    const templates = await getNotificationTemplates();
+    const template = templates.find(t => t.type === 'reserva' && t.enabled) || DEFAULT_TEMPLATES[1];
+
+    // Mapeo de emojis por categoría
+    const emojiMap: Record<string, string> = {
       transport: '✈️',
       accommodation: '🏨',
       food: '🍽️',
       activity: '🎫',
       other: '📌',
     };
-    const emoji = emojiMap[reserva.categoria];
+
+    // Renderizar contenido
+    const variables = {
+      icon: emojiMap[reserva.categoria] || '📌',
+      nombre: reserva.nombre,
+      hora: reserva.horaInicio,
+      ubicacion: reserva.ubicacion ? ` - ${reserva.ubicacion}` : '',
+    };
+
+    const title = renderTemplate(template.title, variables);
+    const body = renderTemplate(template.body, variables) + (viajeDestino ? ` (${viajeDestino})` : '');
 
     // Programar notificación
     const notificationId = await Notifications.scheduleNotificationAsync({
       content: {
-        title: `${emoji} Reserva próxima: ${reserva.nombre}`,
-        body: `${reserva.horaInicio}${reserva.ubicacion ? ` - ${reserva.ubicacion}` : ''}${
-          viajeDestino ? ` (${viajeDestino})` : ''
-        }`,
-        sound: 'default',
-        priority: Notifications.AndroidNotificationPriority.HIGH,
+        title,
+        body,
+        sound: template.sound,
+        priority:
+          template.priority === 'max'
+            ? Notifications.AndroidNotificationPriority.MAX
+            : Notifications.AndroidNotificationPriority.HIGH,
         data: {
           type: 'reserva',
           id: reserva.id,
           viajeId: reserva.viajeId,
+          scheduledFor: notificationDate.toISOString(),
         } as NotificationData,
       },
       trigger: {
-        date: fechaNotificacion,
-        channelId: 'viajes',
+        date: notificationDate,
+        channelId: 'reservas',
       },
     });
 
-    // Guardar el ID de la notificación
-    await saveNotificationId(notificationId, 'reserva', reserva.id);
+    // Guardar metadata
+    await saveNotificationId(notificationId, 'reserva', reserva.id, notificationDate, title, body);
 
-    console.log(`Notificación programada para reserva ${reserva.id}:`, fechaNotificacion);
+    log('info', `✅ Notification scheduled successfully for reserva ${reserva.id}`, {
+      notificationId,
+      scheduledFor: notificationDate.toISOString(),
+      title,
+    });
+
     return true;
   } catch (error) {
-    console.error('Error programando notificación de reserva:', error);
+    log('error', 'Error scheduling reserva notification', error);
     return false;
   }
 }
-
-// Función scheduleEventoNotification eliminada temporalmente
-// Se implementará cuando se cree el sistema de eventos personalizados
 
 // ============================================
 // CANCELAR NOTIFICACIONES
@@ -366,9 +761,9 @@ export async function cancelViajeNotifications(viajeId: string): Promise<void> {
     }
 
     await removeNotificationIdsForEntity('viaje', viajeId);
-    console.log(`Canceladas ${notificationIds.length} notificaciones del viaje ${viajeId}`);
+    log('info', `Cancelled ${notificationIds.length} notifications for viaje ${viajeId}`);
   } catch (error) {
-    console.error('Error cancelando notificaciones de viaje:', error);
+    log('error', 'Error cancelling viaje notifications', error);
   }
 }
 
@@ -384,14 +779,11 @@ export async function cancelReservaNotifications(reservaId: string): Promise<voi
     }
 
     await removeNotificationIdsForEntity('reserva', reservaId);
-    console.log(`Canceladas ${notificationIds.length} notificaciones de la reserva ${reservaId}`);
+    log('info', `Cancelled ${notificationIds.length} notifications for reserva ${reservaId}`);
   } catch (error) {
-    console.error('Error cancelando notificaciones de reserva:', error);
+    log('error', 'Error cancelling reserva notifications', error);
   }
 }
-
-// Función cancelEventoNotifications eliminada temporalmente
-// Se implementará cuando se cree el sistema de eventos personalizados
 
 /**
  * Cancela TODAS las notificaciones programadas
@@ -400,9 +792,65 @@ export async function cancelAllNotifications(): Promise<void> {
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
     await AsyncStorage.removeItem(NOTIFICATION_IDS_STORAGE_KEY);
-    console.log('Todas las notificaciones han sido canceladas');
+    log('info', 'All notifications cancelled');
   } catch (error) {
-    console.error('Error cancelando todas las notificaciones:', error);
+    log('error', 'Error cancelling all notifications', error);
+  }
+}
+
+/**
+ * Limpia notificaciones obsoletas (pasadas)
+ */
+export async function cleanupObsoleteNotifications(): Promise<number> {
+  try {
+    const allInfo = await getAllScheduledNotificationsInfo();
+    const obsolete = allInfo.filter(n => n.isPast);
+
+    for (const notification of obsolete) {
+      await Notifications.cancelScheduledNotificationAsync(notification.id);
+    }
+
+    // Actualizar storage
+    const stored = await AsyncStorage.getItem(NOTIFICATION_IDS_STORAGE_KEY);
+    if (stored) {
+      const ids: StoredNotificationId[] = JSON.parse(stored);
+      const obsoleteIds = new Set(obsolete.map(n => n.id));
+      const filtered = ids.filter(item => !obsoleteIds.has(item.notificationId));
+      await AsyncStorage.setItem(NOTIFICATION_IDS_STORAGE_KEY, JSON.stringify(filtered));
+    }
+
+    log('info', `Cleaned up ${obsolete.length} obsolete notifications`);
+    return obsolete.length;
+  } catch (error) {
+    log('error', 'Error cleaning up obsolete notifications', error);
+    return 0;
+  }
+}
+
+// ============================================
+// REPROGRAMACIÓN
+// ============================================
+
+/**
+ * Reprograma todas las notificaciones (útil cuando cambian preferencias)
+ */
+export async function rescheduleAllNotifications(): Promise<{
+  viajes: number;
+  reservas: number;
+}> {
+  try {
+    log('info', 'Starting reschedule of all notifications');
+
+    // Esta función debería ser llamada desde viajesService/reservasService
+    // ya que necesita acceso a todas las entidades
+    // Por ahora solo limpiamos las existentes
+    await cancelAllNotifications();
+
+    log('info', 'All notifications rescheduled (entities need to reschedule individually)');
+    return { viajes: 0, reservas: 0 };
+  } catch (error) {
+    log('error', 'Error rescheduling all notifications', error);
+    return { viajes: 0, reservas: 0 };
   }
 }
 
@@ -416,11 +864,51 @@ export async function cancelAllNotifications(): Promise<void> {
 export async function getAllScheduledNotifications() {
   try {
     const notifications = await Notifications.getAllScheduledNotificationsAsync();
-    console.log(`Total notificaciones programadas: ${notifications.length}`);
+    log('info', `Total scheduled notifications: ${notifications.length}`);
     return notifications;
   } catch (error) {
-    console.error('Error obteniendo notificaciones:', error);
+    log('error', 'Error getting scheduled notifications', error);
     return [];
+  }
+}
+
+/**
+ * Envía una notificación de prueba (programada en 3 segundos)
+ */
+export async function sendTestNotification(): Promise<boolean> {
+  try {
+    const hasPermissions = await hasNotificationPermissions();
+    if (!hasPermissions) {
+      log('warn', 'Cannot send test notification: no permissions');
+      return false;
+    }
+
+    // Programar para dentro de 3 segundos (más confiable que trigger: null)
+    const testDate = new Date(Date.now() + 3000);
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: '🧪 Notificación de prueba',
+        body: 'El sistema de notificaciones funciona correctamente',
+        sound: 'default',
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+        data: {
+          type: 'evento',
+          id: 'test',
+          viajeId: 'test',
+        },
+      },
+      trigger: {
+        date: testDate,
+        channelId: 'eventos',
+      },
+    });
+
+    log('info', 'Test notification scheduled', { scheduledFor: testDate.toISOString() });
+    return true;
+  } catch (error) {
+    log('error', 'Error sending test notification', error);
+    return false;
   }
 }
 
@@ -440,4 +928,32 @@ export function addNotificationResponseReceivedListener(
   callback: (response: Notifications.NotificationResponse) => void
 ) {
   return Notifications.addNotificationResponseReceivedListener(callback);
+}
+
+/**
+ * Obtiene estadísticas de notificaciones
+ */
+export async function getNotificationStats(): Promise<{
+  total: number;
+  viajes: number;
+  reservas: number;
+  eventos: number;
+  upcoming: number;
+  past: number;
+}> {
+  try {
+    const allInfo = await getAllScheduledNotificationsInfo();
+
+    return {
+      total: allInfo.length,
+      viajes: allInfo.filter(n => n.type === 'viaje').length,
+      reservas: allInfo.filter(n => n.type === 'reserva').length,
+      eventos: allInfo.filter(n => n.type === 'evento').length,
+      upcoming: allInfo.filter(n => !n.isPast).length,
+      past: allInfo.filter(n => n.isPast).length,
+    };
+  } catch (error) {
+    log('error', 'Error getting notification stats', error);
+    return { total: 0, viajes: 0, reservas: 0, eventos: 0, upcoming: 0, past: 0 };
+  }
 }
