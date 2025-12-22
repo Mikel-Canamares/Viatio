@@ -6,20 +6,27 @@
  */
 
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert, Pressable } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   PreferenciasNotificaciones,
   DEFAULT_PREFERENCIAS_NOTIFICACIONES,
+  TIEMPOS_ANTELACION,
+  TiempoAntelacion,
 } from '@/types/perfil';
 import {
   getPreferenciasNotificaciones,
   setPreferenciasNotificaciones,
 } from '@/services/perfilService';
+import {
+  requestNotificationPermissions,
+  hasNotificationPermissions,
+} from '@/services/notificationsService';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { PageHeader } from '@/components/PageHeader';
 import { Card } from '@/components/Card';
 import { SwitchItem } from '@/components/SwitchItem';
+import { SelectItem } from '@/components/SelectItem';
 import { theme } from '@/config';
 
 type RootStackParamList = {
@@ -33,11 +40,36 @@ export default function NotificationsSettingsScreen({ navigation }: Props) {
     DEFAULT_PREFERENCIAS_NOTIFICACIONES
   );
   const [loading, setLoading] = useState(true);
+  const [permissionsGranted, setPermissionsGranted] = useState(false);
 
-  // Cargar preferencias al montar
+  // Cargar preferencias y verificar permisos al montar
   useEffect(() => {
     loadPreferencias();
+    checkPermissions();
   }, []);
+
+  /**
+   * Verifica si hay permisos de notificaciones
+   */
+  const checkPermissions = async () => {
+    const hasPerms = await hasNotificationPermissions();
+    setPermissionsGranted(hasPerms);
+  };
+
+  /**
+   * Solicita permisos de notificaciones
+   */
+  const handleRequestPermissions = async () => {
+    const granted = await requestNotificationPermissions();
+    setPermissionsGranted(granted);
+
+    if (!granted) {
+      Alert.alert(
+        'Permisos denegados',
+        'Para recibir notificaciones, debes activar los permisos en la configuración del dispositivo.'
+      );
+    }
+  };
 
   /**
    * Carga las preferencias desde AsyncStorage
@@ -82,6 +114,29 @@ export default function NotificationsSettingsScreen({ navigation }: Props) {
       <PageHeader title="Notificaciones" onBack={() => navigation.goBack()} />
 
       <View style={styles.content}>
+        {/* Banner de permisos si no están activos */}
+        {!permissionsGranted && (
+          <Card style={styles.warningCard}>
+            <View style={styles.warningContent}>
+              <View style={styles.warningIcon}>
+                <Text style={styles.warningEmoji}>⚠️</Text>
+              </View>
+              <View style={styles.warningTextContainer}>
+                <Text style={styles.warningTitle}>Permisos necesarios</Text>
+                <Text style={styles.warningDescription}>
+                  Activa los permisos de notificaciones para recibir recordatorios de tus viajes
+                </Text>
+              </View>
+            </View>
+            <Pressable
+              style={styles.permissionButton}
+              onPress={handleRequestPermissions}
+            >
+              <Text style={styles.permissionButtonText}>Activar permisos</Text>
+            </Pressable>
+          </Card>
+        )}
+
         {/* Sección Viajes */}
         <Text style={styles.sectionTitle}>Viajes</Text>
         <Card style={styles.card}>
@@ -90,23 +145,49 @@ export default function NotificationsSettingsScreen({ navigation }: Props) {
             description="Recibe avisos antes de tus viajes"
             value={preferencias.recordatoriosViaje}
             onValueChange={(value) => updatePreferencia('recordatoriosViaje', value)}
-            disabled={loading}
+            disabled={loading || !permissionsGranted}
           />
+
+          {preferencias.recordatoriosViaje && (
+            <SelectItem
+              label="Avisar con antelación"
+              value={preferencias.tiempoAvisoViaje}
+              options={Object.entries(TIEMPOS_ANTELACION).map(([key, config]) => ({
+                value: key,
+                label: config.label,
+              }))}
+              onSelect={(value) => updatePreferencia('tiempoAvisoViaje', value as TiempoAntelacion)}
+              icon="time-outline"
+            />
+          )}
 
           <SwitchItem
             label="Actualizaciones de reservas"
-            description="Cambios en vuelos, hoteles, etc."
+            description="Avisos de tus reservas programadas"
             value={preferencias.actualizacionesReservas}
             onValueChange={(value) => updatePreferencia('actualizacionesReservas', value)}
-            disabled={loading}
+            disabled={loading || !permissionsGranted}
           />
+
+          {preferencias.actualizacionesReservas && (
+            <SelectItem
+              label="Avisar con antelación"
+              value={preferencias.tiempoAvisoReserva}
+              options={Object.entries(TIEMPOS_ANTELACION).map(([key, config]) => ({
+                value: key,
+                label: config.label,
+              }))}
+              onSelect={(value) => updatePreferencia('tiempoAvisoReserva', value as TiempoAntelacion)}
+              icon="time-outline"
+            />
+          )}
 
           <SwitchItem
             label="Alertas de documentos"
             description="Documentos próximos a expirar"
             value={preferencias.alertasDocumentos}
             onValueChange={(value) => updatePreferencia('alertasDocumentos', value)}
-            disabled={loading}
+            disabled={loading || !permissionsGranted}
           />
         </Card>
 
@@ -118,7 +199,7 @@ export default function NotificationsSettingsScreen({ navigation }: Props) {
             description="Email con tu actividad de la semana"
             value={preferencias.resumenSemanal}
             onValueChange={(value) => updatePreferencia('resumenSemanal', value)}
-            disabled={loading}
+            disabled={loading || !permissionsGranted}
           />
 
           <SwitchItem
@@ -126,7 +207,7 @@ export default function NotificationsSettingsScreen({ navigation }: Props) {
             description="Descuentos y ofertas especiales"
             value={preferencias.promociones}
             onValueChange={(value) => updatePreferencia('promociones', value)}
-            disabled={loading}
+            disabled={loading || !permissionsGranted}
           />
         </Card>
 
@@ -145,6 +226,49 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: theme.spacing.lg,
+  },
+  warningCard: {
+    marginBottom: theme.spacing.lg,
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+  },
+  warningContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  warningIcon: {
+    marginRight: theme.spacing.md,
+  },
+  warningEmoji: {
+    fontSize: 32,
+  },
+  warningTextContainer: {
+    flex: 1,
+  },
+  warningTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.colors.text,
+    marginBottom: 4,
+  },
+  warningDescription: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    lineHeight: 18,
+  },
+  permissionButton: {
+    backgroundColor: theme.colors.primaryLight,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.radius.md,
+    alignItems: 'center',
+  },
+  permissionButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   sectionTitle: {
     fontSize: 14,

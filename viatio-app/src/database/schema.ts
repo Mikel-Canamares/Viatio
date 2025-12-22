@@ -9,7 +9,7 @@
 // VERSIÓN DEL ESQUEMA
 // ============================================
 
-export const CURRENT_SCHEMA_VERSION = 7;
+export const CURRENT_SCHEMA_VERSION = 8;
 
 // ============================================
 // CREACIÓN DE TABLAS
@@ -134,6 +134,18 @@ const CREATE_GASTOS_TABLE = `
   );
 `;
 
+const CREATE_RESERVAS_DOCUMENTOS_TABLE = `
+  CREATE TABLE IF NOT EXISTS reservas_documentos (
+    id TEXT PRIMARY KEY NOT NULL,
+    reservaId TEXT NOT NULL,
+    documentoId TEXT NOT NULL,
+    createdAt TEXT NOT NULL,
+    FOREIGN KEY (reservaId) REFERENCES reservas(id) ON DELETE CASCADE,
+    FOREIGN KEY (documentoId) REFERENCES documentos(id) ON DELETE CASCADE,
+    UNIQUE(reservaId, documentoId)
+  );
+`;
+
 const CREATE_MIGRATIONS_TABLE = `
   CREATE TABLE IF NOT EXISTS _migrations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -149,6 +161,7 @@ export const CREATE_TABLES_SQL = [
   CREATE_LUGARES_TABLE,
   CREATE_DOCUMENTOS_TABLE,
   CREATE_GASTOS_TABLE,
+  CREATE_RESERVAS_DOCUMENTOS_TABLE,
   CREATE_MIGRATIONS_TABLE,
 ];
 
@@ -261,6 +274,16 @@ const INDEX_RESERVAS_COORDS = `
   ON reservas(latitud, longitud);
 `;
 
+const INDEX_RESERVAS_DOCUMENTOS_RESERVA = `
+  CREATE INDEX IF NOT EXISTS idx_reservas_documentos_reservaId
+  ON reservas_documentos(reservaId);
+`;
+
+const INDEX_RESERVAS_DOCUMENTOS_DOCUMENTO = `
+  CREATE INDEX IF NOT EXISTS idx_reservas_documentos_documentoId
+  ON reservas_documentos(documentoId);
+`;
+
 export const CREATE_INDEXES_SQL = [
   INDEX_VIAJES_USUARIO,
   INDEX_VIAJES_FECHAS,
@@ -283,4 +306,6 @@ export const CREATE_INDEXES_SQL = [
   INDEX_GASTOS_FECHA,
   INDEX_GASTOS_CATEGORIA,
   INDEX_GASTOS_RESERVA,
+  INDEX_RESERVAS_DOCUMENTOS_RESERVA,
+  INDEX_RESERVAS_DOCUMENTOS_DOCUMENTO,
 ];

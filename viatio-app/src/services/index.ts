@@ -30,6 +30,7 @@ export { getReservaById, updateReserva } from './reservasService';
 
 export {
   pickDocument,
+  pickMultipleDocuments,
   pickImage,
   readFileAsBase64,
   isImageFile,

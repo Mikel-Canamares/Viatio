@@ -15,6 +15,10 @@ import type {
 import { logError, parseLocalDate, startOfLocalDay } from '@/utils';
 import { createDiasParaViaje, deleteDiasByViajeId } from './diasViajeService';
 import { getIconicPhotoForDestination } from './googlePlacesService';
+import {
+  scheduleViajeNotification,
+  cancelViajeNotifications,
+} from './notificationsService';
 
 // ============================================
 // VALIDACIONES
@@ -174,6 +178,12 @@ export async function createViaje(
     await createDiasParaViaje(viaje.id, viaje.fechaInicio, viaje.fechaFin);
     console.log('[ViajesService] Días creados para viaje:', viaje.id);
 
+    // Programar notificación del viaje (no bloqueante)
+    scheduleViajeNotification(viaje).catch((error) => {
+      console.warn('[ViajesService] Error al programar notificación:', error);
+      // No lanzamos el error para no bloquear la creación del viaje
+    });
+
     return viaje;
   } catch (error) {
     logError(error, 'createViaje');
@@ -296,6 +306,16 @@ export async function updateViaje(
 
     console.log('[ViajesService] Viaje actualizado:', id);
 
+    // Reprogramar notificación si cambió la fecha o destino
+    if (input.fechaInicio !== undefined || input.destino !== undefined) {
+      const viajeActualizado = await getViajeById(id);
+      if (viajeActualizado) {
+        scheduleViajeNotification(viajeActualizado).catch((error) => {
+          console.warn('[ViajesService] Error al reprogramar notificación:', error);
+        });
+      }
+    }
+
     // Retornar viaje actualizado
     return await getViajeById(id);
   } catch (error) {
@@ -320,6 +340,11 @@ export async function deleteViaje(id: string): Promise<boolean> {
     if (!existing) {
       return false;
     }
+
+    // Cancelar notificaciones del viaje
+    await cancelViajeNotifications(id).catch((error) => {
+      console.warn('[ViajesService] Error al cancelar notificaciones:', error);
+    });
 
     // Eliminar días del viaje en cascada
     await deleteDiasByViajeId(id);
