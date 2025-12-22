@@ -34,7 +34,7 @@ import {
 import { theme } from '@/config';
 import { useReservasStore } from '@/store/reservasStore';
 import { useDocumentosStore } from '@/store/documentosStore';
-import { getViajeById, pickDocument, pickImage } from '@/services';
+import { getViajeById, pickMultipleDocuments, pickImage } from '@/services';
 import { detectTipoArchivo, linkMultipleDocumentosToReserva } from '@/services/documentosService';
 import { confirmPlaceSuggestion, mapReservaCategoriaToLugarCategoria } from '@/services/placeMatchingService';
 import { parseLocalDate } from '@/utils';
@@ -281,20 +281,20 @@ export default function AddReservationScreen({ route, navigation }: Props) {
   const handlePickDocument = async () => {
     try {
       setPickingFile(true);
-      const result = await pickDocument();
+      const results = await pickMultipleDocuments();
 
-      if (result) {
-        const newFile: AttachedFile = {
+      if (results.length > 0) {
+        const newFiles: AttachedFile[] = results.map(result => ({
           uri: result.uri,
           name: result.name,
           type: result.type || 'application/pdf',
           size: result.size || 0,
-        };
-        setAttachedFiles((prev: AttachedFile[]) => [...prev, newFile]);
+        }));
+        setAttachedFiles((prev: AttachedFile[]) => [...prev, ...newFiles]);
       }
     } catch (error) {
-      console.error('[AddReservation] Error al seleccionar documento:', error);
-      Alert.alert('Error', 'No se pudo seleccionar el documento');
+      console.error('[AddReservation] Error al seleccionar documentos:', error);
+      Alert.alert('Error', 'No se pudieron seleccionar los documentos');
     } finally {
       setPickingFile(false);
     }
@@ -770,7 +770,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
                     <>
                       <Ionicons name="document-attach" size={20} color={theme.colors.primaryLight} />
                       <Text style={styles.attachButtonText}>
-                        {attachedFiles.length > 0 ? 'Añadir PDF' : 'Adjuntar PDF'}
+                        {attachedFiles.length > 0 ? 'Añadir más' : 'Seleccionar archivos'}
                       </Text>
                     </>
                   )}
@@ -787,7 +787,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
                     <>
                       <Ionicons name="image" size={20} color={theme.colors.primaryLight} />
                       <Text style={styles.attachButtonText}>
-                        {attachedFiles.length > 0 ? 'Añadir imagen' : 'Adjuntar imagen'}
+                        {attachedFiles.length > 0 ? 'Añadir imagen' : 'Tomar/elegir foto'}
                       </Text>
                     </>
                   )}
@@ -797,7 +797,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
               <Text style={styles.attachmentHint}>
                 {attachedFiles.length > 0
                   ? `${attachedFiles.length} ${attachedFiles.length === 1 ? 'archivo adjunto' : 'archivos adjuntos'}. Puedes añadir más.`
-                  : 'Puedes adjuntar documentos de confirmación de tu reserva'
+                  : 'Puedes seleccionar múltiples archivos (PDFs e imágenes) o tomar fotos'
                 }
               </Text>
             </Card>
