@@ -59,6 +59,35 @@ export async function pickDocument(): Promise<DocumentInfo | null> {
   }
 }
 
+/**
+ * Permite seleccionar múltiples documentos (PDFs o imágenes)
+ * Retorna array de información de documentos o array vacío si se cancela
+ */
+export async function pickMultipleDocuments(): Promise<DocumentInfo[]> {
+  try {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['application/pdf', 'image/*'],
+      copyToCacheDirectory: true,
+      multiple: true, // Habilitar selección múltiple
+    });
+
+    if (result.canceled) {
+      return [];
+    }
+
+    // Mapear todos los assets a DocumentInfo
+    return result.assets.map(asset => ({
+      uri: asset.uri,
+      name: asset.name,
+      type: asset.mimeType || 'application/octet-stream',
+      size: asset.size || 0,
+    }));
+  } catch (error) {
+    console.error('[FileService] Error picking multiple documents:', error);
+    throw new Error('Error al seleccionar los documentos');
+  }
+}
+
 // ============================================
 // IMAGE PICKER
 // ============================================

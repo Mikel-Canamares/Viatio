@@ -248,13 +248,110 @@ export async function updateDocumentoNombre(
 }
 
 // ============================================
+// RELACIÓN RESERVA-DOCUMENTO
+// ============================================
+
+/**
+ * Vincula un documento a una reserva
+ */
+export async function linkDocumentoToReserva(
+  reservaId: string,
+  documentoId: string
+): Promise<boolean> {
+  try {
+    const db = await getDatabase();
+    const id = generateId();
+    const timestamp = getCurrentTimestamp();
+
+    await db.runAsync(
+      `INSERT INTO reservas_documentos (id, reservaId, documentoId, createdAt)
+       VALUES (?, ?, ?, ?)`,
+      [id, reservaId, documentoId, timestamp]
+    );
+
+    console.log('[linkDocumentoToReserva] Documento vinculado:', { reservaId, documentoId });
+    return true;
+  } catch (error) {
+    // Si ya existe la relación (UNIQUE constraint), no es un error
+    if (error instanceof Error && error.message.includes('UNIQUE')) {
+      console.log('[linkDocumentoToReserva] Relación ya existe:', { reservaId, documentoId });
+      return true;
+    }
+    logError(error, 'linkDocumentoToReserva');
+    return false;
+  }
+}
+
+/**
+ * Vincula múltiples documentos a una reserva
+ */
+export async function linkMultipleDocumentosToReserva(
+  reservaId: string,
+  documentoIds: string[]
+): Promise<boolean> {
+  try {
+    for (const documentoId of documentoIds) {
+      await linkDocumentoToReserva(reservaId, documentoId);
+    }
+    console.log('[linkMultipleDocumentosToReserva] Documentos vinculados:', { reservaId, count: documentoIds.length });
+    return true;
+  } catch (error) {
+    logError(error, 'linkMultipleDocumentosToReserva');
+    return false;
+  }
+}
+
+/**
+ * Obtiene todos los documentos vinculados a una reserva
+ */
+export async function getDocumentosByReservaId(reservaId: string): Promise<Documento[]> {
+  try {
+    const db = await getDatabase();
+    const result = await db.getAllAsync<Documento>(
+      `SELECT d.* FROM documentos d
+       INNER JOIN reservas_documentos rd ON d.id = rd.documentoId
+       WHERE rd.reservaId = ?
+       ORDER BY rd.createdAt DESC`,
+      [reservaId]
+    );
+
+    return result || [];
+  } catch (error) {
+    logError(error, 'getDocumentosByReservaId');
+    return [];
+  }
+}
+
+/**
+ * Desvincula un documento de una reserva (no elimina el documento)
+ */
+export async function unlinkDocumentoFromReserva(
+  reservaId: string,
+  documentoId: string
+): Promise<boolean> {
+  try {
+    const db = await getDatabase();
+    await db.runAsync(
+      'DELETE FROM reservas_documentos WHERE reservaId = ? AND documentoId = ?',
+      [reservaId, documentoId]
+    );
+
+    console.log('[unlinkDocumentoFromReserva] Documento desvinculado:', { reservaId, documentoId });
+    return true;
+  } catch (error) {
+    logError(error, 'unlinkDocumentoFromReserva');
+    return false;
+  }
+}
+
+// ============================================
 // DELETE
 // ============================================
 
 /**
  * Elimina un documento (archivo físico y registro de BD)
- * IMPORTANTE: La foreign key con ON DELETE SET NULL se encarga automáticamente
- * de poner a NULL el documentoId en las reservas asociadas
+ * IMPORTANTE: La foreign key con ON DELETE CASCADE se encarga automáticamente
+ * de eliminar las relaciones en reservas_documentos
  */
 export async function deleteDocumento(id: string): Promise<boolean> {
   try {
@@ -274,8 +371,8 @@ export async function deleteDocumento(id: string): Promise<boolean> {
     }
 
     // Eliminar registro de BD
-    // La foreign key con ON DELETE SET NULL actualiza automáticamente
-    // el campo documentoId a NULL en las reservas asociadas
+    // La foreign key con ON DELETE CASCADE elimina automáticamente
+    // las relaciones en reservas_documentos
     const db = await getDatabase();
     await db.runAsync('DELETE FROM documentos WHERE id = ?', [id]);
 
