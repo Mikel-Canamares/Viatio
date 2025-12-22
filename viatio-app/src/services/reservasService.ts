@@ -10,6 +10,11 @@ import { createGasto, getGastoByReservaId, updateGasto, deleteGastoByReservaId }
 import { mapReservaToCategoriaGasto } from '@/types/gasto';
 import { findOrCreateLugarFromReserva, linkReservaToLugar } from './placeMatchingService';
 import type { PlaceMatchResult } from '@/types/placeMatching';
+import { getViajeById } from './viajesService';
+import {
+  scheduleReservaNotification,
+  cancelReservaNotifications,
+} from './notificationsService';
 
 /**
  * Crea una nueva reserva y opcionalmente busca/crea lugar asociado
@@ -146,6 +151,16 @@ export async function createReserva(
       // No fallar la creación de reserva por esto
       placeMatch = undefined;
     }
+  }
+
+  // Programar notificación de la reserva (no bloqueante)
+  try {
+    const viaje = await getViajeById(reserva.viajeId);
+    scheduleReservaNotification(reserva, viaje?.destino).catch((error) => {
+      console.warn('[ReservasService] Error al programar notificación:', error);
+    });
+  } catch (error) {
+    console.warn('[ReservasService] Error al obtener viaje para notificación:', error);
   }
 
   return { reserva, placeMatch };
@@ -371,6 +386,21 @@ export async function updateReserva(
     }
   }
 
+  // Reprogramar notificación si cambió la fecha/hora
+  if (input.fechaInicio !== undefined || input.horaInicio !== undefined) {
+    try {
+      const reservaActualizada = await getReservaById(id);
+      if (reservaActualizada) {
+        const viaje = await getViajeById(reservaActualizada.viajeId);
+        scheduleReservaNotification(reservaActualizada, viaje?.destino).catch((error) => {
+          console.warn('[ReservasService] Error al reprogramar notificación:', error);
+        });
+      }
+    } catch (error) {
+      console.warn('[ReservasService] Error al reprogramar notificación:', error);
+    }
+  }
+
   return getReservaById(id);
 }
 
@@ -379,6 +409,11 @@ export async function updateReserva(
  */
 export async function deleteReserva(id: string): Promise<boolean> {
   const db = await getDatabase();
+
+  // Cancelar notificaciones de la reserva
+  await cancelReservaNotifications(id).catch((error) => {
+    console.warn('[ReservasService] Error al cancelar notificaciones:', error);
+  });
 
   // Eliminar gasto asociado (si existe)
   // La foreign key con CASCADE lo hará automáticamente, pero lo hacemos explícito por claridad
