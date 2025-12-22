@@ -4,7 +4,13 @@
       "Bash(npx kill-port:*)",
       "Bash(npx tsc:*)",
       "Bash(npm run start:*)",
-      "Bash(npx expo:*)"
+      "Bash(npx expo:*)",
+      "Bash(if [ -d \"android\" ])",
+      "Bash(then echo \"android exists\")",
+      "Bash(fi)",
+      "Bash(if [ -d \"ios\" ])",
+      "Bash(then echo \"ios exists\")",
+      "Bash(adb devices:*)"
     ]
   }
 }

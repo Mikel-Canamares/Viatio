@@ -20,16 +20,27 @@ import { TIEMPOS_ANTELACION } from '@/types/perfil';
 
 const NOTIFICATION_IDS_STORAGE_KEY = '@viatio:notification_ids';
 
-// Configurar el comportamiento de las notificaciones
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+// Flag para saber si ya se inicializó el handler
+let isHandlerInitialized = false;
+
+/**
+ * Inicializa el notification handler (se ejecuta lazy, no al importar)
+ */
+function initializeNotificationHandler() {
+  if (isHandlerInitialized) return;
+
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+
+  isHandlerInitialized = true;
+}
 
 // ============================================
 // TIPOS
@@ -55,6 +66,8 @@ interface StoredNotificationId {
  * Solicita permisos de notificaciones al usuario
  */
 export async function requestNotificationPermissions(): Promise<boolean> {
+  initializeNotificationHandler();
+
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
 
   let finalStatus = existingStatus;
@@ -169,6 +182,8 @@ async function removeNotificationIdsForEntity(
  */
 export async function scheduleViajeNotification(viaje: Viaje): Promise<boolean> {
   try {
+    initializeNotificationHandler();
+
     // Verificar permisos
     const hasPermissions = await hasNotificationPermissions();
     if (!hasPermissions) {
@@ -247,6 +262,8 @@ export async function scheduleReservaNotification(
   viajeDestino?: string
 ): Promise<boolean> {
   try {
+    initializeNotificationHandler();
+
     // Verificar permisos
     const hasPermissions = await hasNotificationPermissions();
     if (!hasPermissions) {
