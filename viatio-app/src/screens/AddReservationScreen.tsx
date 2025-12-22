@@ -35,7 +35,7 @@ import { theme } from '@/config';
 import { useReservasStore } from '@/store/reservasStore';
 import { useDocumentosStore } from '@/store/documentosStore';
 import { getViajeById, pickDocument, pickImage } from '@/services';
-import { detectTipoArchivo } from '@/services/documentosService';
+import { detectTipoArchivo, linkMultipleDocumentosToReserva } from '@/services/documentosService';
 import { confirmPlaceSuggestion, mapReservaCategoriaToLugarCategoria } from '@/services/placeMatchingService';
 import { parseLocalDate } from '@/utils';
 import type {
@@ -107,7 +107,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
       moneda: 'EUR',
     }
   );
-  const [attachedFile, setAttachedFile] = useState<AttachedFile | null>(null);
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [pickingFile, setPickingFile] = useState(false);
 
   // Cargar datos del viaje para limitar fechas
@@ -143,14 +143,14 @@ export default function AddReservationScreen({ route, navigation }: Props) {
     field: K,
     value: CreateReservaInput[K]
   ) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev: Partial<CreateReservaInput>) => ({ ...prev, [field]: value }));
   };
 
   const updateMetadata = <K extends keyof NonNullable<CreateReservaInput['metadatos']>>(
     field: K,
     value: NonNullable<CreateReservaInput['metadatos']>[K]
   ) => {
-    setFormData((prev) => ({
+    setFormData((prev: Partial<CreateReservaInput>) => ({
       ...prev,
       metadatos: { ...prev.metadatos, [field]: value },
     }));
@@ -163,45 +163,57 @@ export default function AddReservationScreen({ route, navigation }: Props) {
     }
 
     try {
-      let documentoId: string | undefined;
+      const documentoIds: string[] = [];
+      const categoriaDocumento = mapReservaToCategoriaDocumento(formData.categoria);
 
-      // Determinar qué archivo usar: escaneados o adjuntados manualmente
-      const fileToAttach = scannedFiles?.[0]
-        ? {
-            uri: scannedFiles[0].uri,
-            name: scannedFiles[0].name,
-            type: scannedFiles[0].type,
-            size: scannedFiles[0].base64 ? scannedFiles[0].base64.length : 0
-          }
-        : attachedFile;
+      // Combinar archivos escaneados y adjuntos manualmente
+      const allFiles: AttachedFile[] = [];
 
-      // Si hay un archivo (escaneado o manual), crear el documento primero
-      if (fileToAttach) {
-        const tipoArchivo = detectTipoArchivo(fileToAttach.type);
-        const categoriaDocumento = mapReservaToCategoriaDocumento(formData.categoria);
-
-        console.log('[AddReservation] Categoría reserva:', formData.categoria);
-        console.log('[AddReservation] Categoría documento mapeada:', categoriaDocumento);
-
-        // Crear documento
-        const documento = await addDocumento(
-          {
-            viajeId,
-            nombre: formData.nombre, // Usar el mismo nombre que la reserva
-            categoria: categoriaDocumento,
-            tipoArchivo,
-            rutaArchivo: fileToAttach.name,
-            tamano: fileToAttach.size,
-          },
-          fileToAttach.uri
-        );
-
-        if (documento) {
-          documentoId = documento.id;
-        }
+      // Agregar archivos escaneados
+      if (scannedFiles && scannedFiles.length > 0) {
+        scannedFiles.forEach((file: any) => {
+          allFiles.push({
+            uri: file.uri,
+            name: file.name,
+            type: file.type,
+            size: file.base64 ? file.base64.length : 0,
+          });
+        });
       }
 
-      // Crear la reserva con el documentoId si existe
+      // Agregar archivos adjuntos manualmente
+      if (attachedFiles.length > 0) {
+        allFiles.push(...attachedFiles);
+      }
+
+      // Crear todos los documentos
+      if (allFiles.length > 0) {
+        console.log('[AddReservation] Creando', allFiles.length, 'documentos');
+
+        for (const file of allFiles) {
+          const tipoArchivo = detectTipoArchivo(file.type);
+
+          const documento = await addDocumento(
+            {
+              viajeId,
+              nombre: formData.nombre, // Usar el mismo nombre que la reserva
+              categoria: categoriaDocumento,
+              tipoArchivo,
+              rutaArchivo: file.name,
+              tamano: file.size,
+            },
+            file.uri
+          );
+
+          if (documento) {
+            documentoIds.push(documento.id);
+          }
+        }
+
+        console.log('[AddReservation] Documentos creados:', documentoIds.length);
+      }
+
+      // Crear la reserva (sin documentoId, ya que usaremos la tabla intermedia)
       const input: CreateReservaInput = {
         viajeId,
         categoria: formData.categoria,
@@ -218,12 +230,17 @@ export default function AddReservationScreen({ route, navigation }: Props) {
         moneda: formData.moneda || 'EUR',
         estadoPago: formData.estadoPago || 'pending',
         notas: formData.notas,
-        metadatos: formData.metadatos, // Incluir metadatos
-        documentoId, // Asociar el documento si se creó
+        metadatos: formData.metadatos,
       };
 
       const result = await addReserva(input);
       if (result) {
+        // Vincular todos los documentos a la reserva
+        if (documentoIds.length > 0) {
+          await linkMultipleDocumentosToReserva(result.reserva.id, documentoIds);
+          console.log('[AddReservation] Documentos vinculados a la reserva');
+        }
+
         // Manejar el resultado del place matching
         if (result.placeMatch) {
           handlePlaceMatch(
@@ -253,7 +270,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
       }
     } catch (error) {
       console.error('[AddReservation] Error al guardar:', error);
-      Alert.alert('Error', 'Ocurrió un error al guardar la reserva y el documento');
+      Alert.alert('Error', 'Ocurrió un error al guardar la reserva y los documentos');
     }
   };
 
@@ -267,12 +284,13 @@ export default function AddReservationScreen({ route, navigation }: Props) {
       const result = await pickDocument();
 
       if (result) {
-        setAttachedFile({
+        const newFile: AttachedFile = {
           uri: result.uri,
           name: result.name,
           type: result.type || 'application/pdf',
           size: result.size || 0,
-        });
+        };
+        setAttachedFiles((prev: AttachedFile[]) => [...prev, newFile]);
       }
     } catch (error) {
       console.error('[AddReservation] Error al seleccionar documento:', error);
@@ -292,12 +310,13 @@ export default function AddReservationScreen({ route, navigation }: Props) {
         const timestamp = Date.now();
         const fileName = `image_${timestamp}.jpg`;
 
-        setAttachedFile({
+        const newFile: AttachedFile = {
           uri: result.uri,
           name: fileName,
           type: 'image/jpeg',
           size: result.base64 ? result.base64.length : 0,
-        });
+        };
+        setAttachedFiles((prev: AttachedFile[]) => [...prev, newFile]);
       }
     } catch (error) {
       console.error('[AddReservation] Error al seleccionar imagen:', error);
@@ -307,16 +326,16 @@ export default function AddReservationScreen({ route, navigation }: Props) {
     }
   };
 
-  const handleRemoveFile = () => {
+  const handleRemoveFile = (index: number) => {
     Alert.alert(
       'Eliminar archivo',
-      '¿Deseas eliminar el archivo adjunto?',
+      '¿Deseas eliminar este archivo?',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Eliminar',
           style: 'destructive',
-          onPress: () => setAttachedFile(null)
+          onPress: () => setAttachedFiles((prev: AttachedFile[]) => prev.filter((_: AttachedFile, i: number) => i !== index))
         },
       ]
     );
@@ -401,7 +420,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
                   {`${scannedFiles.length} ${scannedFiles.length === 1 ? 'documento escaneado' : 'documentos escaneados'}`}
                 </Text>
               </View>
-              {scannedFiles.map((file, index) => (
+              {scannedFiles.map((file: any, index: number) => (
                 <View key={index} style={styles.scannedFileItem}>
                   <Ionicons
                     name={file.type.includes('pdf') ? 'document-text' : 'image'}
@@ -706,69 +725,80 @@ export default function AddReservationScreen({ route, navigation }: Props) {
           {/* Sección de documentos - solo visible en modo manual sin archivos escaneados */}
           {!scannedFiles && (
             <Card style={styles.formCard}>
-              <SectionHeader title="Documento adjunto (opcional)" />
+              <SectionHeader title="Documentos adjuntos (opcional)" />
 
-              {attachedFile ? (
-                // Preview del archivo seleccionado
-                <View style={styles.filePreview}>
-                  <View style={styles.filePreviewContent}>
-                    <View style={styles.fileIconContainer}>
-                      <Ionicons
-                        name={attachedFile.type.includes('pdf') ? 'document-text' : 'image'}
-                        size={28}
-                        color={theme.colors.primaryLight}
-                      />
+              {/* Lista de archivos adjuntos */}
+              {attachedFiles.length > 0 && (
+                <View style={styles.filesList}>
+                  {attachedFiles.map((file: AttachedFile, index: number) => (
+                    <View key={index} style={styles.filePreview}>
+                      <View style={styles.filePreviewContent}>
+                        <View style={styles.fileIconContainer}>
+                          <Ionicons
+                            name={file.type.includes('pdf') ? 'document-text' : 'image'}
+                            size={28}
+                            color={theme.colors.primaryLight}
+                          />
+                        </View>
+                        <View style={styles.fileInfo}>
+                          <Text style={styles.fileName} numberOfLines={1}>
+                            {file.name}
+                          </Text>
+                          <Text style={styles.fileSize}>
+                            {(file.size / 1024).toFixed(0)} KB
+                          </Text>
+                        </View>
+                        <Pressable onPress={() => handleRemoveFile(index)} style={styles.removeButton}>
+                          <Ionicons name="close-circle" size={24} color="#EF4444" />
+                        </Pressable>
+                      </View>
                     </View>
-                    <View style={styles.fileInfo}>
-                      <Text style={styles.fileName} numberOfLines={1}>
-                        {attachedFile.name}
-                      </Text>
-                      <Text style={styles.fileSize}>
-                        {(attachedFile.size / 1024).toFixed(0)} KB
-                      </Text>
-                    </View>
-                    <Pressable onPress={handleRemoveFile} style={styles.removeButton}>
-                      <Ionicons name="close-circle" size={24} color="#EF4444" />
-                    </Pressable>
-                  </View>
-                </View>
-              ) : (
-                // Botones para seleccionar archivo
-                <View style={styles.attachmentButtons}>
-                  <Pressable
-                    onPress={handlePickDocument}
-                    style={styles.attachButton}
-                    disabled={pickingFile}
-                  >
-                    {pickingFile ? (
-                      <ActivityIndicator size="small" color={theme.colors.primaryLight} />
-                    ) : (
-                      <>
-                        <Ionicons name="document-attach" size={20} color={theme.colors.primaryLight} />
-                        <Text style={styles.attachButtonText}>Adjuntar PDF</Text>
-                      </>
-                    )}
-                  </Pressable>
-
-                  <Pressable
-                    onPress={handlePickImage}
-                    style={styles.attachButton}
-                    disabled={pickingFile}
-                  >
-                    {pickingFile ? (
-                      <ActivityIndicator size="small" color={theme.colors.primaryLight} />
-                    ) : (
-                      <>
-                        <Ionicons name="image" size={20} color={theme.colors.primaryLight} />
-                        <Text style={styles.attachButtonText}>Adjuntar imagen</Text>
-                      </>
-                    )}
-                  </Pressable>
+                  ))}
                 </View>
               )}
 
+              {/* Botones para añadir más archivos */}
+              <View style={styles.attachmentButtons}>
+                <Pressable
+                  onPress={handlePickDocument}
+                  style={styles.attachButton}
+                  disabled={pickingFile}
+                >
+                  {pickingFile ? (
+                    <ActivityIndicator size="small" color={theme.colors.primaryLight} />
+                  ) : (
+                    <>
+                      <Ionicons name="document-attach" size={20} color={theme.colors.primaryLight} />
+                      <Text style={styles.attachButtonText}>
+                        {attachedFiles.length > 0 ? 'Añadir PDF' : 'Adjuntar PDF'}
+                      </Text>
+                    </>
+                  )}
+                </Pressable>
+
+                <Pressable
+                  onPress={handlePickImage}
+                  style={styles.attachButton}
+                  disabled={pickingFile}
+                >
+                  {pickingFile ? (
+                    <ActivityIndicator size="small" color={theme.colors.primaryLight} />
+                  ) : (
+                    <>
+                      <Ionicons name="image" size={20} color={theme.colors.primaryLight} />
+                      <Text style={styles.attachButtonText}>
+                        {attachedFiles.length > 0 ? 'Añadir imagen' : 'Adjuntar imagen'}
+                      </Text>
+                    </>
+                  )}
+                </Pressable>
+              </View>
+
               <Text style={styles.attachmentHint}>
-                Puedes adjuntar el documento de confirmación de tu reserva
+                {attachedFiles.length > 0
+                  ? `${attachedFiles.length} ${attachedFiles.length === 1 ? 'archivo adjunto' : 'archivos adjuntos'}. Puedes añadir más.`
+                  : 'Puedes adjuntar documentos de confirmación de tu reserva'
+                }
               </Text>
             </Card>
           )}
@@ -1027,6 +1057,10 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     textAlign: 'center',
     marginTop: theme.spacing.xs,
+  },
+  filesList: {
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.sm,
   },
   filePreview: {
     borderRadius: 12,
