@@ -10,7 +10,8 @@
       "Bash(fi)",
       "Bash(if [ -d \"ios\" ])",
       "Bash(then echo \"ios exists\")",
-      "Bash(adb devices:*)"
+      "Bash(adb devices:*)",
+      "Bash(git restore:*)"
     ]
   }
 }

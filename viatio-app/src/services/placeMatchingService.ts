@@ -602,3 +602,193 @@ export async function confirmPlaceSuggestion(
     return null;
   }
 }
+
+// ============================================
+// EVENTOS PERSONALIZADOS - PLACE MATCHING
+// ============================================
+
+/**
+ * Interfaz para eventos personalizados (similar a Reserva)
+ */
+interface EventoForMatching {
+  id: string;
+  viajeId: string;
+  diaId?: string;
+  nombre: string;
+  ubicacion?: string;
+  categoria: string;
+  latitud?: number;
+  longitud?: number;
+}
+
+/**
+ * Busca lugares automáticamente para un evento personalizado
+ * Similar a searchPlacesForReservation pero adaptado para eventos
+ */
+export async function searchPlacesForEvento(
+  evento: EventoForMatching,
+  options: AutoPlaceCreationOptions = DEFAULT_AUTO_CREATION_OPTIONS
+): Promise<PlaceMatchResult> {
+  console.log('[PlaceMatching Evento] Iniciando búsqueda para evento:', evento.nombre);
+
+  // PASO 1: Validar que tengamos información suficiente
+  if (!evento.nombre && !evento.ubicacion) {
+    console.log('[PlaceMatching Evento] Sin nombre ni ubicación, no se puede buscar');
+    return {
+      type: 'none',
+      confidence: 0,
+      message: 'No hay información suficiente para buscar el lugar',
+    };
+  }
+
+  // PASO 2: Verificar si ya existe lugar con googlePlaceId (si aplica)
+  // Los eventos no tienen googlePlaceId directo, solo pueden tener ubicación
+
+  // PASO 3: Construir query de búsqueda inteligente
+  const parts: string[] = [];
+
+  // Para eventos, priorizar: nombre + ubicación
+  if (evento.nombre) {
+    parts.push(evento.nombre);
+  }
+
+  if (evento.ubicacion) {
+    parts.push(evento.ubicacion);
+  }
+
+  const searchQuery = parts.join(' ').trim();
+
+  if (!searchQuery) {
+    return {
+      type: 'none',
+      confidence: 0,
+      message: 'No hay información suficiente para buscar el lugar',
+    };
+  }
+
+  console.log('[PlaceMatching Evento] Query de búsqueda:', searchQuery);
+
+  // Buscar en Google Places
+  const placeResults = await searchPlacesByText(searchQuery, {
+    latitude: evento.latitud,
+    longitude: evento.longitud,
+    maxResults: 5,
+  });
+
+  if (placeResults.length === 0) {
+    console.log('[PlaceMatching Evento] No se encontraron resultados en Google Places');
+    return {
+      type: 'none',
+      confidence: 0,
+      message: 'No se encontraron lugares en Google Places',
+    };
+  }
+
+  // PASO 4: Scoring de resultados (usamos una versión simplificada)
+  const scoredResults = placeResults.map((place) => {
+    let score = 0;
+
+    // Similitud de nombre (peso: 70)
+    if (evento.nombre && place.name) {
+      const nameSim = combinedSimilarity(evento.nombre, place.name);
+      score += nameSim * 70;
+    }
+
+    // Distancia si hay coordenadas (peso: 30)
+    if (evento.latitud && evento.longitud && place.latitude && place.longitude) {
+      const distance = calculateDistance(
+        { lat: evento.latitud, lng: evento.longitud },
+        { lat: place.latitude, lng: place.longitude }
+      );
+
+      if (distance < 50) {
+        score += 30;
+      } else if (distance < 1000) {
+        score += 30 * (1 - distance / 1000);
+      }
+    }
+
+    return { place, score, breakdown: {} } as ScoredPlace;
+  }).sort((a, b) => b.score - a.score);
+
+  console.log('[PlaceMatching Evento] Mejores resultados:', scoredResults.slice(0, 3).map(s => ({
+    nombre: s.place.name,
+    score: s.score,
+  })));
+
+  const bestMatch = scoredResults[0];
+
+  // PASO 5: Decisión según umbral de confianza
+  // Para eventos personalizados usamos umbrales más bajos que para reservas
+  if (bestMatch.score >= options.threshold) {
+    // Alta confianza: crear automáticamente
+    console.log('[PlaceMatching Evento] Alta confianza, creando lugar automáticamente');
+
+    // Mapear categoría de evento a categoría de lugar
+    const categoria = mapEventoCategoriaToLugarCategoria(evento.categoria);
+
+    const lugar = await createLugarFromPlaceResult(
+      evento.viajeId,
+      bestMatch.place,
+      categoria,
+      evento.diaId
+    );
+
+    return {
+      type: 'exact',
+      lugar,
+      confidence: bestMatch.score,
+      message: `Lugar "${lugar.nombre}" añadido automáticamente al mapa`,
+    };
+  } else if (scoredResults.length === 1 && bestMatch.score >= 30) {
+    // Confianza media: sugerir (umbral reducido para eventos: 30 vs 60 en reservas)
+    console.log('[PlaceMatching Evento] Confianza media, sugiriendo resultado');
+    return {
+      type: 'suggested',
+      suggestions: [bestMatch.place],
+      confidence: bestMatch.score,
+      message: `¿Es "${bestMatch.place.name}" el lugar correcto?`,
+    };
+  } else if (scoredResults.length > 1 && bestMatch.score >= 25) {
+    // Múltiples opciones: pedir selección (umbral reducido para eventos: 25 vs 50 en reservas)
+    console.log('[PlaceMatching Evento] Múltiples opciones, requiere selección manual');
+    return {
+      type: 'multiple',
+      suggestions: scoredResults.slice(0, 3).map((s) => s.place),
+      confidence: bestMatch.score,
+      message: 'Selecciona el lugar correcto',
+    };
+  } else {
+    // Confianza muy baja
+    console.log('[PlaceMatching Evento] Confianza muy baja, no se sugiere nada');
+    return {
+      type: 'none',
+      confidence: bestMatch.score,
+      message: 'No se encontró un lugar con suficiente confianza',
+    };
+  }
+}
+
+/**
+ * Mapea categoría de evento a categoría de lugar
+ * Categorías válidas: 'restaurant' | 'hotel' | 'attraction' | 'shopping' | 'transport' | 'other'
+ */
+export function mapEventoCategoriaToLugarCategoria(
+  eventoCategoria: string
+): CategoriaLugar {
+  const mapping: Record<string, CategoriaLugar> = {
+    sightseeing: 'attraction',
+    culture: 'attraction',
+    food: 'restaurant',
+    shopping: 'shopping',
+    entertainment: 'attraction', // Entretenimiento → atracción
+    nature: 'attraction', // Naturaleza/parques → atracción
+    relaxation: 'hotel', // Spa/wellness → hotel
+    transport: 'transport',
+    nightlife: 'restaurant', // Vida nocturna → restaurante (bares/pubs)
+    sports: 'attraction',
+    other: 'other',
+  };
+
+  return mapping[eventoCategoria] || 'other';
+}

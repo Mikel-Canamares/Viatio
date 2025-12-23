@@ -29,3 +29,5 @@ export { default as EditProfileScreen } from './EditProfileScreen';
 export { default as NotificationsSettingsScreen } from './NotificationsSettingsScreen';
 export { default as SettingsScreen } from './SettingsScreen';
 export { default as HelpScreen } from './HelpScreen';
+export { AddEventoScreen } from './AddEventoScreen';
+export { EventoDetailScreen } from './EventoDetailScreen';

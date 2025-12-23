@@ -14,12 +14,16 @@ export interface DiaViaje {
   updatedAt: string;
 }
 
+export type OrigenEvento = 'reserva' | 'evento_personalizado' | 'lugar';
+
 export interface EventoAgenda {
   id: string;
   tipo: 'reserva' | 'lugar';
+  origen: OrigenEvento;
   reservaId?: string; // ID de la reserva si tipo === 'reserva'
   lugarId?: string; // ID del lugar asociado (si la reserva tiene ubicación guardada)
   hora?: string;
+  horaFin?: string;
   titulo: string;
   subtitulo?: string;
   categoria?: string;
@@ -27,6 +31,10 @@ export interface EventoAgenda {
   iconColor: string; // Color del icono
   iconBgColor: string; // Color de fondo del icono
   ubicacion?: string;
+  completado?: boolean;
+  // Referencia al objeto original para navegación
+  referenciaId: string;
+  referenciaTipo: OrigenEvento;
 }
 
 export interface DiaAgenda {

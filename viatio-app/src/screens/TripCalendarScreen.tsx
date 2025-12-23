@@ -168,6 +168,9 @@ export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
             const evento: EventoAgendaCalendario = {
               id: reserva.id,
               tipo: 'reserva',
+              origen: 'reserva',
+              referenciaId: reserva.id,
+              referenciaTipo: 'reserva',
               reservaId: reserva.id,
               hora: reserva.horaInicio || undefined,
               titulo: reserva.nombre,

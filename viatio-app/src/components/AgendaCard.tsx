@@ -14,9 +14,14 @@ import type { EventoAgenda } from '@/types/diaViaje';
 interface AgendaCardProps {
   evento: EventoAgenda;
   onPress?: () => void;
+  onToggleComplete?: () => void;
+  showCheckbox?: boolean;
 }
 
-export default function AgendaCard({ evento, onPress }: AgendaCardProps) {
+export default function AgendaCard({
+  evento,
+  onPress,
+}: AgendaCardProps) {
   const isClickable = !!onPress;
 
   return (
@@ -33,9 +38,13 @@ export default function AgendaCard({ evento, onPress }: AgendaCardProps) {
           {/* Hora a la izquierda */}
           <View style={styles.timeContainer}>
             {evento.hora ? (
-              <Text style={styles.timeText}>{evento.hora}</Text>
+              <Text style={styles.timeText}>
+                {evento.hora}
+              </Text>
             ) : (
-              <Text style={styles.timeTextEmpty}>--:--</Text>
+              <Text style={styles.timeTextEmpty}>
+                --:--
+              </Text>
             )}
           </View>
 
@@ -53,8 +62,8 @@ export default function AgendaCard({ evento, onPress }: AgendaCardProps) {
             />
           </View>
 
-          {/* Título */}
-          <Text style={styles.titulo} numberOfLines={1}>
+          {/* Título - Sin numberOfLines para que no se corte */}
+          <Text style={styles.titulo}>
             {evento.titulo}
           </Text>
 
@@ -113,6 +122,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: theme.colors.text,
     flex: 1,
+    flexWrap: 'wrap',
   },
   chevron: {
     marginLeft: theme.spacing.xs,
