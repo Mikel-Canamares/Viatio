@@ -5,15 +5,17 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copiar archivos de dependencias
-COPY package*.json ./
+# IMPORTANTE: Railway ejecuta docker build desde la RAÍZ del monorepo
+# Por eso las rutas deben ser relativas a la raíz, no al subdirectorio
+
+# Copiar archivos de dependencias DESDE viatio-backend/
+COPY viatio-backend/package*.json ./
 
 # Instalar TODAS las dependencias (incluidas devDependencies para compilar)
-# Usar npm install en lugar de npm ci porque Railway no copia package-lock.json correctamente
 RUN npm install
 
-# Copiar código fuente
-COPY . .
+# Copiar TODO el código fuente del backend
+COPY viatio-backend/ ./
 
 # Compilar TypeScript a JavaScript
 RUN npm run build
@@ -26,7 +28,7 @@ FROM node:18-alpine
 WORKDIR /app
 
 # Copiar archivos de dependencias
-COPY package*.json ./
+COPY viatio-backend/package*.json ./
 
 # Instalar SOLO dependencias de producción
 RUN npm install --omit=dev

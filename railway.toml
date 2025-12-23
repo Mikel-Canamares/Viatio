@@ -1,13 +1,16 @@
 # ==========================================
 # Railway Configuration - Viatio Backend
 # ==========================================
-# Este archivo le dice a Railway cómo construir
-# y desplegar el backend desde un monorepo
+# Configuración para desplegar viatio-backend desde un monorepo
 
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "viatio-backend/Dockerfile"
-dockerContext = "viatio-backend"
+# Railway ejecuta docker build desde la raíz del repo
+# El Dockerfile debe usar rutas relativas a la raíz (ej: COPY viatio-backend/...)
+
+# Solo redeploy si cambian archivos del backend
+watchPatterns = ["viatio-backend/**"]
 
 [deploy]
 startCommand = "node dist/index.js"
@@ -15,12 +18,3 @@ restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
 healthcheckPath = "/health"
 healthcheckTimeout = 100
-
-# Configuración del servicio
-[[services]]
-name = "viatio-backend"
-rootDirectory = "viatio-backend"
-
-# Watch paths - Railway solo redesplegará si cambian estos archivos
-[[services.watchPaths]]
-paths = ["viatio-backend/**"]
