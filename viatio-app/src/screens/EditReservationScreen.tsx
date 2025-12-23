@@ -36,8 +36,13 @@ import { theme } from '@/config';
 import { useReservasStore } from '@/store/reservasStore';
 import { useDocumentosStore } from '@/store/documentosStore';
 import { getViajeById } from '@/services';
-import { getReservaById, getDocumentoByReservaId } from '@/services/reservasService';
-import { updateDocumentoCategoria } from '@/services/documentosService';
+import { getReservaById } from '@/services/reservasService';
+import {
+  getDocumentosByReservaId,
+  updateDocumentoCategoria,
+  unlinkDocumentoFromReserva,
+  linkDocumentoToReserva,
+} from '@/services/documentosService';
 import { parseLocalDate } from '@/utils';
 import type {
   CreateReservaInput,
@@ -81,15 +86,15 @@ export default function EditReservationScreen({ route, navigation }: Props) {
   const [viaje, setViaje] = useState<Viaje | null>(null);
   const [formData, setFormData] = useState<Partial<CreateReservaInput>>({});
 
-  // Document state
-  const [existingDocument, setExistingDocument] = useState<Documento | null>(null);
+  // Document state - ahora soporta múltiples documentos
+  const [existingDocuments, setExistingDocuments] = useState<Documento[]>([]);
+  const [documentsToDelete, setDocumentsToDelete] = useState<string[]>([]);
   const [attachedFile, setAttachedFile] = useState<{
     uri: string;
     name: string;
     type: string;
     size: number;
   } | null>(null);
-  const [documentToDelete, setDocumentToDelete] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -110,11 +115,9 @@ export default function EditReservationScreen({ route, navigation }: Props) {
       const viajeData = await getViajeById(reservaData.viajeId);
       setViaje(viajeData);
 
-      // Cargar documento asociado si existe
-      if (reservaData.documentoId) {
-        const doc = await getDocumentoByReservaId(reservaId);
-        setExistingDocument(doc as Documento | null);
-      }
+      // Cargar documentos asociados desde tabla intermedia
+      const docs = await getDocumentosByReservaId(reservaId);
+      setExistingDocuments(docs);
 
       // Precargar formulario con datos existentes
       setFormData({
@@ -212,9 +215,7 @@ export default function EditReservationScreen({ route, navigation }: Props) {
     }
   };
 
-  const handleDeleteExistingDocument = () => {
-    if (!existingDocument) return;
-
+  const handleDeleteExistingDocument = (documentoId: string) => {
     Alert.alert(
       'Eliminar documento',
       '¿Deseas eliminar el documento asociado? Se eliminará al guardar los cambios.',
@@ -224,8 +225,10 @@ export default function EditReservationScreen({ route, navigation }: Props) {
           text: 'Eliminar',
           style: 'destructive',
           onPress: () => {
-            setDocumentToDelete(true);
-            setExistingDocument(null);
+            // Añadir a lista de documentos a eliminar
+            setDocumentsToDelete((prev) => [...prev, documentoId]);
+            // Remover de lista de documentos existentes
+            setExistingDocuments((prev) => prev.filter((d) => d.id !== documentoId));
           },
         },
       ]
@@ -243,27 +246,28 @@ export default function EditReservationScreen({ route, navigation }: Props) {
     }
 
     try {
-      // 1. Delete existing document if marked for deletion
-      if (documentToDelete && existingDocument) {
-        await removeDocumento(existingDocument.id);
+      // 1. Desvincular y eliminar documentos marcados para eliminación
+      for (const docId of documentsToDelete) {
+        await unlinkDocumentoFromReserva(reservaId, docId);
+        await removeDocumento(docId);
       }
 
-      // 2. Update existing document category if it exists and category changed
-      if (existingDocument && !documentToDelete && formData.categoria) {
+      // 2. Actualizar categoría de documentos existentes si la categoría de la reserva cambió
+      if (existingDocuments.length > 0 && formData.categoria) {
         const nuevaCategoriaDocumento = mapReservaToCategoriaDocumento(formData.categoria);
-        // Solo actualizar si la categoría cambió
-        if (existingDocument.categoria !== nuevaCategoriaDocumento) {
-          await updateDocumentoCategoria(existingDocument.id, nuevaCategoriaDocumento);
-          console.log('[EditReservation] Categoría de documento actualizada:', {
-            documentoId: existingDocument.id,
-            categoriaAnterior: existingDocument.categoria,
-            categoriaNueva: nuevaCategoriaDocumento,
-          });
+        for (const doc of existingDocuments) {
+          if (doc.categoria !== nuevaCategoriaDocumento) {
+            await updateDocumentoCategoria(doc.id, nuevaCategoriaDocumento);
+            console.log('[EditReservation] Categoría de documento actualizada:', {
+              documentoId: doc.id,
+              categoriaAnterior: doc.categoria,
+              categoriaNueva: nuevaCategoriaDocumento,
+            });
+          }
         }
       }
 
-      // 3. Create new document if attached
-      let newDocumentoId: string | undefined;
+      // 3. Crear y vincular nuevo documento si se adjuntó
       if (attachedFile && formData.viajeId && formData.categoria) {
         const categoriaDocumento = mapReservaToCategoriaDocumento(formData.categoria);
         const tipoArchivo = attachedFile.type.includes('pdf') ? 'pdf' : 'image';
@@ -281,11 +285,12 @@ export default function EditReservationScreen({ route, navigation }: Props) {
         );
 
         if (documento) {
-          newDocumentoId = documento.id;
+          await linkDocumentoToReserva(reservaId, documento.id);
+          console.log('[EditReservation] Nuevo documento vinculado a la reserva');
         }
       }
 
-      // 4. Update reservation
+      // 4. Actualizar la reserva
       const input: Partial<CreateReservaInput> = {
         categoria: formData.categoria,
         nombre: formData.nombre,
@@ -301,8 +306,7 @@ export default function EditReservationScreen({ route, navigation }: Props) {
         moneda: formData.moneda || 'EUR',
         estadoPago: formData.estadoPago || 'pending',
         notas: formData.notas,
-        metadatos: formData.metadatos, // Incluir metadatos
-        documentoId: newDocumentoId,
+        metadatos: formData.metadatos,
       };
 
       await updateReserva(reservaId, input);
@@ -638,31 +642,31 @@ export default function EditReservationScreen({ route, navigation }: Props) {
           </Card>
 
           <Card style={styles.formCard}>
-            <SectionHeader title="Documento adjunto" />
+            <SectionHeader title={existingDocuments.length > 1 ? "Documentos adjuntos" : "Documento adjunto"} />
 
-            {/* Existing document */}
-            {existingDocument && !documentToDelete && (
-              <View style={styles.documentPreview}>
+            {/* Existing documents */}
+            {existingDocuments.map((doc) => (
+              <View key={doc.id} style={styles.documentPreview}>
                 <View style={styles.documentRow}>
                   <View style={styles.documentIconContainer}>
                     <Ionicons
-                      name={existingDocument.tipoArchivo === 'pdf' ? 'document-text' : 'image'}
+                      name={doc.tipoArchivo === 'pdf' ? 'document-text' : 'image'}
                       size={24}
                       color={theme.colors.primaryLight}
                     />
                   </View>
                   <View style={styles.documentInfo}>
-                    <Text style={styles.documentName}>{existingDocument.nombre}</Text>
+                    <Text style={styles.documentName}>{doc.nombre}</Text>
                     <Text style={styles.documentMeta}>
-                      {existingDocument.tipoArchivo.toUpperCase()} • {(existingDocument.tamano / 1024).toFixed(0)} KB
+                      {doc.tipoArchivo.toUpperCase()} • {(doc.tamano / 1024).toFixed(0)} KB
                     </Text>
                   </View>
-                  <Pressable onPress={handleDeleteExistingDocument} style={styles.deleteIconButton}>
+                  <Pressable onPress={() => handleDeleteExistingDocument(doc.id)} style={styles.deleteIconButton}>
                     <Ionicons name="trash-outline" size={20} color="#EF4444" />
                   </Pressable>
                 </View>
               </View>
-            )}
+            ))}
 
             {/* Attached file preview */}
             {attachedFile && (
@@ -688,29 +692,20 @@ export default function EditReservationScreen({ route, navigation }: Props) {
               </View>
             )}
 
-            {/* Attach buttons */}
-            {!existingDocument && !attachedFile && (
+            {/* Attach buttons - siempre disponibles para añadir más documentos */}
+            {!attachedFile && (
               <View style={styles.attachButtons}>
                 <Pressable onPress={handlePickDocument} style={styles.attachButton}>
                   <Ionicons name="document-attach-outline" size={20} color={theme.colors.primaryLight} />
-                  <Text style={styles.attachButtonText}>Adjuntar PDF</Text>
+                  <Text style={styles.attachButtonText}>
+                    {existingDocuments.length > 0 ? 'Añadir PDF' : 'Adjuntar PDF'}
+                  </Text>
                 </Pressable>
                 <Pressable onPress={handlePickImage} style={styles.attachButton}>
                   <Ionicons name="image-outline" size={20} color={theme.colors.primaryLight} />
-                  <Text style={styles.attachButtonText}>Adjuntar imagen</Text>
-                </Pressable>
-              </View>
-            )}
-
-            {(existingDocument && !attachedFile) && (
-              <View style={styles.attachButtons}>
-                <Pressable onPress={handlePickDocument} style={styles.attachButton}>
-                  <Ionicons name="document-attach-outline" size={20} color={theme.colors.primaryLight} />
-                  <Text style={styles.attachButtonText}>Adjuntar PDF</Text>
-                </Pressable>
-                <Pressable onPress={handlePickImage} style={styles.attachButton}>
-                  <Ionicons name="image-outline" size={20} color={theme.colors.primaryLight} />
-                  <Text style={styles.attachButtonText}>Adjuntar imagen</Text>
+                  <Text style={styles.attachButtonText}>
+                    {existingDocuments.length > 0 ? 'Añadir imagen' : 'Adjuntar imagen'}
+                  </Text>
                 </Pressable>
               </View>
             )}

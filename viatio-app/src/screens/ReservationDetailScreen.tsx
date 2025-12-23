@@ -27,7 +27,8 @@ import {
 } from '@/components';
 import { theme } from '@/config';
 import { useReservasStore } from '@/store/reservasStore';
-import { getReservaById, getDocumentoByReservaId } from '@/services/reservasService';
+import { getReservaById } from '@/services/reservasService';
+import { getDocumentosByReservaId } from '@/services/documentosService';
 import { openDocument } from '@/utils/documentViewer';
 import type { Reserva } from '@/types/reserva';
 import type { Documento } from '@/types/documento';
@@ -104,7 +105,7 @@ function getIconForReserva(reserva: Reserva): string {
 export default function ReservationDetailScreen({ route, navigation }: Props) {
   const { reservaId } = route.params;
   const [reserva, setReserva] = useState<Reserva | null>(null);
-  const [documento, setDocumento] = useState<Documento | null>(null);
+  const [documentos, setDocumentos] = useState<Documento[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -124,11 +125,9 @@ export default function ReservationDetailScreen({ route, navigation }: Props) {
       const data = await getReservaById(reservaId);
       setReserva(data);
 
-      // Cargar documento asociado si existe
-      if (data?.documentoId) {
-        const doc = await getDocumentoByReservaId(reservaId);
-        setDocumento(doc as Documento | null);
-      }
+      // Cargar documentos asociados desde tabla intermedia
+      const docs = await getDocumentosByReservaId(reservaId);
+      setDocumentos(docs);
     } catch (error) {
       console.error('Error loading reservation:', error);
       Alert.alert('Error', 'No se pudo cargar la reserva');
@@ -331,29 +330,31 @@ export default function ReservationDetailScreen({ route, navigation }: Props) {
             </View>
           )}
 
-          {documento && (
+          {documentos.length > 0 && (
             <View style={styles.section}>
-              <SectionHeader title="Documento asociado" />
-              <Pressable onPress={() => openDocument(documento)}>
-                <Card style={styles.documentCard}>
-                  <View style={styles.documentRow}>
-                    <View style={styles.documentIconContainer}>
-                      <Ionicons
-                        name={documento.tipoArchivo === 'pdf' ? 'document-text' : 'image'}
-                        size={24}
-                        color={theme.colors.primaryLight}
-                      />
+              <SectionHeader title={documentos.length === 1 ? "Documento asociado" : "Documentos asociados"} />
+              {documentos.map((documento) => (
+                <Pressable key={documento.id} onPress={() => openDocument(documento)}>
+                  <Card style={styles.documentCard}>
+                    <View style={styles.documentRow}>
+                      <View style={styles.documentIconContainer}>
+                        <Ionicons
+                          name={documento.tipoArchivo === 'pdf' ? 'document-text' : 'image'}
+                          size={24}
+                          color={theme.colors.primaryLight}
+                        />
+                      </View>
+                      <View style={styles.documentInfo}>
+                        <Text style={styles.documentName}>{documento.nombre}</Text>
+                        <Text style={styles.documentMeta}>
+                          {documento.tipoArchivo.toUpperCase()} • {(documento.tamano / 1024).toFixed(0)} KB
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
                     </View>
-                    <View style={styles.documentInfo}>
-                      <Text style={styles.documentName}>{documento.nombre}</Text>
-                      <Text style={styles.documentMeta}>
-                        {documento.tipoArchivo.toUpperCase()} • {(documento.tamano / 1024).toFixed(0)} KB
-                      </Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
-                  </View>
-                </Card>
-              </Pressable>
+                  </Card>
+                </Pressable>
+              ))}
             </View>
           )}
         </ScrollView>
@@ -505,6 +506,7 @@ const styles = StyleSheet.create({
   },
   documentCard: {
     padding: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
   },
   documentRow: {
     flexDirection: 'row',

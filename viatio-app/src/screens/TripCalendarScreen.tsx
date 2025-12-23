@@ -14,7 +14,9 @@ import { CalendarDay } from '@/components/CalendarDay';
 import type { EventoAgendaCalendario } from '@/components';
 import { theme } from '@/config';
 import type { Viaje } from '@/types/viaje';
-import type { CategoriaReserva } from '@/types/reserva';
+import type { CategoriaReserva, Reserva } from '@/types/reserva';
+import { SUBTIPOS_TRANSPORTE, SUBTIPOS_ALOJAMIENTO, SUBTIPOS_ACTIVIDAD, RESERVA_CATEGORIAS } from '@/types/reserva';
+import { BASE_CATEGORIES } from '@/config/categories';
 import type { TipoEvento, CategoriaEvento } from '@/types/evento';
 import { EVENTO_COLORS, EVENTO_LABELS, EVENTO_CATEGORIAS } from '@/types/evento';
 import { useAuth } from '@/context';
@@ -102,6 +104,29 @@ export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
     return isCategoriaReserva(categoria) ? categoria : 'other';
   };
 
+  /**
+   * Obtiene el icono y color específico según categoría y subtipo de reserva
+   */
+  const getIconForReserva = (reserva: Reserva) => {
+    const metadatos = reserva.metadatos;
+
+    // Usar icono específico del subtipo si existe
+    if (reserva.categoria === 'transport' && metadatos?.subtipoTransporte) {
+      return SUBTIPOS_TRANSPORTE[metadatos.subtipoTransporte].icon;
+    }
+
+    if (reserva.categoria === 'accommodation' && metadatos?.subtipoAlojamiento) {
+      return SUBTIPOS_ALOJAMIENTO[metadatos.subtipoAlojamiento].icon;
+    }
+
+    if (reserva.categoria === 'activity' && metadatos?.subtipoActividad) {
+      return SUBTIPOS_ACTIVIDAD[metadatos.subtipoActividad].icon;
+    }
+
+    // Fallback al ícono de categoría general
+    return RESERVA_CATEGORIAS[reserva.categoria].icon;
+  };
+
   // Mapear categoría de evento personalizado a categoría de reserva
   const mapEventoCategoriaToReserva = (categoria: CategoriaEvento): CategoriaReserva => {
     const mapping: Record<CategoriaEvento, CategoriaReserva> = {
@@ -171,6 +196,8 @@ export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
 
             const fechaISO = formatDateISO(fechaReserva);
             const categoria = getSafeCategoria(reserva.categoria);
+            const iconName = getIconForReserva(reserva);
+            const categoryConfig = BASE_CATEGORIES[categoria];
 
             const evento: EventoAgendaCalendario = {
               id: reserva.id,
@@ -183,9 +210,9 @@ export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
               titulo: reserva.nombre,
               subtitulo: reserva.proveedor,
               categoria,
-              iconName: 'ellipsis-horizontal',
-              iconColor: '#6B7280',
-              iconBgColor: '#F3F4F6',
+              iconName,
+              iconColor: categoryConfig.color,
+              iconBgColor: categoryConfig.bgColor,
               ubicacion: reserva.ubicacion || reserva.direccion,
               tieneReserva: true,
               tieneDocumento: Boolean(reserva.documentoId),

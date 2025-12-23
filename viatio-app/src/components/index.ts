@@ -54,6 +54,9 @@ export type { EventoAgendaCalendario } from './DayEventsModal';
 export { ExpensesSummary } from './ExpensesSummary';
 export { ExpenseCategoryGroup } from './ExpenseCategoryGroup';
 
+// Componentes de Documentos
+export { DocumentCategoryGroup } from './DocumentCategoryGroup';
+
 // Componentes de Perfil/Configuración
 export { ProfileMenuItem } from './ProfileMenuItem';
 export { SectionTitle } from './SectionTitle';
