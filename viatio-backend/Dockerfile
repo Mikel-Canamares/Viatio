@@ -9,7 +9,8 @@ WORKDIR /app
 COPY package*.json ./
 
 # Instalar TODAS las dependencias (incluidas devDependencies para compilar)
-RUN npm ci
+# Usar npm install en lugar de npm ci porque Railway no copia package-lock.json correctamente
+RUN npm install
 
 # Copiar código fuente
 COPY . .
@@ -28,7 +29,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Instalar SOLO dependencias de producción
-RUN npm ci --only=production
+RUN npm install --omit=dev
 
 # Copiar build compilado desde el stage anterior
 COPY --from=builder /app/dist ./dist
