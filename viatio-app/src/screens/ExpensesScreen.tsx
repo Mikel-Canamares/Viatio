@@ -5,7 +5,7 @@
  * Muestra resumen total, distribución por categoría e historial agrupado.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -16,6 +16,8 @@ import { PrimaryButton } from '@/components/PrimaryButton';
 import { ExpenseCategoryGroup } from '@/components/ExpenseCategoryGroup';
 import { useGastosStore } from '@/store/gastosStore';
 import { Gasto, GASTO_CATEGORIAS, CategoriaGasto } from '@/types/gasto';
+import { Reserva } from '@/types/reserva';
+import { getReservasByViajeId } from '@/services/reservasService';
 import { theme } from '@/config';
 
 // ============================================
@@ -40,12 +42,23 @@ export function ExpensesScreen() {
   const { viajeId } = route.params;
 
   const { gastos, resumen, loading, fetchGastos, fetchResumen } = useGastosStore();
+  const [reservas, setReservas] = useState<Reserva[]>([]);
 
   // Cargar datos al montar
   useEffect(() => {
     fetchGastos(viajeId);
     fetchResumen(viajeId);
+    loadReservas();
   }, [viajeId]);
+
+  const loadReservas = async () => {
+    try {
+      const reservasData = await getReservasByViajeId(viajeId);
+      setReservas(reservasData);
+    } catch (error) {
+      console.error('Error cargando reservas:', error);
+    }
+  };
 
   // Calcular porcentaje de presupuesto usado
   const presupuestoPercentage = resumen?.presupuesto
@@ -57,24 +70,6 @@ export function ExpensesScreen() {
     if (presupuestoPercentage < 75) return theme.colors.success;
     if (presupuestoPercentage < 90) return theme.colors.warning;
     return theme.colors.error;
-  };
-
-  // Obtener categorías ordenadas por monto para el resumen visual (mayor a menor)
-  const categoriasResumen = resumen
-    ? (Object.entries(resumen.porCategoria) as [CategoriaGasto, number][])
-        .filter(([_, monto]) => monto > 0)
-        .sort((a, b) => b[1] - a[1])
-    : [];
-
-  const maxCategoriaMonto = categoriasResumen[0]?.[1] || 1;
-
-  // Formatear fecha para mostrar
-  const formatFecha = (fecha: string) => {
-    const date = new Date(fecha);
-    return date.toLocaleDateString('es-ES', {
-      day: '2-digit',
-      month: 'short',
-    });
   };
 
   // Agrupar gastos por categoría
@@ -163,47 +158,6 @@ export function ExpensesScreen() {
           )}
         </View>
 
-        {/* Card 2 - Por Categoría (Resumen Visual) */}
-        {categoriasResumen.length > 0 && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Por categoría</Text>
-            {categoriasResumen.map(([categoria, monto]) => {
-              const categoriaInfo = GASTO_CATEGORIAS[categoria];
-              const percentage = (monto / maxCategoriaMonto) * 100;
-
-              return (
-                <View key={categoria} style={styles.categoriaRow}>
-                  <View style={styles.categoriaLeft}>
-                    <Ionicons
-                      name={categoriaInfo.icon as any}
-                      size={20}
-                      color={categoriaInfo.color}
-                    />
-                    <Text style={styles.categoriaLabel}>{categoriaInfo.label}</Text>
-                  </View>
-
-                  <View style={styles.categoriaRight}>
-                    <View style={styles.categoriaBarContainer}>
-                      <View
-                        style={[
-                          styles.categoriaBar,
-                          {
-                            width: `${percentage}%`,
-                            backgroundColor: categoriaInfo.color,
-                          },
-                        ]}
-                      />
-                    </View>
-                    <Text style={styles.categoriaMonto}>
-                      {resumen?.moneda || 'EUR'} {monto.toFixed(2)}
-                    </Text>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        )}
-
         {/* Sección de Historial con título */}
         <View style={styles.historialHeader}>
           <Text style={styles.historialTitle}>Historial</Text>
@@ -215,6 +169,7 @@ export function ExpensesScreen() {
             key={categoria}
             categoria={categoria}
             gastos={gastosPorCategoria[categoria]}
+            reservas={reservas}
             moneda={resumen?.moneda || 'EUR'}
           />
         ))}
@@ -284,54 +239,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.textMuted,
     fontStyle: 'italic',
-  },
-
-  // Categorías (resumen visual)
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.colors.text,
-    marginBottom: theme.spacing.md,
-  },
-  categoriaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.md,
-  },
-  categoriaLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-    width: 120,
-  },
-  categoriaLabel: {
-    fontSize: 14,
-    color: theme.colors.text,
-  },
-  categoriaRight: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-  },
-  categoriaBarContainer: {
-    flex: 1,
-    height: 8,
-    backgroundColor: theme.colors.secondary,
-    borderRadius: theme.radius.full,
-    overflow: 'hidden',
-  },
-  categoriaBar: {
-    height: '100%',
-    borderRadius: theme.radius.full,
-  },
-  categoriaMonto: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: theme.colors.text,
-    minWidth: 80,
-    textAlign: 'right',
   },
 
   // Historial

@@ -8,7 +8,14 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Gasto, GASTO_CATEGORIAS, CategoriaGasto } from '@/types/gasto';
+import { Gasto, GASTO_CATEGORIAS, CategoriaGasto, mapReservaToCategoriaGasto } from '@/types/gasto';
+import {
+  Reserva,
+  SUBTIPOS_TRANSPORTE,
+  SUBTIPOS_ALOJAMIENTO,
+  SUBTIPOS_ACTIVIDAD,
+  RESERVA_CATEGORIAS,
+} from '@/types/reserva';
 import { theme } from '@/config';
 
 // Habilitar LayoutAnimation en Android
@@ -23,6 +30,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 interface ExpenseCategoryGroupProps {
   categoria: CategoriaGasto;
   gastos: Gasto[];
+  reservas: Reserva[]; // Necesario para obtener iconos específicos de subtipo
   moneda: string;
 }
 
@@ -48,11 +56,49 @@ const calcularTotal = (gastos: Gasto[]): number => {
   return gastos.reduce((sum, gasto) => sum + gasto.monto, 0);
 };
 
+/**
+ * Obtiene el icono específico para un gasto
+ * Si el gasto está vinculado a una reserva, usa el icono del subtipo de la reserva
+ * Si no, usa el icono genérico de la categoría del gasto
+ */
+function getIconForGasto(gasto: Gasto, reservas: Reserva[]): string {
+  // Si el gasto no está vinculado a una reserva, usar icono de categoría de gasto
+  if (!gasto.reservaId) {
+    return GASTO_CATEGORIAS[gasto.categoria].icon;
+  }
+
+  // Buscar la reserva vinculada
+  const reservaVinculada = reservas.find(r => r.id === gasto.reservaId);
+
+  if (reservaVinculada) {
+    const metadatos = reservaVinculada.metadatos;
+
+    // Si la reserva tiene subtipo, usar su icono específico
+    if (reservaVinculada.categoria === 'transport' && metadatos?.subtipoTransporte) {
+      return SUBTIPOS_TRANSPORTE[metadatos.subtipoTransporte].icon;
+    }
+
+    if (reservaVinculada.categoria === 'accommodation' && metadatos?.subtipoAlojamiento) {
+      return SUBTIPOS_ALOJAMIENTO[metadatos.subtipoAlojamiento].icon;
+    }
+
+    if (reservaVinculada.categoria === 'activity' && metadatos?.subtipoActividad) {
+      return SUBTIPOS_ACTIVIDAD[metadatos.subtipoActividad].icon;
+    }
+
+    // Si la reserva no tiene subtipo, usar icono de categoría de reserva
+    return RESERVA_CATEGORIAS[reservaVinculada.categoria].icon;
+  }
+
+  // Fallback al icono de categoría de gasto
+  return GASTO_CATEGORIAS[gasto.categoria].icon;
+}
+
 // ============================================
 // COMPONENTE PRINCIPAL
 // ============================================
 
-export function ExpenseCategoryGroup({ categoria, gastos, moneda }: ExpenseCategoryGroupProps) {
+export function ExpenseCategoryGroup({ categoria, gastos, reservas, moneda }: ExpenseCategoryGroupProps) {
   const [expanded, setExpanded] = useState(false);
 
   const categoriaInfo = GASTO_CATEGORIAS[categoria];
@@ -104,6 +150,7 @@ export function ExpenseCategoryGroup({ categoria, gastos, moneda }: ExpenseCateg
           {gastos.map((gasto, index) => {
             const esDeReserva = !!gasto.reservaId;
             const isLast = index === gastos.length - 1;
+            const iconoGasto = getIconForGasto(gasto, reservas);
 
             return (
               <View
@@ -114,6 +161,11 @@ export function ExpenseCategoryGroup({ categoria, gastos, moneda }: ExpenseCateg
                 ]}
               >
                 <View style={styles.gastoLeft}>
+                  {/* Icono específico del gasto/reserva */}
+                  <View style={[styles.gastoIcon, { backgroundColor: categoriaInfo.color + '15' }]}>
+                    <Ionicons name={iconoGasto as any} size={18} color={categoriaInfo.color} />
+                  </View>
+
                   <View style={styles.gastoInfo}>
                     <View style={styles.descripcionRow}>
                       <Text style={styles.gastoDescripcion}>{gasto.descripcion}</Text>
@@ -218,6 +270,14 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  gastoIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   gastoInfo: {
     flex: 1,

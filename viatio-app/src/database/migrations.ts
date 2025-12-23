@@ -98,6 +98,18 @@ export async function runMigrations(
     await migrateToV7(db);
   }
 
+  if (currentVersion < 8) {
+    await migrateToV8(db);
+  }
+
+  if (currentVersion < 9) {
+    await migrateToV9(db);
+  }
+
+  if (currentVersion < 10) {
+    await migrateToV10(db);
+  }
+
   console.log('[Migrations] Migraciones completadas exitosamente');
 }
 
@@ -368,6 +380,122 @@ async function migrateToV7(db: SQLite.SQLiteDatabase): Promise<void> {
     console.log('[Migrations] Migración a v7 completada');
   } catch (error) {
     console.error('[Migrations] Error en migración a v7:', error);
+    throw error;
+  }
+}
+
+/**
+ * Migración a versión 8: Placeholder para mantener compatibilidad
+ */
+async function migrateToV8(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migrations] Ejecutando migración a v8...');
+
+  try {
+    // Registrar migración
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'INSERT INTO _migrations (version, appliedAt) VALUES (?, ?)',
+      [8, now]
+    );
+
+    console.log('[Migrations] Migración a v8 completada');
+  } catch (error) {
+    console.error('[Migrations] Error en migración a v8:', error);
+    throw error;
+  }
+}
+
+/**
+ * Migración a versión 9: Añadir tabla eventos_personalizados
+ * Permite a los usuarios crear actividades personalizadas en la agenda
+ */
+async function migrateToV9(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migrations] Ejecutando migración a v9...');
+
+  try {
+    // Crear tabla eventos_personalizados
+    console.log('[Migrations] Creando tabla eventos_personalizados...');
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS eventos_personalizados (
+        id TEXT PRIMARY KEY NOT NULL,
+        viajeId TEXT NOT NULL,
+        diaId TEXT,
+        nombre TEXT NOT NULL,
+        descripcion TEXT,
+        categoria TEXT NOT NULL DEFAULT 'other',
+        horaInicio TEXT,
+        horaFin TEXT,
+        duracionMinutos INTEGER,
+        ubicacion TEXT,
+        direccion TEXT,
+        latitud REAL,
+        longitud REAL,
+        notas TEXT,
+        completado INTEGER NOT NULL DEFAULT 0,
+        prioridad TEXT DEFAULT 'media',
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        FOREIGN KEY (viajeId) REFERENCES viajes(id) ON DELETE CASCADE,
+        FOREIGN KEY (diaId) REFERENCES dias_viaje(id) ON DELETE SET NULL
+      );
+    `);
+
+    // Crear índices
+    console.log('[Migrations] Creando índices para eventos_personalizados...');
+    await db.execAsync('CREATE INDEX IF NOT EXISTS idx_eventos_viajeId ON eventos_personalizados(viajeId);');
+    await db.execAsync('CREATE INDEX IF NOT EXISTS idx_eventos_diaId ON eventos_personalizados(diaId);');
+    await db.execAsync('CREATE INDEX IF NOT EXISTS idx_eventos_categoria ON eventos_personalizados(categoria);');
+
+    // Registrar migración
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'INSERT INTO _migrations (version, appliedAt) VALUES (?, ?)',
+      [9, now]
+    );
+
+    console.log('[Migrations] Migración a v9 completada');
+  } catch (error) {
+    console.error('[Migrations] Error en migración a v9:', error);
+    throw error;
+  }
+}
+
+/**
+ * Migración a versión 10: Añadir campo lugarId a tabla eventos_personalizados
+ * Permite vincular eventos personalizados con lugares usando Google Places API
+ */
+async function migrateToV10(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migrations] Ejecutando migración a v10...');
+
+  try {
+    // Verificar si la columna lugarId ya existe en eventos_personalizados
+    const eventosInfo = await db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(eventos_personalizados);'
+    );
+
+    const lugarIdExists = eventosInfo.some(col => col.name === 'lugarId');
+
+    if (!lugarIdExists) {
+      console.log('[Migrations] Añadiendo columna lugarId a eventos_personalizados...');
+      await db.execAsync('ALTER TABLE eventos_personalizados ADD COLUMN lugarId TEXT;');
+    } else {
+      console.log('[Migrations] Columna lugarId ya existe, omitiendo...');
+    }
+
+    // Crear índice para lugarId
+    console.log('[Migrations] Creando índice para lugarId...');
+    await db.execAsync('CREATE INDEX IF NOT EXISTS idx_eventos_lugarId ON eventos_personalizados(lugarId);');
+
+    // Registrar migración
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'INSERT INTO _migrations (version, appliedAt) VALUES (?, ?)',
+      [10, now]
+    );
+
+    console.log('[Migrations] Migración a v10 completada');
+  } catch (error) {
+    console.error('[Migrations] Error en migración a v10:', error);
     throw error;
   }
 }

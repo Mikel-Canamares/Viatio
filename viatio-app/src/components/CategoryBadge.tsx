@@ -1,14 +1,15 @@
 /**
  * CATEGORY BADGE
  *
- * Badge para mostrar categorías de gastos con icono y color.
- * Soporta diferentes tamaños y categorías predefinidas.
+ * Badge para mostrar categorías con icono y color.
+ * Usa el sistema centralizado de categorías para mantener consistencia.
  */
 
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { CategoryBase, BASE_CATEGORIES } from '@/config/categories';
 
-export type CategoryType = 'transport' | 'accommodation' | 'food' | 'activity' | 'other';
+export type CategoryType = CategoryBase;
 
 interface CategoryConfig {
   bg: string;
@@ -31,41 +32,52 @@ interface CategoryBadgeProps {
   label?: string;
 }
 
-// Configuración de colores e iconos por categoría
+/**
+ * Configuración de colores e iconos por categoría
+ * Importada del sistema centralizado
+ */
 export const CATEGORY_COLORS: Record<CategoryType, CategoryConfig> = {
   transport: {
-    bg: '#DBEAFE',
-    text: '#1E40AF',
-    icon: 'airplane',
-    label: 'Transporte',
+    bg: BASE_CATEGORIES.transport.lightBg,
+    text: BASE_CATEGORIES.transport.color,
+    icon: BASE_CATEGORIES.transport.icon,
+    label: BASE_CATEGORIES.transport.label,
   },
   accommodation: {
-    bg: '#DCFCE7',
-    text: '#166534',
-    icon: 'bed',
-    label: 'Alojamiento',
+    bg: BASE_CATEGORIES.accommodation.lightBg,
+    text: BASE_CATEGORIES.accommodation.color,
+    icon: BASE_CATEGORIES.accommodation.icon,
+    label: BASE_CATEGORIES.accommodation.label,
   },
   food: {
-    bg: '#FFEDD5',
-    text: '#9A3412',
-    icon: 'restaurant',
-    label: 'Comida',
+    bg: BASE_CATEGORIES.food.lightBg,
+    text: BASE_CATEGORIES.food.color,
+    icon: BASE_CATEGORIES.food.icon,
+    label: BASE_CATEGORIES.food.label,
   },
   activity: {
-    bg: '#F3E8FF',
-    text: '#6B21A8',
-    icon: 'ticket',
-    label: 'Actividad',
+    bg: BASE_CATEGORIES.activity.lightBg,
+    text: BASE_CATEGORIES.activity.color,
+    icon: BASE_CATEGORIES.activity.icon,
+    label: BASE_CATEGORIES.activity.label,
+  },
+  shopping: {
+    bg: BASE_CATEGORIES.shopping.lightBg,
+    text: BASE_CATEGORIES.shopping.color,
+    icon: BASE_CATEGORIES.shopping.icon,
+    label: BASE_CATEGORIES.shopping.label,
   },
   other: {
-    bg: '#F3F4F6',
-    text: '#374151',
-    icon: 'ellipsis-horizontal',
-    label: 'Otro',
+    bg: BASE_CATEGORIES.other.lightBg,
+    text: BASE_CATEGORIES.other.color,
+    icon: BASE_CATEGORIES.other.icon,
+    label: BASE_CATEGORIES.other.label,
   },
 };
 
-// Helper para obtener configuración de categoría
+/**
+ * Helper para obtener configuración de categoría
+ */
 export function getCategoryConfig(category: CategoryType): CategoryConfig {
   return CATEGORY_COLORS[category];
 }

@@ -99,6 +99,8 @@ const styles = StyleSheet.create({
     paddingLeft: 60, // Espacio para el botón de retroceso
   },
   rightElement: {
-    marginLeft: 'auto',
+    position: 'absolute',
+    right: theme.spacing.lg,
+    zIndex: 10,
   },
 });

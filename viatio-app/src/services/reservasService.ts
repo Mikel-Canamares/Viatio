@@ -15,6 +15,8 @@ import {
   scheduleReservaNotification,
   cancelReservaNotifications,
 } from './notificationsService';
+import { deleteLugar } from './lugaresService';
+import { deleteDocumento, getDocumentosByReservaId } from './documentosService';
 
 /**
  * Crea una nueva reserva y opcionalmente busca/crea lugar asociado
@@ -405,17 +407,81 @@ export async function updateReserva(
 }
 
 /**
- * Elimina una reserva y su gasto asociado (si existe)
+ * Elimina una reserva y sus recursos asociados en cascada:
+ * - Documentos asociados (desde tabla intermedia)
+ * - Lugar asociado (si existe y es exclusivo)
+ * - Gasto asociado (si existe)
+ * - Notificaciones programadas
  */
 export async function deleteReserva(id: string): Promise<boolean> {
   const db = await getDatabase();
 
-  // Cancelar notificaciones de la reserva
+  // 1. Obtener la reserva completa antes de eliminarla
+  const reserva = await getReservaById(id);
+  if (!reserva) {
+    console.warn('[ReservasService] Reserva no encontrada:', id);
+    return false;
+  }
+
+  // 2. Cancelar notificaciones de la reserva
   await cancelReservaNotifications(id).catch((error) => {
     console.warn('[ReservasService] Error al cancelar notificaciones:', error);
   });
 
-  // Eliminar gasto asociado (si existe)
+  // 3. Eliminar documentos asociados desde tabla intermedia
+  try {
+    const documentos = await getDocumentosByReservaId(id);
+
+    for (const documento of documentos) {
+      // Verificar si el documento está siendo usado por otras reservas
+      const otrasReservasConDocumento = await db.getAllAsync<{ id: string }>(
+        `SELECT DISTINCT r.id
+         FROM reservas r
+         INNER JOIN reservas_documentos rd ON r.id = rd.reservaId
+         WHERE rd.documentoId = ? AND r.id != ?`,
+        [documento.id, id]
+      );
+
+      // Solo eliminar si es exclusivo de esta reserva
+      if (otrasReservasConDocumento.length === 0) {
+        await deleteDocumento(documento.id);
+        console.log('[ReservasService] Documento eliminado en cascada:', documento.id);
+      } else {
+        console.log('[ReservasService] Documento compartido con otras reservas, no se elimina:', documento.id);
+      }
+    }
+  } catch (error) {
+    console.error('[ReservasService] Error al eliminar documentos asociados:', error);
+  }
+
+  // 4. Eliminar lugar asociado si existe
+  if (reserva.lugarId) {
+    try {
+      // Verificar si el lugar está siendo usado por otras reservas o eventos
+      const [otrasReservas, eventosConLugar] = await Promise.all([
+        db.getAllAsync<{ id: string }>(
+          'SELECT id FROM reservas WHERE lugarId = ? AND id != ?',
+          [reserva.lugarId, id]
+        ),
+        db.getAllAsync<{ id: string }>(
+          'SELECT id FROM eventos_personalizados WHERE lugarId = ?',
+          [reserva.lugarId]
+        ),
+      ]);
+
+      // Solo eliminar si es exclusivo de esta reserva
+      if (otrasReservas.length === 0 && eventosConLugar.length === 0) {
+        await deleteLugar(reserva.lugarId);
+        console.log('[ReservasService] Lugar eliminado en cascada:', reserva.lugarId);
+      } else {
+        console.log('[ReservasService] Lugar compartido, no se elimina:', reserva.lugarId);
+      }
+    } catch (error) {
+      console.error('[ReservasService] Error al eliminar lugar asociado:', error);
+    }
+  }
+
+  // 5. Eliminar gasto asociado (si existe)
   // La foreign key con CASCADE lo hará automáticamente, pero lo hacemos explícito por claridad
   try {
     await deleteGastoByReservaId(id);
@@ -423,9 +489,10 @@ export async function deleteReserva(id: string): Promise<boolean> {
     console.error('[ReservasService] Error al eliminar gasto asociado:', error);
   }
 
+  // 6. Finalmente, eliminar la reserva
   await db.runAsync('DELETE FROM reservas WHERE id = ?', [id]);
 
-  console.log('[ReservasService] Reserva eliminada:', id);
+  console.log('[ReservasService] Reserva eliminada con cascada completa:', id);
   return true;
 }
 

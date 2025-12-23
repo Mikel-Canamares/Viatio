@@ -28,6 +28,10 @@ export { default as DocumentCard } from './DocumentCard';
 export { default as AgendaCard } from './AgendaCard';
 export { default as NavigationChoiceModal } from './NavigationChoiceModal';
 export { SubtypeSelector } from './SubtypeSelector';
+export { EventoCategoriaSelector } from './EventoCategoriaSelector';
+export { TimePickerInput } from './TimePickerInput';
+export { DayPicker, useDiasViaje } from './DayPicker';
+export type { DiaViaje } from './DayPicker';
 export { SwipeableCard } from './SwipeableCard';
 export { SwipeActions } from './SwipeActions';
 export { SwipeActionsDocument } from './SwipeActionsDocument';
@@ -49,6 +53,9 @@ export type { EventoAgendaCalendario } from './DayEventsModal';
 // Componentes de Gastos
 export { ExpensesSummary } from './ExpensesSummary';
 export { ExpenseCategoryGroup } from './ExpenseCategoryGroup';
+
+// Componentes de Documentos
+export { DocumentCategoryGroup } from './DocumentCategoryGroup';
 
 // Componentes de Perfil/Configuración
 export { ProfileMenuItem } from './ProfileMenuItem';

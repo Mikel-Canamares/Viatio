@@ -14,11 +14,18 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ScreenContainer, PageHeader, AgendaCard, NavigationChoiceModal } from '@/components';
+import {
+  ScreenContainer,
+  PageHeader,
+  AgendaCard,
+  NavigationChoiceModal,
+  PrimaryButton,
+} from '@/components';
 import { theme } from '@/config';
 import { getAgendaByViajeId } from '@/services/agendaService';
 import type { DiaAgenda, EventoAgenda } from '@/types/diaViaje';
 import type { HomeStackParamList } from '@/navigation/types';
+import { useEventosStore } from '@/store/eventosStore';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'TripAgenda'>;
 
@@ -72,6 +79,15 @@ export default function TripAgendaScreen({ route, navigation }: Props) {
   );
 
   const handleEventPress = (item: EventoAgenda) => {
+    // Eventos personalizados
+    if (item.origen === 'evento_personalizado') {
+      // Siempre mostrar modal de elección para eventos personalizados
+      setSelectedEvent(item);
+      setShowChoiceModal(true);
+      return;
+    }
+
+    // Reservas
     if (item.tipo === 'reserva' && item.reservaId) {
       // Si la reserva tiene un lugar asociado, mostrar modal de elección
       if (item.lugarId) {
@@ -93,8 +109,16 @@ export default function TripAgendaScreen({ route, navigation }: Props) {
     }
   };
 
+  const handleAddEvento = () => {
+    navigation.navigate('AddEvento', { viajeId });
+  };
+
   const handleViewReservation = () => {
-    if (selectedEvent?.reservaId) {
+    if (selectedEvent?.origen === 'evento_personalizado') {
+      // Es un evento personalizado
+      navigation.navigate('EventoDetail', { eventoId: selectedEvent.id });
+    } else if (selectedEvent?.reservaId) {
+      // Es una reserva
       navigation.navigate('ReservationDetail', {
         viajeId,
         reservaId: selectedEvent.reservaId,
@@ -103,20 +127,27 @@ export default function TripAgendaScreen({ route, navigation }: Props) {
   };
 
   const handleViewMap = () => {
+    // Si tiene lugarId (reserva con lugar asociado), navegar al lugar
     if (selectedEvent?.lugarId) {
       navigation.navigate('TripMap', {
         viajeId,
         lugarId: selectedEvent.lugarId,
       });
     }
+    // Si es evento personalizado con ubicación, navegar al mapa (podría centrarse en coordenadas en el futuro)
+    else if (selectedEvent?.origen === 'evento_personalizado' && selectedEvent?.ubicacion) {
+      navigation.navigate('TripMap', { viajeId });
+    }
   };
 
-  const renderEvent = ({ item }: { item: EventoAgenda }) => (
-    <AgendaCard
-      evento={item}
-      onPress={() => handleEventPress(item)}
-    />
-  );
+  const renderEvent = ({ item }: { item: EventoAgenda }) => {
+    return (
+      <AgendaCard
+        evento={item}
+        onPress={() => handleEventPress(item)}
+      />
+    );
+  };
 
   const renderEmptyDay = ({ section }: { section: AgendaSection }) => {
     if (section.data.length > 0) return null;
@@ -167,7 +198,27 @@ export default function TripAgendaScreen({ route, navigation }: Props) {
         onClose={() => setShowChoiceModal(false)}
         onViewReservation={handleViewReservation}
         onViewMap={handleViewMap}
+        reservationLabel={selectedEvent?.origen === 'evento_personalizado' ? 'Ver evento' : 'Ver reserva'}
+        reservationDescription={
+          selectedEvent?.origen === 'evento_personalizado'
+            ? 'Ver detalles del evento'
+            : 'Detalles, confirmación y documentos'
+        }
+        showMapOption={
+          // Mostrar opción de mapa si:
+          // - Es una reserva/lugar con lugarId, o
+          // - Es evento personalizado con ubicación
+          !!(selectedEvent?.lugarId ||
+             (selectedEvent?.origen === 'evento_personalizado' && selectedEvent?.ubicacion))
+        }
       />
+
+      {/* Botón fijo para añadir evento */}
+      <View style={styles.buttonContainer}>
+        <PrimaryButton onPress={handleAddEvento}>
+          Añadir evento
+        </PrimaryButton>
+      </View>
     </View>
   );
 }
@@ -180,7 +231,7 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 20,
     paddingTop: theme.spacing.md,
-    paddingBottom: theme.spacing.xl * 2,
+    paddingBottom: 100, // Espacio para el botón fijo
   },
   loadingContainer: {
     flex: 1,
@@ -217,5 +268,16 @@ const styles = StyleSheet.create({
   },
   daySeparator: {
     height: 0,
+  },
+  buttonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: theme.spacing.lg,
+    backgroundColor: theme.colors.background,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    ...theme.shadows.card,
   },
 });

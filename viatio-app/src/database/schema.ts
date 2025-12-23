@@ -9,7 +9,7 @@
 // VERSIÓN DEL ESQUEMA
 // ============================================
 
-export const CURRENT_SCHEMA_VERSION = 8;
+export const CURRENT_SCHEMA_VERSION = 10;
 
 // ============================================
 // CREACIÓN DE TABLAS
@@ -146,6 +146,33 @@ const CREATE_RESERVAS_DOCUMENTOS_TABLE = `
   );
 `;
 
+const CREATE_EVENTOS_PERSONALIZADOS_TABLE = `
+  CREATE TABLE IF NOT EXISTS eventos_personalizados (
+    id TEXT PRIMARY KEY NOT NULL,
+    viajeId TEXT NOT NULL,
+    diaId TEXT,
+    nombre TEXT NOT NULL,
+    descripcion TEXT,
+    categoria TEXT NOT NULL DEFAULT 'other',
+    horaInicio TEXT,
+    horaFin TEXT,
+    duracionMinutos INTEGER,
+    ubicacion TEXT,
+    direccion TEXT,
+    latitud REAL,
+    longitud REAL,
+    lugarId TEXT,
+    notas TEXT,
+    completado INTEGER NOT NULL DEFAULT 0,
+    prioridad TEXT DEFAULT 'media',
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT NOT NULL,
+    FOREIGN KEY (viajeId) REFERENCES viajes(id) ON DELETE CASCADE,
+    FOREIGN KEY (diaId) REFERENCES dias_viaje(id) ON DELETE SET NULL,
+    FOREIGN KEY (lugarId) REFERENCES lugares(id) ON DELETE SET NULL
+  );
+`;
+
 const CREATE_MIGRATIONS_TABLE = `
   CREATE TABLE IF NOT EXISTS _migrations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -162,6 +189,7 @@ export const CREATE_TABLES_SQL = [
   CREATE_DOCUMENTOS_TABLE,
   CREATE_GASTOS_TABLE,
   CREATE_RESERVAS_DOCUMENTOS_TABLE,
+  CREATE_EVENTOS_PERSONALIZADOS_TABLE,
   CREATE_MIGRATIONS_TABLE,
 ];
 
@@ -284,6 +312,26 @@ const INDEX_RESERVAS_DOCUMENTOS_DOCUMENTO = `
   ON reservas_documentos(documentoId);
 `;
 
+const INDEX_EVENTOS_VIAJE = `
+  CREATE INDEX IF NOT EXISTS idx_eventos_viajeId
+  ON eventos_personalizados(viajeId);
+`;
+
+const INDEX_EVENTOS_DIA = `
+  CREATE INDEX IF NOT EXISTS idx_eventos_diaId
+  ON eventos_personalizados(diaId);
+`;
+
+const INDEX_EVENTOS_CATEGORIA = `
+  CREATE INDEX IF NOT EXISTS idx_eventos_categoria
+  ON eventos_personalizados(categoria);
+`;
+
+const INDEX_EVENTOS_LUGAR = `
+  CREATE INDEX IF NOT EXISTS idx_eventos_lugarId
+  ON eventos_personalizados(lugarId);
+`;
+
 export const CREATE_INDEXES_SQL = [
   INDEX_VIAJES_USUARIO,
   INDEX_VIAJES_FECHAS,
@@ -308,4 +356,8 @@ export const CREATE_INDEXES_SQL = [
   INDEX_GASTOS_RESERVA,
   INDEX_RESERVAS_DOCUMENTOS_RESERVA,
   INDEX_RESERVAS_DOCUMENTOS_DOCUMENTO,
+  INDEX_EVENTOS_VIAJE,
+  INDEX_EVENTOS_DIA,
+  INDEX_EVENTOS_CATEGORIA,
+  INDEX_EVENTOS_LUGAR,
 ];

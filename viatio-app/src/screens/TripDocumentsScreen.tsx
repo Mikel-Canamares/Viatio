@@ -10,7 +10,7 @@ import {
   View,
   Text,
   StyleSheet,
-  SectionList,
+  ScrollView,
   ActivityIndicator,
   Alert,
 } from 'react-native';
@@ -19,27 +19,17 @@ import { Ionicons } from '@expo/vector-icons';
 import {
   ScreenContainer,
   PageHeader,
-  DocumentCard,
   PrimaryButton,
   Card,
+  DocumentCategoryGroup,
 } from '@/components';
 import { theme } from '@/config';
 import { useDocumentosStore } from '@/store/documentosStore';
 import { openDocument } from '@/utils/documentViewer';
 import type { Documento, CategoriaDocumento } from '@/types/documento';
-import { DOCUMENTO_CATEGORIAS } from '@/types/documento';
 import type { HomeStackParamList } from '@/navigation/types';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'TripDocuments'>;
-
-// ============================================
-// TYPES
-// ============================================
-
-interface DocumentSection {
-  categoria: CategoriaDocumento;
-  data: Documento[];
-}
 
 // ============================================
 // COMPONENT
@@ -124,33 +114,26 @@ export default function TripDocumentsScreen({ route, navigation }: Props) {
   // ============================================
 
   /**
-   * Agrupa documentos por categoría para SectionList
+   * Agrupa documentos por categoría
    */
-  const groupedDocuments = (): DocumentSection[] => {
-    const groups: Record<CategoriaDocumento, Documento[]> = {
-      identidad: [],
-      transporte: [],
-      alojamiento: [],
-      seguro: [],
-      actividades: [],
-      otros: [],
-    };
+  const documentosPorCategoria = documentos.reduce((acc, doc) => {
+    if (!acc[doc.categoria]) {
+      acc[doc.categoria] = [];
+    }
+    acc[doc.categoria].push(doc);
+    return acc;
+  }, {} as Record<CategoriaDocumento, Documento[]>);
 
-    // Agrupar documentos
-    documentos.forEach((doc) => {
-      groups[doc.categoria].push(doc);
+  /**
+   * Ordena categorías por cantidad de documentos (mayor a menor)
+   */
+  const categoriasOrdenadas = Object.keys(documentosPorCategoria)
+    .map((cat) => cat as CategoriaDocumento)
+    .sort((a, b) => {
+      const totalA = documentosPorCategoria[a].length;
+      const totalB = documentosPorCategoria[b].length;
+      return totalB - totalA;
     });
-
-    // Convertir a array de secciones (solo categorías con documentos)
-    return Object.entries(groups)
-      .filter(([_, docs]) => docs.length > 0)
-      .map(([categoria, data]) => ({
-        categoria: categoria as CategoriaDocumento,
-        data,
-      }));
-  };
-
-  const sections = groupedDocuments();
 
   // ============================================
   // RENDER: LOADING
@@ -197,52 +180,6 @@ export default function TripDocumentsScreen({ route, navigation }: Props) {
   }
 
   // ============================================
-  // RENDER: SECTION HEADER
-  // ============================================
-
-  const renderSectionHeader = ({ section }: { section: DocumentSection }) => {
-    const categoryConfig = DOCUMENTO_CATEGORIAS[section.categoria];
-
-    return (
-      <View style={styles.sectionHeader}>
-        <View
-          style={[
-            styles.sectionIconContainer,
-            { backgroundColor: categoryConfig.color + '20' },
-          ]}
-        >
-          <Ionicons
-            name={categoryConfig.icon as any}
-            size={24}
-            color={categoryConfig.color}
-          />
-        </View>
-        <View style={styles.sectionTextContainer}>
-          <Text style={styles.sectionTitle}>{categoryConfig.label}</Text>
-          <Text style={styles.sectionSubtitle}>
-            {section.data.length} {section.data.length === 1 ? 'archivo' : 'archivos'}
-          </Text>
-        </View>
-      </View>
-    );
-  };
-
-  // ============================================
-  // RENDER: DOCUMENT ITEM
-  // ============================================
-
-  const renderItem = ({ item }: { item: Documento }) => (
-    <View style={styles.itemContainer}>
-      <DocumentCard
-        documento={item}
-        onPress={() => handleViewDocument(item)}
-        onEdit={() => handleEditDocument(item)}
-        onDelete={() => handleDeleteDocument(item)}
-      />
-    </View>
-  );
-
-  // ============================================
   // RENDER: MAIN
   // ============================================
 
@@ -250,17 +187,25 @@ export default function TripDocumentsScreen({ route, navigation }: Props) {
     <View style={styles.container}>
       <PageHeader title="Documentos" onBack={() => navigation.goBack()} />
       <ScreenContainer>
-        <SectionList
-          sections={sections}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          renderSectionHeader={renderSectionHeader}
-          contentContainerStyle={styles.listContent}
-          stickySectionHeadersEnabled={false}
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-          onRefresh={handleRefresh}
-          refreshing={refreshing}
-        />
+        >
+          {/* Grupos de documentos por categoría */}
+          {categoriasOrdenadas.map((categoria) => (
+            <DocumentCategoryGroup
+              key={categoria}
+              categoria={categoria}
+              documentos={documentosPorCategoria[categoria]}
+              onViewDocument={handleViewDocument}
+              onEditDocument={handleEditDocument}
+              onDeleteDocument={handleDeleteDocument}
+            />
+          ))}
+
+          {/* Espaciado para el botón fijo */}
+          <View style={styles.bottomSpacer} />
+        </ScrollView>
       </ScreenContainer>
 
       {/* Botón fijo en la parte inferior */}
@@ -317,45 +262,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: theme.spacing.md,
   },
-  listContent: {
+  scrollContent: {
     padding: theme.spacing.lg,
-    paddingBottom: theme.spacing.xl,
+    paddingBottom: 100, // Espacio para el botón fijo
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.md,
-    marginBottom: theme.spacing.md,
-    marginTop: theme.spacing.lg,
-  },
-  sectionIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sectionTextContainer: {
-    flex: 1,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.colors.text,
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-  },
-  itemContainer: {
-    marginBottom: theme.spacing.md,
+  bottomSpacer: {
+    height: theme.spacing.lg,
   },
   buttonContainer: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    paddingBottom: theme.spacing.lg,
-    backgroundColor: theme.colors.surface,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: theme.spacing.lg,
+    backgroundColor: theme.colors.background,
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: theme.colors.secondary,
+    ...theme.shadows.card,
   },
 });

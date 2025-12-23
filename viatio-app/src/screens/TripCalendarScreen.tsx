@@ -14,13 +14,18 @@ import { CalendarDay } from '@/components/CalendarDay';
 import type { EventoAgendaCalendario } from '@/components';
 import { theme } from '@/config';
 import type { Viaje } from '@/types/viaje';
-import type { CategoriaReserva } from '@/types/reserva';
-import type { TipoEvento } from '@/types/evento';
-import { EVENTO_COLORS, EVENTO_LABELS } from '@/types/evento';
+import type { CategoriaReserva, Reserva } from '@/types/reserva';
+import { SUBTIPOS_TRANSPORTE, SUBTIPOS_ALOJAMIENTO, SUBTIPOS_ACTIVIDAD, RESERVA_CATEGORIAS } from '@/types/reserva';
+import { BASE_CATEGORIES } from '@/config/categories';
+import type { TipoEvento, CategoriaEvento } from '@/types/evento';
+import { EVENTO_COLORS, EVENTO_LABELS, EVENTO_CATEGORIAS } from '@/types/evento';
 import { useAuth } from '@/context';
 import { getViajesByUsuario } from '@/services/viajesService';
 import { getReservasByViajeId } from '@/services/reservasService';
+import { getEventosByViajeId } from '@/services/eventosService';
+import { getDiasByViajeId } from '@/services/diasViajeService';
 import { useReservasStore } from '@/store/reservasStore';
+import { useEventosStore } from '@/store/eventosStore';
 import { parseLocalDate, formatLocalDateISO, startOfLocalDay } from '@/utils';
 
 interface TripCalendarScreenProps {
@@ -49,6 +54,7 @@ const isCategoriaReserva = (value?: string): value is CategoriaReserva => {
 export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
   const { user } = useAuth();
   const reservasStoreTimestamp = useReservasStore((state) => state.reservas.length);
+  const eventosStoreTimestamp = useEventosStore((state) => state.eventos.length);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -98,6 +104,47 @@ export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
     return isCategoriaReserva(categoria) ? categoria : 'other';
   };
 
+  /**
+   * Obtiene el icono y color específico según categoría y subtipo de reserva
+   */
+  const getIconForReserva = (reserva: Reserva) => {
+    const metadatos = reserva.metadatos;
+
+    // Usar icono específico del subtipo si existe
+    if (reserva.categoria === 'transport' && metadatos?.subtipoTransporte) {
+      return SUBTIPOS_TRANSPORTE[metadatos.subtipoTransporte].icon;
+    }
+
+    if (reserva.categoria === 'accommodation' && metadatos?.subtipoAlojamiento) {
+      return SUBTIPOS_ALOJAMIENTO[metadatos.subtipoAlojamiento].icon;
+    }
+
+    if (reserva.categoria === 'activity' && metadatos?.subtipoActividad) {
+      return SUBTIPOS_ACTIVIDAD[metadatos.subtipoActividad].icon;
+    }
+
+    // Fallback al ícono de categoría general
+    return RESERVA_CATEGORIAS[reserva.categoria].icon;
+  };
+
+  // Mapear categoría de evento personalizado a categoría de reserva
+  const mapEventoCategoriaToReserva = (categoria: CategoriaEvento): CategoriaReserva => {
+    const mapping: Record<CategoriaEvento, CategoriaReserva> = {
+      sightseeing: 'activity',
+      culture: 'activity',
+      food: 'food',
+      shopping: 'activity',
+      entertainment: 'activity',
+      nature: 'activity',
+      relaxation: 'activity',
+      transport: 'transport',
+      nightlife: 'activity',
+      sports: 'activity',
+      other: 'other',
+    };
+    return mapping[categoria];
+  };
+
   // Cargar eventos del mes
   const loadEventosDelMes = useCallback(async (month: Date) => {
     if (!user) {
@@ -129,6 +176,7 @@ export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
             return;
           }
 
+          // Cargar reservas
           const reservas = await getReservasByViajeId(viaje.id);
 
           reservas.forEach((reserva) => {
@@ -137,48 +185,95 @@ export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
               return;
             }
 
-            console.log('[TripCalendarScreen] Procesando reserva:', {
-              id: reserva.id,
-              nombre: reserva.nombre,
-              fechaInicio: reserva.fechaInicio,
-              categoria: reserva.categoria,
-            });
-
             const fechaReserva = parseLocalDate(reserva.fechaInicio);
-
-            console.log('[TripCalendarScreen] Fecha parseada:', {
-              fechaReserva,
-              month: fechaReserva.getMonth(),
-              year: fechaReserva.getFullYear(),
-              currentMonth: month.getMonth(),
-              currentYear: month.getFullYear(),
-            });
 
             if (
               fechaReserva.getMonth() !== month.getMonth() ||
               fechaReserva.getFullYear() !== month.getFullYear()
             ) {
-              console.log('[TripCalendarScreen] Reserva descartada: fuera del mes');
               return;
             }
 
             const fechaISO = formatDateISO(fechaReserva);
             const categoria = getSafeCategoria(reserva.categoria);
+            const iconName = getIconForReserva(reserva);
+            const categoryConfig = BASE_CATEGORIES[categoria];
 
             const evento: EventoAgendaCalendario = {
               id: reserva.id,
               tipo: 'reserva',
+              origen: 'reserva',
+              referenciaId: reserva.id,
+              referenciaTipo: 'reserva',
               reservaId: reserva.id,
               hora: reserva.horaInicio || undefined,
               titulo: reserva.nombre,
               subtitulo: reserva.proveedor,
               categoria,
-              iconName: 'ellipsis-horizontal', // Icono placeholder para calendario
-              iconColor: '#6B7280',
-              iconBgColor: '#F3F4F6',
+              iconName,
+              iconColor: categoryConfig.color,
+              iconBgColor: categoryConfig.bgColor,
               ubicacion: reserva.ubicacion || reserva.direccion,
               tieneReserva: true,
               tieneDocumento: Boolean(reserva.documentoId),
+              viajeId: viaje.id,
+            };
+
+            const eventosDia = eventosMap.get(fechaISO) || [];
+            eventosMap.set(fechaISO, [...eventosDia, evento]);
+          });
+
+          // Cargar días del viaje para mapear eventos personalizados
+          const dias = await getDiasByViajeId(viaje.id);
+          const diasMap = new Map(dias.map(d => [d.id, d]));
+
+          // Cargar eventos personalizados
+          const eventosPersonalizados = await getEventosByViajeId(viaje.id);
+
+          eventosPersonalizados.forEach((eventoPersonalizado) => {
+            // Solo mostramos eventos asignados a días específicos
+            if (!eventoPersonalizado.diaId) {
+              return;
+            }
+
+            // Obtener la fecha del día
+            const dia = diasMap.get(eventoPersonalizado.diaId);
+            if (!dia) {
+              return;
+            }
+
+            const fechaEvento = parseLocalDate(dia.fecha);
+
+            // Verificar si el evento está en el mes actual
+            if (
+              fechaEvento.getMonth() !== month.getMonth() ||
+              fechaEvento.getFullYear() !== month.getFullYear()
+            ) {
+              return;
+            }
+
+            const fechaISO = formatDateISO(fechaEvento);
+            const categoriaReserva = mapEventoCategoriaToReserva(eventoPersonalizado.categoria);
+            const categoriaConfig = EVENTO_CATEGORIAS[eventoPersonalizado.categoria];
+
+            const evento: EventoAgendaCalendario = {
+              id: eventoPersonalizado.id,
+              tipo: 'reserva', // Usamos 'reserva' para compatibilidad con el tipo
+              origen: 'evento_personalizado',
+              referenciaId: eventoPersonalizado.id,
+              referenciaTipo: 'evento_personalizado',
+              hora: eventoPersonalizado.horaInicio || undefined,
+              horaFin: eventoPersonalizado.horaFin || undefined,
+              titulo: eventoPersonalizado.nombre,
+              subtitulo: eventoPersonalizado.descripcion,
+              categoria: categoriaReserva,
+              iconName: categoriaConfig.icon,
+              iconColor: categoriaConfig.color,
+              iconBgColor: categoriaConfig.bgColor,
+              ubicacion: eventoPersonalizado.ubicacion || eventoPersonalizado.direccion,
+              completado: eventoPersonalizado.completado,
+              tieneReserva: false,
+              tieneDocumento: false,
               viajeId: viaje.id,
             };
 
@@ -270,10 +365,10 @@ export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
     setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   };
 
-  // Recargar eventos cuando cambia el mes o cuando se modifican las reservas
+  // Recargar eventos cuando cambia el mes o cuando se modifican las reservas o eventos
   useEffect(() => {
     loadEventosDelMes(currentMonth);
-  }, [currentMonth, loadEventosDelMes, reservasStoreTimestamp]);
+  }, [currentMonth, loadEventosDelMes, reservasStoreTimestamp, eventosStoreTimestamp]);
 
   // Recargar eventos cada vez que la pantalla se enfoca
   useFocusEffect(

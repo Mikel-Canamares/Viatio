@@ -79,6 +79,8 @@ export type HomeStackParamList = {
   EditDocument: { documentoId: string; nombreActual: string };
   Expenses: { viajeId: string };
   AddExpense: { viajeId: string };
+  AddEvento: { viajeId: string; diaId?: string; eventoId?: string };
+  EventoDetail: { eventoId: string };
 };
 
 // ============================================
@@ -98,6 +100,7 @@ export type ProfileStackParamList = {
   ProfileMain: undefined;
   EditProfile: undefined;
   NotificationsSettings: undefined;
+  NotificationsManagement: undefined;
   Settings: undefined;
   Help: undefined;
 };

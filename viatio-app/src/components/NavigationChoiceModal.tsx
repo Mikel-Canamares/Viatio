@@ -16,6 +16,9 @@ interface NavigationChoiceModalProps {
   onClose: () => void;
   onViewReservation: () => void;
   onViewMap: () => void;
+  reservationLabel?: string;
+  reservationDescription?: string;
+  showMapOption?: boolean; // Si false, oculta la opción "Ver en el mapa"
 }
 
 export default function NavigationChoiceModal({
@@ -24,6 +27,9 @@ export default function NavigationChoiceModal({
   onClose,
   onViewReservation,
   onViewMap,
+  reservationLabel = 'Ver reserva',
+  reservationDescription = 'Detalles, confirmación y documentos',
+  showMapOption = true,
 }: NavigationChoiceModalProps) {
   return (
     <Modal
@@ -66,9 +72,9 @@ export default function NavigationChoiceModal({
                     <Ionicons name="document-text" size={24} color="#3B82F6" />
                   </View>
                   <View style={styles.optionContent}>
-                    <Text style={styles.optionTitle}>Ver reserva</Text>
+                    <Text style={styles.optionTitle}>{reservationLabel}</Text>
                     <Text style={styles.optionDescription}>
-                      Detalles, confirmación y documentos
+                      {reservationDescription}
                     </Text>
                   </View>
                   <Ionicons
@@ -78,32 +84,34 @@ export default function NavigationChoiceModal({
                   />
                 </Pressable>
 
-                {/* Opción: Ver en Mapa */}
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.option,
-                    pressed && styles.optionPressed,
-                  ]}
-                  onPress={() => {
-                    onClose();
-                    onViewMap();
-                  }}
-                >
-                  <View style={[styles.iconContainer, { backgroundColor: '#D1FAE5' }]}>
-                    <Ionicons name="map" size={24} color="#10B981" />
-                  </View>
-                  <View style={styles.optionContent}>
-                    <Text style={styles.optionTitle}>Ver en el mapa</Text>
-                    <Text style={styles.optionDescription}>
-                      Ubicación y cómo llegar
-                    </Text>
-                  </View>
-                  <Ionicons
-                    name="chevron-forward"
-                    size={20}
-                    color={theme.colors.textMuted}
-                  />
-                </Pressable>
+                {/* Opción: Ver en Mapa (condicional) */}
+                {showMapOption && (
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.option,
+                      pressed && styles.optionPressed,
+                    ]}
+                    onPress={() => {
+                      onClose();
+                      onViewMap();
+                    }}
+                  >
+                    <View style={[styles.iconContainer, { backgroundColor: '#D1FAE5' }]}>
+                      <Ionicons name="map" size={24} color="#10B981" />
+                    </View>
+                    <View style={styles.optionContent}>
+                      <Text style={styles.optionTitle}>Ver en el mapa</Text>
+                      <Text style={styles.optionDescription}>
+                        Ubicación y cómo llegar
+                      </Text>
+                    </View>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={20}
+                      color={theme.colors.textMuted}
+                    />
+                  </Pressable>
+                )}
               </View>
             </Card>
           </Pressable>

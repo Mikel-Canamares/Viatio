@@ -57,16 +57,6 @@ export function DayEventsModal({
   // Formatear fecha: "Viernes, 21 de diciembre"
   const fechaFormateada = format(date, "EEEE, d 'de' MMMM", { locale: es });
 
-  const getEventIcon = (categoria: CategoriaReserva): keyof typeof Ionicons.glyphMap => {
-    switch (categoria) {
-      case 'transport': return 'airplane';
-      case 'accommodation': return 'bed';
-      case 'food': return 'restaurant';
-      case 'activity': return 'ticket';
-      default: return 'calendar';
-    }
-  };
-
   const renderEvento = ({ item }: { item: EventoAgendaCalendario }) => (
     <Pressable
       style={({ pressed }) => [
@@ -76,12 +66,12 @@ export function DayEventsModal({
       onPress={() => onEventPress?.(item)}
       disabled={!onEventPress}
     >
-      {/* Icono de categoría */}
-      <View style={[styles.iconContainer, { backgroundColor: `${theme.colors.primary}20` }]}>
+      {/* Icono de categoría - usa los datos del evento del sistema centralizado */}
+      <View style={[styles.iconContainer, { backgroundColor: item.iconBgColor || `${theme.colors.primary}20` }]}>
         <Ionicons
-          name={getEventIcon(item.categoria)}
+          name={item.iconName as any}
           size={24}
-          color={theme.colors.primary}
+          color={item.iconColor || theme.colors.primary}
         />
       </View>
 

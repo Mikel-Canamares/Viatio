@@ -7,16 +7,19 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import { CategoriaLugar } from '@/types/lugar';
+import { CategoriaLugar, LUGAR_MARKER_COLORS } from '@/types/lugar';
 
-// Configuración de colores por categoría
+/**
+ * Configuración de colores por categoría
+ * Usa el sistema centralizado para mantener consistencia
+ */
 const CATEGORIA_CONFIG: Record<CategoriaLugar, { color: string }> = {
-  restaurant: { color: '#EA580C' },
-  hotel: { color: '#16A34A' },
-  attraction: { color: '#8B5CF6' },
-  shopping: { color: '#EC4899' },
-  transport: { color: '#0066CC' },
-  other: { color: '#6B7280' },
+  restaurant: { color: LUGAR_MARKER_COLORS.restaurant },
+  hotel: { color: LUGAR_MARKER_COLORS.hotel },
+  attraction: { color: LUGAR_MARKER_COLORS.attraction },
+  shopping: { color: LUGAR_MARKER_COLORS.shopping },
+  transport: { color: LUGAR_MARKER_COLORS.transport },
+  other: { color: LUGAR_MARKER_COLORS.other },
 };
 
 interface MapMarkerProps {
