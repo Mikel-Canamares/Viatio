@@ -12,7 +12,7 @@ import { logError } from '@/utils';
 import { theme } from '@/config';
 
 // DEVELOPMENT: Cambiar a true para limpiar la BD al iniciar
-const CLEAR_DB_ON_START = false;
+const CLEAR_DB_ON_START = true;
 
 export default function App() {
   const [dbReady, setDbReady] = useState(false);

@@ -133,6 +133,7 @@ export default function EditReservationScreen({ route, navigation }: Props) {
         moneda: reservaData.moneda,
         estadoPago: reservaData.estadoPago,
         notas: reservaData.notas,
+        metadatos: reservaData.metadatos, // CRITICAL: Incluir metadatos para que se cargue el subtipo
       });
     } catch (error) {
       console.error('[EditReservationScreen] Error al cargar datos:', error);

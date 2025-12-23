@@ -8,8 +8,6 @@
 import { View, Text, Pressable, StyleSheet, Dimensions } from 'react-native';
 import { theme } from '@/config';
 import type { EventoAgenda } from '@/types/diaViaje';
-import type { CategoriaReserva } from '@/types/reserva';
-import { CATEGORY_COLORS, CategoryType } from './CategoryBadge';
 
 const { width: screenWidth } = Dimensions.get('window');
 // Calcular ancho de cada dia: (ancho pantalla - padding lateral - gaps) / 7
@@ -25,23 +23,12 @@ interface CalendarDayProps {
   disabled?: boolean; // Dias de otros meses
 }
 
-const CATEGORIA_RESERVA_VALUES: CategoriaReserva[] = [
-  'transport',
-  'accommodation',
-  'food',
-  'activity',
-  'other',
-];
-
-const isCategoriaReserva = (value?: string): value is CategoriaReserva => {
-  return value ? CATEGORIA_RESERVA_VALUES.includes(value as CategoriaReserva) : false;
-};
-
+/**
+ * Obtiene el color del evento directamente desde iconColor
+ * que ya viene del sistema centralizado
+ */
 const getEventColor = (event: EventoAgenda): string => {
-  if (isCategoriaReserva(event.categoria)) {
-    return CATEGORY_COLORS[event.categoria as CategoryType].text;
-  }
-  return theme.colors.primary;
+  return event.iconColor || theme.colors.primary;
 };
 
 export function CalendarDay({

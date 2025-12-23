@@ -22,16 +22,38 @@ import {
 } from '@/types/reserva';
 import { Lugar, LUGAR_CATEGORIAS } from '@/types/lugar';
 import { EventoPersonalizado, EVENTO_CATEGORIAS } from '@/types/evento';
+import { BASE_CATEGORIES, CategoryBase } from '@/config/categories';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-// Mapeo de colores por categoría
-const CATEGORIA_COLORS: Record<string, { bg: string; icon: string }> = {
-  transport: { bg: '#DBEAFE', icon: '#3B82F6' },
-  accommodation: { bg: '#FEE2E2', icon: '#EF4444' },
-  food: { bg: '#FEF3C7', icon: '#F59E0B' },
-  activity: { bg: '#D1FAE5', icon: '#10B981' },
-  other: { bg: '#F3F4F6', icon: '#6B7280' },
+/**
+ * Mapeo de colores por categoría usando el sistema centralizado
+ */
+const CATEGORIA_COLORS: Record<CategoryBase, { bg: string; icon: string }> = {
+  transport: {
+    bg: BASE_CATEGORIES.transport.lightBg,
+    icon: BASE_CATEGORIES.transport.color
+  },
+  accommodation: {
+    bg: BASE_CATEGORIES.accommodation.lightBg,
+    icon: BASE_CATEGORIES.accommodation.color
+  },
+  food: {
+    bg: BASE_CATEGORIES.food.lightBg,
+    icon: BASE_CATEGORIES.food.color
+  },
+  activity: {
+    bg: BASE_CATEGORIES.activity.lightBg,
+    icon: BASE_CATEGORIES.activity.color
+  },
+  shopping: {
+    bg: BASE_CATEGORIES.shopping.lightBg,
+    icon: BASE_CATEGORIES.shopping.color
+  },
+  other: {
+    bg: BASE_CATEGORIES.other.lightBg,
+    icon: BASE_CATEGORIES.other.color
+  },
 };
 
 /**

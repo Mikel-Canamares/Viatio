@@ -31,7 +31,13 @@ import { getReservaById, getDocumentoByReservaId } from '@/services/reservasServ
 import { openDocument } from '@/utils/documentViewer';
 import type { Reserva } from '@/types/reserva';
 import type { Documento } from '@/types/documento';
-import { RESERVA_CATEGORIAS } from '@/types/reserva';
+import {
+  RESERVA_CATEGORIAS,
+  SUBTIPOS_TRANSPORTE,
+  SUBTIPOS_ALOJAMIENTO,
+  SUBTIPOS_ACTIVIDAD,
+} from '@/types/reserva';
+import { BASE_CATEGORIES, CategoryBase } from '@/config/categories';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { HomeStackParamList } from '@/navigation/types';
@@ -44,16 +50,56 @@ const ESTADO_PAGO_CONFIG = {
   paid: { label: 'Pagado', color: '#10B981', bg: '#D1FAE5' },
 };
 
-const CATEGORIA_COLORS: Record<
-  string,
-  { bg: string; icon: string }
-> = {
-  transport: { bg: '#DBEAFE', icon: '#3B82F6' },
-  accommodation: { bg: '#FEE2E2', icon: '#EF4444' },
-  food: { bg: '#FEF3C7', icon: '#F59E0B' },
-  activity: { bg: '#D1FAE5', icon: '#10B981' },
-  other: { bg: '#F3F4F6', icon: '#6B7280' },
+/**
+ * Colores de categorías usando el sistema centralizado
+ */
+const CATEGORIA_COLORS: Record<CategoryBase, { bg: string; icon: string }> = {
+  transport: {
+    bg: BASE_CATEGORIES.transport.lightBg,
+    icon: BASE_CATEGORIES.transport.color
+  },
+  accommodation: {
+    bg: BASE_CATEGORIES.accommodation.lightBg,
+    icon: BASE_CATEGORIES.accommodation.color
+  },
+  food: {
+    bg: BASE_CATEGORIES.food.lightBg,
+    icon: BASE_CATEGORIES.food.color
+  },
+  activity: {
+    bg: BASE_CATEGORIES.activity.lightBg,
+    icon: BASE_CATEGORIES.activity.color
+  },
+  shopping: {
+    bg: BASE_CATEGORIES.shopping.lightBg,
+    icon: BASE_CATEGORIES.shopping.color
+  },
+  other: {
+    bg: BASE_CATEGORIES.other.lightBg,
+    icon: BASE_CATEGORIES.other.color
+  },
 };
+
+/**
+ * Obtiene el icono específico según categoría y subtipo de reserva
+ */
+function getIconForReserva(reserva: Reserva): string {
+  const metadatos = reserva.metadatos;
+
+  if (reserva.categoria === 'transport' && metadatos?.subtipoTransporte) {
+    return SUBTIPOS_TRANSPORTE[metadatos.subtipoTransporte].icon;
+  }
+
+  if (reserva.categoria === 'accommodation' && metadatos?.subtipoAlojamiento) {
+    return SUBTIPOS_ALOJAMIENTO[metadatos.subtipoAlojamiento].icon;
+  }
+
+  if (reserva.categoria === 'activity' && metadatos?.subtipoActividad) {
+    return SUBTIPOS_ACTIVIDAD[metadatos.subtipoActividad].icon;
+  }
+
+  return RESERVA_CATEGORIAS[reserva.categoria].icon;
+}
 
 export default function ReservationDetailScreen({ route, navigation }: Props) {
   const { reservaId } = route.params;
@@ -121,9 +167,9 @@ export default function ReservationDetailScreen({ route, navigation }: Props) {
     );
   }
 
-  const categoriaInfo = RESERVA_CATEGORIAS[reserva.categoria];
   const colors = CATEGORIA_COLORS[reserva.categoria];
   const estadoPagoInfo = ESTADO_PAGO_CONFIG[reserva.estadoPago];
+  const iconName = getIconForReserva(reserva);
 
   return (
     <View style={styles.container}>
@@ -137,7 +183,7 @@ export default function ReservationDetailScreen({ route, navigation }: Props) {
             <View style={styles.headerRow}>
               <View style={[styles.iconLarge, { backgroundColor: colors.bg }]}>
                 <Ionicons
-                  name={categoriaInfo.icon as any}
+                  name={iconName as any}
                   size={32}
                   color={colors.icon}
                 />
@@ -147,7 +193,7 @@ export default function ReservationDetailScreen({ route, navigation }: Props) {
                 {reserva.proveedor && (
                   <Text style={styles.proveedor}>{reserva.proveedor}</Text>
                 )}
-                <CategoryBadge category={reserva.categoria} label={categoriaInfo.label} />
+                <CategoryBadge category={reserva.categoria} label={RESERVA_CATEGORIAS[reserva.categoria].label} />
               </View>
             </View>
           </Card>

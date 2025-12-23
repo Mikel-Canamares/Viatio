@@ -5,7 +5,7 @@
  * Muestra resumen total, distribución por categoría e historial agrupado.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -16,6 +16,8 @@ import { PrimaryButton } from '@/components/PrimaryButton';
 import { ExpenseCategoryGroup } from '@/components/ExpenseCategoryGroup';
 import { useGastosStore } from '@/store/gastosStore';
 import { Gasto, GASTO_CATEGORIAS, CategoriaGasto } from '@/types/gasto';
+import { Reserva } from '@/types/reserva';
+import { getReservasByViajeId } from '@/services/reservasService';
 import { theme } from '@/config';
 
 // ============================================
@@ -40,12 +42,23 @@ export function ExpensesScreen() {
   const { viajeId } = route.params;
 
   const { gastos, resumen, loading, fetchGastos, fetchResumen } = useGastosStore();
+  const [reservas, setReservas] = useState<Reserva[]>([]);
 
   // Cargar datos al montar
   useEffect(() => {
     fetchGastos(viajeId);
     fetchResumen(viajeId);
+    loadReservas();
   }, [viajeId]);
+
+  const loadReservas = async () => {
+    try {
+      const reservasData = await getReservasByViajeId(viajeId);
+      setReservas(reservasData);
+    } catch (error) {
+      console.error('Error cargando reservas:', error);
+    }
+  };
 
   // Calcular porcentaje de presupuesto usado
   const presupuestoPercentage = resumen?.presupuesto
@@ -215,6 +228,7 @@ export function ExpensesScreen() {
             key={categoria}
             categoria={categoria}
             gastos={gastosPorCategoria[categoria]}
+            reservas={reservas}
             moneda={resumen?.moneda || 'EUR'}
           />
         ))}

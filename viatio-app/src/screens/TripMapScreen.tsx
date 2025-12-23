@@ -20,6 +20,7 @@ import { MapMarker, SelectedPlaceMarker } from '@/components/MapMarker';
 import { PlaceResult } from '@/types/googlePlaces';
 import { Lugar, LUGAR_CATEGORIAS, CategoriaLugar } from '@/types/lugar';
 import { Viaje } from '@/types/viaje';
+import { Reserva } from '@/types/reserva';
 import {
   searchNearbyPlaces,
   getPlaceDetails,
@@ -30,6 +31,7 @@ import {
   deleteLugar,
   toggleVisitado,
 } from '@/services/lugaresService';
+import { getReservasByViajeId } from '@/services/reservasService';
 import { getViajeById } from '@/services/viajesService';
 import { theme } from '@/config/theme';
 
@@ -59,6 +61,7 @@ export default function TripMapScreen() {
   // Estados
   const [viaje, setViaje] = useState<Viaje | null>(null);
   const [lugares, setLugares] = useState<Lugar[]>([]);
+  const [reservas, setReservas] = useState<Reserva[]>([]); // Necesario para obtener iconos de subtipo
   const [selectedPlace, setSelectedPlace] = useState<PlaceResult | null>(null);
   const [showPlaceCard, setShowPlaceCard] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -153,43 +156,50 @@ export default function TripMapScreen() {
     }
   };
 
-  // Cargar lugares guardados
+  // Cargar lugares guardados y reservas
   useFocusEffect(
     useCallback(() => {
-      loadLugares();
+      loadLugaresAndReservas();
     }, [viajeId])
   );
 
-  const loadLugares = async () => {
+  const loadLugaresAndReservas = async () => {
     try {
-      const data = await getLugaresByViajeId(viajeId);
-      console.log('[TripMapScreen] Lugares cargados:', data.length);
-      console.log('[TripMapScreen] Lugares con coordenadas:', data.filter(l => l.latitud && l.longitud).length);
+      // Cargar lugares y reservas en paralelo
+      const [lugaresData, reservasData] = await Promise.all([
+        getLugaresByViajeId(viajeId),
+        getReservasByViajeId(viajeId),
+      ]);
+
+      console.log('[TripMapScreen] Lugares cargados:', lugaresData.length);
+      console.log('[TripMapScreen] Reservas cargadas:', reservasData.length);
+      console.log('[TripMapScreen] Lugares con coordenadas:', lugaresData.filter(l => l.latitud && l.longitud).length);
 
       // Log detallado de cada lugar
-      data.forEach(lugar => {
+      lugaresData.forEach(lugar => {
         console.log(`[TripMapScreen] Lugar: ${lugar.nombre}, lat: ${lugar.latitud}, lng: ${lugar.longitud}, categoria: ${lugar.categoria}`);
       });
 
-      setLugares(data);
+      setLugares(lugaresData);
+      setReservas(reservasData);
 
       // Si se proporciona lugarId, centrar en ese lugar específico
       if (lugarId) {
-        const lugarSeleccionado = data.find(l => l.id === lugarId);
+        const lugarSeleccionado = lugaresData.find(l => l.id === lugarId);
         if (lugarSeleccionado) {
           console.log('[TripMapScreen] Centrando en lugar desde agenda:', lugarSeleccionado.nombre);
           await handleSelectLugar(lugarSeleccionado);
         }
-      } else if (data.length > 0 && initialMapCentered) {
+      } else if (lugaresData.length > 0 && initialMapCentered) {
         // Solo centrar mapa en lugares si:
         // 1. Hay lugares guardados
         // 2. Ya se hizo el centrado inicial en el destino (para no interferir con el centrado automático)
-        const newRegion = calculateRegion(data);
+        const newRegion = calculateRegion(lugaresData);
         setRegion(newRegion);
         mapRef.current?.animateToRegion(newRegion, 500);
       }
     } catch (error) {
-      console.error('Error cargando lugares:', error);
+      console.error('Error cargando lugares y reservas:', error);
     }
   };
 
@@ -341,8 +351,8 @@ export default function TripMapScreen() {
       setPlaceToAdd(null);
       setSelectedPlace(null);
 
-      // Recargar lugares
-      await loadLugares();
+      // Recargar lugares y reservas
+      await loadLugaresAndReservas();
     } catch (error) {
       console.error('Error añadiendo lugar:', error);
       Alert.alert('Error', 'No se pudo añadir el lugar');
@@ -441,7 +451,7 @@ export default function TripMapScreen() {
   const handleToggleVisitado = async (lugar: Lugar) => {
     try {
       await toggleVisitado(lugar.id);
-      await loadLugares();
+      await loadLugaresAndReservas();
     } catch (error) {
       console.error('Error actualizando lugar:', error);
     }
@@ -461,7 +471,7 @@ export default function TripMapScreen() {
             try {
               await deleteLugar(lugar.id);
               Alert.alert('Eliminado', 'Lugar eliminado del viaje');
-              await loadLugares();
+              await loadLugaresAndReservas();
             } catch (error) {
               Alert.alert('Error', 'No se pudo eliminar');
             }
@@ -627,6 +637,7 @@ export default function TripMapScreen() {
         /* Vista de lista */
         <SavedPlacesAccordion
           lugares={lugares}
+          reservas={reservas}
           onSelectLugar={handleSelectLugar}
           onToggleVisitado={handleToggleVisitado}
           onDeleteLugar={handleDeleteLugar}

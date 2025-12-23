@@ -2,7 +2,7 @@
  * COMPONENTE: EventoCategoriaSelector
  *
  * Selector visual de categorías para eventos personalizados.
- * Muestra grid de categorías con iconos y colores.
+ * Muestra grid de categorías con iconos y colores del sistema centralizado.
  */
 
 import { View, Text, StyleSheet, Pressable } from 'react-native';

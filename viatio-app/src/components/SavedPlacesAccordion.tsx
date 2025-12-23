@@ -10,6 +10,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Lugar, LUGAR_CATEGORIAS, CategoriaLugar } from '@/types/lugar';
+import {
+  Reserva,
+  SUBTIPOS_TRANSPORTE,
+  SUBTIPOS_ALOJAMIENTO,
+  SUBTIPOS_ACTIVIDAD,
+  RESERVA_CATEGORIAS,
+} from '@/types/reserva';
 import { theme } from '@/config/theme';
 
 // Habilitar LayoutAnimation en Android
@@ -19,6 +26,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 interface SavedPlacesAccordionProps {
   lugares: Lugar[];
+  reservas: Reserva[]; // Necesario para obtener iconos específicos de subtipo
   onSelectLugar: (lugar: Lugar) => void | Promise<void>;
   onToggleVisitado: (lugar: Lugar) => void | Promise<void>;
   onDeleteLugar: (lugar: Lugar) => void;
@@ -30,8 +38,42 @@ interface LugaresPorCategoria {
   config: typeof LUGAR_CATEGORIAS[CategoriaLugar];
 }
 
+/**
+ * Obtiene el icono específico para un lugar
+ * Si el lugar está vinculado a una reserva, usa el icono del subtipo de la reserva
+ * Si no, usa el icono genérico de la categoría del lugar
+ */
+function getIconForLugar(lugar: Lugar, reservas: Reserva[]): string {
+  // Buscar si hay una reserva vinculada a este lugar
+  const reservaVinculada = reservas.find(r => r.lugarId === lugar.id);
+
+  if (reservaVinculada) {
+    const metadatos = reservaVinculada.metadatos;
+
+    // Si la reserva tiene subtipo, usar su icono específico
+    if (reservaVinculada.categoria === 'transport' && metadatos?.subtipoTransporte) {
+      return SUBTIPOS_TRANSPORTE[metadatos.subtipoTransporte].icon;
+    }
+
+    if (reservaVinculada.categoria === 'accommodation' && metadatos?.subtipoAlojamiento) {
+      return SUBTIPOS_ALOJAMIENTO[metadatos.subtipoAlojamiento].icon;
+    }
+
+    if (reservaVinculada.categoria === 'activity' && metadatos?.subtipoActividad) {
+      return SUBTIPOS_ACTIVIDAD[metadatos.subtipoActividad].icon;
+    }
+
+    // Si la reserva no tiene subtipo, usar icono de categoría de reserva
+    return RESERVA_CATEGORIAS[reservaVinculada.categoria].icon;
+  }
+
+  // Si no hay reserva vinculada, usar icono de categoría de lugar
+  return LUGAR_CATEGORIAS[lugar.categoria].icon;
+}
+
 export function SavedPlacesAccordion({
   lugares,
+  reservas,
   onSelectLugar,
   onToggleVisitado,
   onDeleteLugar,
@@ -129,61 +171,70 @@ export function SavedPlacesAccordion({
             {/* Lista de lugares */}
             {isExpanded && (
               <View style={styles.lugaresContainer}>
-                {lugaresCategoria.map((lugar) => (
-                  <Pressable
-                    key={lugar.id}
-                    style={styles.lugarItem}
-                    onPress={() => onSelectLugar(lugar)}
-                  >
-                    {/* Checkbox de visitado */}
+                {lugaresCategoria.map((lugar) => {
+                  const iconoLugar = getIconForLugar(lugar, reservas);
+
+                  return (
                     <Pressable
-                      style={styles.checkbox}
-                      onPress={() => onToggleVisitado(lugar)}
-                      hitSlop={8}
+                      key={lugar.id}
+                      style={styles.lugarItem}
+                      onPress={() => onSelectLugar(lugar)}
                     >
-                      <View
-                        style={[
-                          styles.checkboxInner,
-                          lugar.visitado && {
-                            backgroundColor: theme.colors.success,
-                            borderColor: theme.colors.success,
-                          },
-                        ]}
+                      {/* Checkbox de visitado */}
+                      <Pressable
+                        style={styles.checkbox}
+                        onPress={() => onToggleVisitado(lugar)}
+                        hitSlop={8}
                       >
-                        {lugar.visitado && (
-                          <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                        <View
+                          style={[
+                            styles.checkboxInner,
+                            lugar.visitado && {
+                              backgroundColor: theme.colors.success,
+                              borderColor: theme.colors.success,
+                            },
+                          ]}
+                        >
+                          {lugar.visitado && (
+                            <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                          )}
+                        </View>
+                      </Pressable>
+
+                      {/* Icono específico del lugar/reserva */}
+                      <View style={[styles.lugarIcon, { backgroundColor: config.color + '15' }]}>
+                        <Ionicons name={iconoLugar as any} size={18} color={config.color} />
+                      </View>
+
+                      {/* Info del lugar */}
+                      <View style={styles.lugarInfo}>
+                        <Text
+                          style={[
+                            styles.lugarNombre,
+                            lugar.visitado && styles.lugarNombreVisitado,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {lugar.nombre}
+                        </Text>
+                        {lugar.direccion && (
+                          <Text style={styles.lugarDireccion} numberOfLines={1}>
+                            {lugar.direccion}
+                          </Text>
                         )}
                       </View>
-                    </Pressable>
 
-                    {/* Info del lugar */}
-                    <View style={styles.lugarInfo}>
-                      <Text
-                        style={[
-                          styles.lugarNombre,
-                          lugar.visitado && styles.lugarNombreVisitado,
-                        ]}
-                        numberOfLines={1}
+                      {/* Botón eliminar */}
+                      <Pressable
+                        style={styles.deleteButton}
+                        onPress={() => onDeleteLugar(lugar)}
+                        hitSlop={8}
                       >
-                        {lugar.nombre}
-                      </Text>
-                      {lugar.direccion && (
-                        <Text style={styles.lugarDireccion} numberOfLines={1}>
-                          {lugar.direccion}
-                        </Text>
-                      )}
-                    </View>
-
-                    {/* Botón eliminar */}
-                    <Pressable
-                      style={styles.deleteButton}
-                      onPress={() => onDeleteLugar(lugar)}
-                      hitSlop={8}
-                    >
-                      <Ionicons name="trash-outline" size={18} color={theme.colors.error} />
+                        <Ionicons name="trash-outline" size={18} color={theme.colors.error} />
+                      </Pressable>
                     </Pressable>
-                  </Pressable>
-                ))}
+                  );
+                })}
               </View>
             )}
           </View>
@@ -282,6 +333,14 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  lugarIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
   lugarInfo: {
     flex: 1,

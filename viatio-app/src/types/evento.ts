@@ -5,12 +5,9 @@
  * Un evento puede ser una reserva, un día de viaje, etc.
  */
 
-export type TipoEvento =
-  | 'transport'
-  | 'accommodation'
-  | 'food'
-  | 'activity'
-  | 'other';
+import { CategoryBase, BASE_CATEGORIES } from '@/config/categories';
+
+export type TipoEvento = CategoryBase;
 
 export interface EventoCalendario {
   id: string;
@@ -25,38 +22,50 @@ export interface EventoCalendario {
   tieneDocumento?: boolean;
 }
 
+/**
+ * Colores de eventos - importados del sistema centralizado
+ */
 export const EVENTO_COLORS: Record<TipoEvento, string> = {
-  transport: '#3B82F6',    // Azul
-  accommodation: '#16A34A', // Verde
-  food: '#EC4899',          // Rosa
-  activity: '#F97316',      // Naranja
-  other: '#9CA3AF',         // Gris
+  transport: BASE_CATEGORIES.transport.color,
+  accommodation: BASE_CATEGORIES.accommodation.color,
+  food: BASE_CATEGORIES.food.color,
+  activity: BASE_CATEGORIES.activity.color,
+  shopping: BASE_CATEGORIES.shopping.color,
+  other: BASE_CATEGORIES.other.color,
 };
 
+/**
+ * Etiquetas de eventos - importadas del sistema centralizado
+ */
 export const EVENTO_LABELS: Record<TipoEvento, string> = {
-  transport: 'Transporte',
-  accommodation: 'Alojamiento',
-  food: 'Comida',
-  activity: 'Actividad',
-  other: 'Otro',
+  transport: BASE_CATEGORIES.transport.label,
+  accommodation: BASE_CATEGORIES.accommodation.label,
+  food: BASE_CATEGORIES.food.label,
+  activity: BASE_CATEGORIES.activity.label,
+  shopping: BASE_CATEGORIES.shopping.label,
+  other: BASE_CATEGORIES.other.labelShort,
 };
 
 // ============================================
 // EVENTOS PERSONALIZADOS
 // ============================================
 
+/**
+ * Categorías de eventos personalizados
+ * Mezcla de categorías base y subcategorías de actividad
+ */
 export type CategoriaEvento =
-  | 'sightseeing' // Turismo / Visitas
-  | 'culture' // Cultura / Museos
-  | 'food' // Comida / Restaurantes
-  | 'shopping' // Compras
-  | 'entertainment' // Entretenimiento
-  | 'nature' // Naturaleza / Parques
-  | 'relaxation' // Descanso / Spa
-  | 'transport' // Transporte / Traslados
-  | 'nightlife' // Vida nocturna
-  | 'sports' // Deportes / Actividades
-  | 'other'; // Otros
+  | 'sightseeing' // Turismo / Visitas (subcategoría de activity)
+  | 'culture' // Cultura / Museos (subcategoría de activity)
+  | 'food' // Comida / Restaurantes (categoría base)
+  | 'shopping' // Compras (categoría base)
+  | 'entertainment' // Entretenimiento (subcategoría de activity)
+  | 'nature' // Naturaleza / Parques (subcategoría de activity)
+  | 'relaxation' // Descanso / Spa (subcategoría de activity)
+  | 'transport' // Transporte / Traslados (categoría base)
+  | 'nightlife' // Vida nocturna (subcategoría de activity)
+  | 'sports' // Deportes / Actividades (subcategoría de activity)
+  | 'other'; // Otros (categoría base)
 
 export type PrioridadEvento = 'alta' | 'media' | 'baja';
 
@@ -117,7 +126,12 @@ export interface UpdateEventoInput {
   prioridad?: PrioridadEvento;
 }
 
-// Configuración de categorías con colores e iconos
+import { ACTIVITY_SUBTYPES } from '@/config/categories';
+
+/**
+ * Configuración de categorías de eventos personalizados
+ * Usa el sistema centralizado de colores para mantener consistencia
+ */
 export const EVENTO_CATEGORIAS: Record<
   CategoriaEvento,
   {
@@ -128,82 +142,84 @@ export const EVENTO_CATEGORIAS: Record<
     bgColor: string;
   }
 > = {
+  // Subcategorías de actividad (color púrpura #8B5CF6)
   sightseeing: {
     label: 'Turismo y visitas',
-    labelCorto: 'Turismo',
+    labelCorto: ACTIVITY_SUBTYPES.sightseeing.label,
     icon: 'camera-outline',
-    color: '#8B5CF6',
-    bgColor: 'rgba(139, 92, 246, 0.1)',
+    color: BASE_CATEGORIES.activity.color,
+    bgColor: BASE_CATEGORIES.activity.bgColor,
   },
   culture: {
     label: 'Cultura y museos',
-    labelCorto: 'Cultura',
+    labelCorto: ACTIVITY_SUBTYPES.culture.label,
     icon: 'library-outline',
-    color: '#6366F1',
-    bgColor: 'rgba(99, 102, 241, 0.1)',
-  },
-  food: {
-    label: 'Comida y restaurantes',
-    labelCorto: 'Comida',
-    icon: 'restaurant-outline',
-    color: '#EA580C',
-    bgColor: 'rgba(234, 88, 12, 0.1)',
-  },
-  shopping: {
-    label: 'Compras',
-    labelCorto: 'Compras',
-    icon: 'bag-outline',
-    color: '#EC4899',
-    bgColor: 'rgba(236, 72, 153, 0.1)',
-  },
-  entertainment: {
-    label: 'Entretenimiento',
-    labelCorto: 'Ocio',
-    icon: 'game-controller-outline',
-    color: '#F59E0B',
-    bgColor: 'rgba(245, 158, 11, 0.1)',
-  },
-  nature: {
-    label: 'Naturaleza y parques',
-    labelCorto: 'Naturaleza',
-    icon: 'leaf-outline',
-    color: '#16A34A',
-    bgColor: 'rgba(22, 163, 74, 0.1)',
-  },
-  relaxation: {
-    label: 'Descanso y relax',
-    labelCorto: 'Descanso',
-    icon: 'bed-outline',
-    color: '#06B6D4',
-    bgColor: 'rgba(6, 182, 212, 0.1)',
-  },
-  transport: {
-    label: 'Transporte y traslados',
-    labelCorto: 'Transporte',
-    icon: 'car-outline',
-    color: '#0066CC',
-    bgColor: 'rgba(0, 102, 204, 0.1)',
-  },
-  nightlife: {
-    label: 'Vida nocturna',
-    labelCorto: 'Noche',
-    icon: 'moon-outline',
-    color: '#7C3AED',
-    bgColor: 'rgba(124, 58, 237, 0.1)',
+    color: BASE_CATEGORIES.activity.color,
+    bgColor: BASE_CATEGORIES.activity.bgColor,
   },
   sports: {
     label: 'Deportes y actividades',
-    labelCorto: 'Deportes',
+    labelCorto: ACTIVITY_SUBTYPES.sports.label,
     icon: 'fitness-outline',
-    color: '#DC2626',
-    bgColor: 'rgba(220, 38, 38, 0.1)',
+    color: BASE_CATEGORIES.activity.color,
+    bgColor: BASE_CATEGORIES.activity.bgColor,
+  },
+  nature: {
+    label: 'Naturaleza y parques',
+    labelCorto: ACTIVITY_SUBTYPES.nature.label,
+    icon: 'leaf-outline',
+    color: BASE_CATEGORIES.activity.color,
+    bgColor: BASE_CATEGORIES.activity.bgColor,
+  },
+  entertainment: {
+    label: 'Entretenimiento',
+    labelCorto: ACTIVITY_SUBTYPES.entertainment.label,
+    icon: 'game-controller-outline',
+    color: BASE_CATEGORIES.activity.color,
+    bgColor: BASE_CATEGORIES.activity.bgColor,
+  },
+  nightlife: {
+    label: 'Vida nocturna',
+    labelCorto: ACTIVITY_SUBTYPES.nightlife.label,
+    icon: 'moon-outline',
+    color: BASE_CATEGORIES.activity.color,
+    bgColor: BASE_CATEGORIES.activity.bgColor,
+  },
+  relaxation: {
+    label: 'Descanso y relax',
+    labelCorto: ACTIVITY_SUBTYPES.relaxation.label,
+    icon: 'bed-outline',
+    color: BASE_CATEGORIES.activity.color,
+    bgColor: BASE_CATEGORIES.activity.bgColor,
+  },
+  // Categorías base
+  food: {
+    label: 'Comida y restaurantes',
+    labelCorto: BASE_CATEGORIES.food.label,
+    icon: 'restaurant-outline',
+    color: BASE_CATEGORIES.food.color,
+    bgColor: BASE_CATEGORIES.food.bgColor,
+  },
+  shopping: {
+    label: BASE_CATEGORIES.shopping.label,
+    labelCorto: BASE_CATEGORIES.shopping.label,
+    icon: 'bag-outline',
+    color: BASE_CATEGORIES.shopping.color,
+    bgColor: BASE_CATEGORIES.shopping.bgColor,
+  },
+  transport: {
+    label: 'Transporte y traslados',
+    labelCorto: BASE_CATEGORIES.transport.label,
+    icon: 'car-outline',
+    color: BASE_CATEGORIES.transport.color,
+    bgColor: BASE_CATEGORIES.transport.bgColor,
   },
   other: {
-    label: 'Otros',
-    labelCorto: 'Otros',
+    label: BASE_CATEGORIES.other.label,
+    labelCorto: BASE_CATEGORIES.other.label,
     icon: 'ellipsis-horizontal-outline',
-    color: '#6B7280',
-    bgColor: 'rgba(107, 114, 128, 0.1)',
+    color: BASE_CATEGORIES.other.color,
+    bgColor: BASE_CATEGORIES.other.bgColor,
   },
 };
 
