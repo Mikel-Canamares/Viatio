@@ -33,7 +33,10 @@ export const SwipeableCard: React.FC<SwipeableCardProps> = ({
   const startX = useSharedValue(0);
 
   // Configuración del gesto con spring suave usando Gesture API
+  // Solución robusta: combinar activeOffsetX solo para izquierda + failOffsetY más amplio
   const panGesture = Gesture.Pan()
+    .activeOffsetX([-15, 999999]) // Activar solo swipe izquierda (>=15px), ignorar derecha
+    .failOffsetY([-15, 15]) // Fallar si movimiento vertical >= 15px (da prioridad a scroll)
     .onStart(() => {
       startX.value = translateX.value;
     })
