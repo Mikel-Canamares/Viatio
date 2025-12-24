@@ -27,11 +27,18 @@ interface OcrResult {
 // ============================================
 
 /**
- * Extrae información de reserva desde una imagen usando Gemini AI
- * La imagen se envía al backend que procesa con Gemini y retorna datos estructurados
+ * Extrae información de reserva desde una o múltiples imágenes usando Gemini AI
+ * Las imágenes se envían al backend que procesa con Gemini y retorna datos estructurados
  */
 export async function extractReservaFromImage(
   imageBase64: string,
+  mimeType?: string
+): Promise<OcrResult>;
+export async function extractReservaFromImage(
+  images: Array<{ base64: string; mimeType: string }>
+): Promise<OcrResult>;
+export async function extractReservaFromImage(
+  imageOrImages: string | Array<{ base64: string; mimeType: string }>,
   mimeType: string = 'image/jpeg'
 ): Promise<OcrResult> {
   try {
@@ -40,17 +47,37 @@ export async function extractReservaFromImage(
     }
 
     console.log('[OCR] Backend URL:', config.backendUrl);
-    console.log('[OCR] imageBase64 type:', typeof imageBase64);
-    console.log('[OCR] imageBase64 length:', imageBase64.length);
-    console.log('[OCR] mimeType:', mimeType);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
-    const payload = {
-      imageBase64,
-      mimeType,
-    };
+    let payload: any;
+
+    // Determinar si es una imagen o múltiples
+    if (typeof imageOrImages === 'string') {
+      // Modo legacy: una sola imagen
+      console.log('[OCR] Procesando UNA imagen');
+      console.log('[OCR] imageBase64 type:', typeof imageOrImages);
+      console.log('[OCR] imageBase64 length:', imageOrImages.length);
+      console.log('[OCR] mimeType:', mimeType);
+
+      payload = {
+        imageBase64: imageOrImages,
+        mimeType,
+      };
+    } else {
+      // Modo nuevo: múltiples imágenes
+      console.log('[OCR] Procesando MÚLTIPLES imágenes:', imageOrImages.length);
+
+      for (let i = 0; i < imageOrImages.length; i++) {
+        const img = imageOrImages[i];
+        console.log(`[OCR] Imagen ${i + 1}: mimeType=${img.mimeType}, size=${(img.base64.length / 1024).toFixed(2)}KB`);
+      }
+
+      payload = {
+        images: imageOrImages,
+      };
+    }
 
     console.log('[OCR] Payload keys:', Object.keys(payload));
     console.log('[OCR] Sending request to:', `${config.backendUrl}/api/extract-reserva`);
