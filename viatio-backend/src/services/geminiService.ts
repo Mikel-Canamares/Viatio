@@ -89,16 +89,12 @@ Tu funci�n es ayudar al usuario con:
 S� conciso, amigable y �til. Usa el contexto del viaje si est� disponible.`;
 
 /**
- * Servicio de integraci�n con Gemini AI
+ * Extrae datos estructurados de una o múltiples imágenes de reserva usando Gemini Vision
  */
-export const geminiService = {
-  /**
-   * Extrae datos estructurados de una imagen de reserva usando Gemini Vision
-   */
-  async extractReservaFromImage(
-    imageBase64: string,
-    mimeType: string
-  ): Promise<ReservaExtractedData> {
+async function extractReservaFromImageImpl(
+  imageOrImages: string | Array<{ base64: string; mimeType: string }>,
+  mimeType?: string
+): Promise<ReservaExtractedData> {
     try {
       // Usar gemini-2.0-flash-exp: Modelo experimental de Gemini 2.0 Flash
       // - Soporta vision (imagenes y PDFs)
@@ -106,15 +102,38 @@ export const geminiService = {
       // - Gratuito durante preview
       const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
-      const result = await model.generateContent([
-        EXTRACT_RESERVA_PROMPT,
-        {
+      // Preparar contenido para Gemini
+      const contentParts: any[] = [EXTRACT_RESERVA_PROMPT];
+
+      // Soporte para múltiples imágenes o una sola
+      if (typeof imageOrImages === 'string') {
+        // Modo legacy: una sola imagen
+        contentParts.push({
           inlineData: {
-            mimeType,
-            data: imageBase64,
+            mimeType: mimeType || 'image/jpeg',
+            data: imageOrImages,
           },
-        },
-      ]);
+        });
+      } else {
+        // Modo nuevo: múltiples imágenes
+        for (const img of imageOrImages) {
+          contentParts.push({
+            inlineData: {
+              mimeType: img.mimeType,
+              data: img.base64,
+            },
+          });
+        }
+
+        // Si hay múltiples imágenes, añadir instrucción adicional
+        if (imageOrImages.length > 1) {
+          contentParts.push(
+            `\n\nNOTA: Se proporcionan ${imageOrImages.length} imágenes. Analiza TODAS las imágenes y combina la información extraída en un solo JSON. Si hay información duplicada o contradictoria, prioriza la más detallada o reciente.`
+          );
+        }
+      }
+
+      const result = await model.generateContent(contentParts);
 
       const response = result.response;
       const text = response.text();
@@ -157,7 +176,16 @@ export const geminiService = {
       }
       throw error;
     }
-  },
+}
+
+/**
+ * Servicio de integración con Gemini AI
+ */
+export const geminiService = {
+  /**
+   * Extrae datos estructurados de una o múltiples imágenes de reserva usando Gemini Vision
+   */
+  extractReservaFromImage: extractReservaFromImageImpl,
 
   /**
    * Mantiene una conversaci�n con el asistente de viaje usando Gemini

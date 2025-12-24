@@ -1,7 +1,12 @@
 // Request types
 export interface ExtractReservaRequest {
-  imageBase64: string; // Base64 de la imagen (sin el prefijo data:image/...)
-  mimeType?: string; // image/jpeg, image/png, etc.
+  // Soporta tanto una imagen como múltiples imágenes
+  imageBase64?: string; // Base64 de UNA imagen (deprecated, usar images)
+  mimeType?: string; // image/jpeg, image/png, etc. (deprecated, usar images)
+  images?: Array<{
+    base64: string;
+    mimeType: string;
+  }>; // Array de imágenes para procesar juntas
 }
 
 export interface AssistantRequest {

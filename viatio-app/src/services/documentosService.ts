@@ -66,6 +66,7 @@ export async function createDocumento(
 ): Promise<Documento> {
   try {
     console.log('[createDocumento] Input recibido:', JSON.stringify(input, null, 2));
+    console.log('[createDocumento] Source URI:', sourceUri);
 
     await ensureDocumentsDir();
 
@@ -78,11 +79,35 @@ export async function createDocumento(
 
     // Crear File usando la nueva API
     const docsDir = getDocumentsDirectory();
+    console.log('[createDocumento] Directorio de documentos:', docsDir.uri);
+
     const sourceFile = new File(sourceUri);
     const destinationFile = new File(docsDir, fileName);
 
+    console.log('[createDocumento] Iniciando copia de archivo...');
+    console.log('[createDocumento] Source exists:', sourceFile.exists);
+    console.log('[createDocumento] Destination path:', destinationFile.uri);
+
+    // Verificar que el archivo fuente existe
+    if (!sourceFile.exists) {
+      throw new Error(`Archivo fuente no existe: ${sourceUri}`);
+    }
+
     // Copiar archivo de sourceUri a directorio de documentos
-    sourceFile.copy(destinationFile);
+    try {
+      sourceFile.copy(destinationFile);
+      console.log('[createDocumento] Archivo copiado exitosamente');
+    } catch (copyError) {
+      console.error('[createDocumento] Error al copiar archivo:', copyError);
+      throw new Error('Error al copiar el archivo al almacenamiento');
+    }
+
+    // Verificar que el archivo se copió correctamente
+    if (!destinationFile.exists) {
+      throw new Error('El archivo no se copió correctamente al destino');
+    }
+
+    console.log('[createDocumento] Verificación exitosa, archivo existe en destino');
 
     // Insertar registro en BD
     const db = await getDatabase();
@@ -104,6 +129,8 @@ export async function createDocumento(
       ]
     );
 
+    console.log('[createDocumento] Documento creado en BD:', id);
+
     const documento: Documento = {
       id,
       viajeId: input.viajeId,
@@ -119,7 +146,8 @@ export async function createDocumento(
     return documento;
   } catch (error) {
     logError(error, 'createDocumento');
-    throw new Error('Error al crear el documento');
+    console.error('[createDocumento] Error completo:', error);
+    throw new Error(`Error al crear el documento: ${error instanceof Error ? error.message : 'Error desconocido'}`);
   }
 }
 
@@ -259,7 +287,32 @@ export async function linkDocumentoToReserva(
   documentoId: string
 ): Promise<boolean> {
   try {
+    console.log('[linkDocumentoToReserva] Intentando vincular:', { reservaId, documentoId });
+
     const db = await getDatabase();
+
+    // Verificar que la reserva existe
+    const reservaExists = await db.getFirstAsync<{ id: string }>(
+      'SELECT id FROM reservas WHERE id = ?',
+      [reservaId]
+    );
+
+    if (!reservaExists) {
+      console.error('[linkDocumentoToReserva] Reserva no existe:', reservaId);
+      return false;
+    }
+
+    // Verificar que el documento existe
+    const documentoExists = await db.getFirstAsync<{ id: string }>(
+      'SELECT id FROM documentos WHERE id = ?',
+      [documentoId]
+    );
+
+    if (!documentoExists) {
+      console.error('[linkDocumentoToReserva] Documento no existe:', documentoId);
+      return false;
+    }
+
     const id = generateId();
     const timestamp = getCurrentTimestamp();
 
@@ -269,7 +322,20 @@ export async function linkDocumentoToReserva(
       [id, reservaId, documentoId, timestamp]
     );
 
-    console.log('[linkDocumentoToReserva] Documento vinculado:', { reservaId, documentoId });
+    console.log('[linkDocumentoToReserva] Documento vinculado exitosamente:', { reservaId, documentoId, linkId: id });
+
+    // Verificar que la relación se creó correctamente
+    const linkCreated = await db.getFirstAsync<{ id: string }>(
+      'SELECT id FROM reservas_documentos WHERE reservaId = ? AND documentoId = ?',
+      [reservaId, documentoId]
+    );
+
+    if (!linkCreated) {
+      console.error('[linkDocumentoToReserva] La relación no se creó en la BD');
+      return false;
+    }
+
+    console.log('[linkDocumentoToReserva] Verificación exitosa, relación existe en BD');
     return true;
   } catch (error) {
     // Si ya existe la relación (UNIQUE constraint), no es un error
@@ -278,6 +344,7 @@ export async function linkDocumentoToReserva(
       return true;
     }
     logError(error, 'linkDocumentoToReserva');
+    console.error('[linkDocumentoToReserva] Error completo:', error);
     return false;
   }
 }
@@ -290,13 +357,38 @@ export async function linkMultipleDocumentosToReserva(
   documentoIds: string[]
 ): Promise<boolean> {
   try {
-    for (const documentoId of documentoIds) {
-      await linkDocumentoToReserva(reservaId, documentoId);
+    console.log('[linkMultipleDocumentosToReserva] Iniciando vinculación de', documentoIds.length, 'documentos a reserva:', reservaId);
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < documentoIds.length; i++) {
+      const documentoId = documentoIds[i];
+      console.log(`[linkMultipleDocumentosToReserva] Vinculando documento ${i + 1}/${documentoIds.length}:`, documentoId);
+
+      const success = await linkDocumentoToReserva(reservaId, documentoId);
+
+      if (success) {
+        successCount++;
+        console.log(`[linkMultipleDocumentosToReserva] Documento ${i + 1} vinculado exitosamente`);
+      } else {
+        failCount++;
+        console.error(`[linkMultipleDocumentosToReserva] Falló vinculación del documento ${i + 1}`);
+      }
     }
-    console.log('[linkMultipleDocumentosToReserva] Documentos vinculados:', { reservaId, count: documentoIds.length });
-    return true;
+
+    console.log('[linkMultipleDocumentosToReserva] Resultado:', {
+      reservaId,
+      total: documentoIds.length,
+      exitosos: successCount,
+      fallidos: failCount
+    });
+
+    // Retornar true solo si todos se vincularon exitosamente
+    return failCount === 0;
   } catch (error) {
     logError(error, 'linkMultipleDocumentosToReserva');
+    console.error('[linkMultipleDocumentosToReserva] Error completo:', error);
     return false;
   }
 }

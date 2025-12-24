@@ -110,6 +110,10 @@ export async function runMigrations(
     await migrateToV10(db);
   }
 
+  if (currentVersion < 11) {
+    await migrateToV11(db);
+  }
+
   console.log('[Migrations] Migraciones completadas exitosamente');
 }
 
@@ -496,6 +500,65 @@ async function migrateToV10(db: SQLite.SQLiteDatabase): Promise<void> {
     console.log('[Migrations] Migración a v10 completada');
   } catch (error) {
     console.error('[Migrations] Error en migración a v10:', error);
+    throw error;
+  }
+}
+
+/**
+ * Migración a versión 11: Crear tabla reservas_documentos
+ * Permite relación many-to-many entre reservas y documentos
+ */
+async function migrateToV11(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migrations] Ejecutando migración a v11...');
+
+  try {
+    // Crear tabla reservas_documentos
+    console.log('[Migrations] Creando tabla reservas_documentos...');
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS reservas_documentos (
+        id TEXT PRIMARY KEY NOT NULL,
+        reservaId TEXT NOT NULL,
+        documentoId TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        FOREIGN KEY (reservaId) REFERENCES reservas(id) ON DELETE CASCADE,
+        FOREIGN KEY (documentoId) REFERENCES documentos(id) ON DELETE CASCADE,
+        UNIQUE(reservaId, documentoId)
+      );
+    `);
+
+    // Crear índices para optimizar búsquedas
+    console.log('[Migrations] Creando índices para reservas_documentos...');
+    await db.execAsync('CREATE INDEX IF NOT EXISTS idx_reservas_documentos_reservaId ON reservas_documentos(reservaId);');
+    await db.execAsync('CREATE INDEX IF NOT EXISTS idx_reservas_documentos_documentoId ON reservas_documentos(documentoId);');
+
+    // Migrar datos existentes desde reservas.documentoId
+    console.log('[Migrations] Migrando relaciones existentes de reservas con documentos...');
+    await db.execAsync(`
+      INSERT OR IGNORE INTO reservas_documentos (id, reservaId, documentoId, createdAt)
+      SELECT
+        lower(hex(randomblob(16))),
+        r.id,
+        r.documentoId,
+        r.updatedAt
+      FROM reservas r
+      WHERE r.documentoId IS NOT NULL;
+    `);
+
+    const migratedCount = await db.getFirstAsync<{ count: number }>(
+      'SELECT COUNT(*) as count FROM reservas_documentos'
+    );
+    console.log(`[Migrations] ${migratedCount?.count || 0} relaciones migradas desde reservas.documentoId`);
+
+    // Registrar migración
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'INSERT INTO _migrations (version, appliedAt) VALUES (?, ?)',
+      [11, now]
+    );
+
+    console.log('[Migrations] Migración a v11 completada');
+  } catch (error) {
+    console.error('[Migrations] Error en migración a v11:', error);
     throw error;
   }
 }

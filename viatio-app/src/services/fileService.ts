@@ -96,7 +96,7 @@ export async function pickMultipleDocuments(): Promise<DocumentInfo[]> {
  * Permite capturar una foto o seleccionar de la galería
  * Retorna URI y base64 de la imagen o null si se cancela
  */
-export async function pickImage(useCamera = false): Promise<ImageInfo | null> {
+export async function pickImage(useCamera = false, quality = 0.8): Promise<ImageInfo | null> {
   try {
     // Solicitar permisos
     let permissionResult;
@@ -119,13 +119,13 @@ export async function pickImage(useCamera = false): Promise<ImageInfo | null> {
     const result = useCamera
       ? await ImagePicker.launchCameraAsync({
           mediaTypes: ['images'],
-          quality: 0.8,
+          quality, // Usar parámetro de calidad configurable
           base64: true,
           allowsEditing: false,
         })
       : await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ['images'],
-          quality: 0.8,
+          quality, // Usar parámetro de calidad configurable
           base64: true,
           allowsEditing: false,
         });

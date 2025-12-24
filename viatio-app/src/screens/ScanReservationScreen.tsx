@@ -68,7 +68,8 @@ export default function ScanReservationScreen({ route, navigation }: Props) {
 
   const handlePickImage = async (useCamera: boolean) => {
     try {
-      const imageResult = await pickImage(useCamera);
+      // Usar calidad 0.6 para OCR (menor tamaño, sigue siendo legible para IA)
+      const imageResult = await pickImage(useCamera, 0.6);
 
       if (!imageResult) {
         return; // Usuario canceló
@@ -78,6 +79,8 @@ export default function ScanReservationScreen({ route, navigation }: Props) {
         Alert.alert('Error', 'No se pudo obtener los datos de la imagen');
         return;
       }
+
+      console.log('[ScanReservation] Imagen capturada, tamaño base64:', (imageResult.base64.length / 1024).toFixed(2), 'KB');
 
       const newFile: FileItem = {
         uri: imageResult.uri,
@@ -145,17 +148,45 @@ export default function ScanReservationScreen({ route, navigation }: Props) {
     setError(null);
 
     try {
-      // Si hay múltiples archivos, combinar todos los base64
-      // El backend debería soportar múltiples imágenes
-      const combinedBase64 = files.map(f => f.base64).join('|||');
+      console.log('[ScanReservation] Procesando', files.length, 'archivos');
 
-      const ocrResult = await extractReservaFromImage(combinedBase64, files[0].type);
+      // Validar tamaño de cada imagen (máximo ~4MB de base64 por imagen)
+      const maxBase64Size = 4 * 1024 * 1024; // 4MB
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        console.log(`[ScanReservation] Imagen ${i + 1}: tamaño=${(file.base64.length / 1024).toFixed(2)}KB`);
+
+        if (file.base64.length > maxBase64Size) {
+          throw new Error(
+            `La imagen ${i + 1} es demasiado grande (${(file.base64.length / 1024 / 1024).toFixed(2)}MB). ` +
+            `Máximo permitido: 4MB por imagen`
+          );
+        }
+      }
+
+      let ocrResult;
+
+      if (files.length === 1) {
+        // UNA sola imagen: usar modo legacy
+        console.log('[ScanReservation] Procesando UNA imagen con OCR');
+        ocrResult = await extractReservaFromImage(files[0].base64, files[0].type);
+      } else {
+        // MÚLTIPLES imágenes: usar nuevo modo de array
+        console.log('[ScanReservation] Procesando MÚLTIPLES imágenes con OCR:', files.length);
+
+        const images = files.map((file) => ({
+          base64: file.base64,
+          mimeType: file.type,
+        }));
+
+        ocrResult = await extractReservaFromImage(images);
+      }
 
       setResult(ocrResult);
       setStep('result');
 
       if (!ocrResult.success) {
-        setError(ocrResult.error || 'Error al procesar los archivos');
+        setError(ocrResult.error || 'Error al procesar el archivo');
       }
     } catch (error) {
       console.error('[ScanReservation] Error processing files:', error);

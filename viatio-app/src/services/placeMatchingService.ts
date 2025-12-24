@@ -491,8 +491,8 @@ export async function findOrCreateLugarFromReserva(
       confidence: bestMatch.score,
       message: `Lugar "${lugar.nombre}" añadido automáticamente al mapa`,
     };
-  } else if (scoredResults.length === 1 && bestMatch.score >= 60) {
-    // Confianza media y única opción: sugerir
+  } else if (scoredResults.length === 1 && bestMatch.score >= 45) {
+    // Confianza media y única opción: sugerir (threshold reducido de 60 a 45)
     console.log('[PlaceMatching] Confianza media, sugiriendo único resultado');
     return {
       type: 'suggested',
@@ -500,8 +500,8 @@ export async function findOrCreateLugarFromReserva(
       confidence: bestMatch.score,
       message: `¿Es "${bestMatch.place.name}" el lugar correcto?`,
     };
-  } else if (scoredResults.length > 1 && bestMatch.score >= 50) {
-    // Múltiples opciones razonables: pedir selección
+  } else if (scoredResults.length > 1 && bestMatch.score >= 40) {
+    // Múltiples opciones razonables: pedir selección (threshold reducido de 50 a 40)
     console.log('[PlaceMatching] Múltiples opciones, requiere selección manual');
     return {
       type: 'multiple',

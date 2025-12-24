@@ -162,6 +162,10 @@ export default function AddReservationScreen({ route, navigation }: Props) {
       return;
     }
 
+    console.log('[AddReservation] ===== INICIANDO GUARDADO =====');
+    console.log('[AddReservation] Nombre:', formData.nombre);
+    console.log('[AddReservation] Categoría:', formData.categoria);
+
     try {
       const documentoIds: string[] = [];
       const categoriaDocumento = mapReservaToCategoriaDocumento(formData.categoria);
@@ -171,6 +175,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
 
       // Agregar archivos escaneados
       if (scannedFiles && scannedFiles.length > 0) {
+        console.log('[AddReservation] Archivos escaneados:', scannedFiles.length);
         scannedFiles.forEach((file: any) => {
           allFiles.push({
             uri: file.uri,
@@ -183,34 +188,77 @@ export default function AddReservationScreen({ route, navigation }: Props) {
 
       // Agregar archivos adjuntos manualmente
       if (attachedFiles.length > 0) {
+        console.log('[AddReservation] Archivos adjuntos manualmente:', attachedFiles.length);
         allFiles.push(...attachedFiles);
       }
 
-      // Crear todos los documentos
+      // Crear todos los documentos ANTES de crear la reserva
       if (allFiles.length > 0) {
-        console.log('[AddReservation] Creando', allFiles.length, 'documentos');
+        console.log('[AddReservation] ===== CREANDO', allFiles.length, 'DOCUMENTOS =====');
 
-        for (const file of allFiles) {
-          const tipoArchivo = detectTipoArchivo(file.type);
+        for (let i = 0; i < allFiles.length; i++) {
+          const file = allFiles[i];
+          console.log(`[AddReservation] Creando documento ${i + 1}/${allFiles.length}:`, file.name);
 
-          const documento = await addDocumento(
-            {
-              viajeId,
-              nombre: formData.nombre, // Usar el mismo nombre que la reserva
-              categoria: categoriaDocumento,
-              tipoArchivo,
-              rutaArchivo: file.name,
-              tamano: file.size,
-            },
-            file.uri
-          );
+          try {
+            const tipoArchivo = detectTipoArchivo(file.type);
 
-          if (documento) {
-            documentoIds.push(documento.id);
+            const documento = await addDocumento(
+              {
+                viajeId,
+                nombre: formData.nombre, // Usar el mismo nombre que la reserva
+                categoria: categoriaDocumento,
+                tipoArchivo,
+                rutaArchivo: file.name,
+                tamano: file.size,
+              },
+              file.uri
+            );
+
+            if (documento) {
+              console.log(`[AddReservation] Documento ${i + 1} creado con ID:`, documento.id);
+              documentoIds.push(documento.id);
+            } else {
+              console.error(`[AddReservation] Documento ${i + 1} retornó null`);
+            }
+          } catch (docError) {
+            console.error(`[AddReservation] Error al crear documento ${i + 1}:`, docError);
+            // Continuar con los demás documentos, no fallar todo
           }
         }
 
-        console.log('[AddReservation] Documentos creados:', documentoIds.length);
+        console.log('[AddReservation] Total documentos creados exitosamente:', documentoIds.length);
+
+        if (documentoIds.length === 0 && allFiles.length > 0) {
+          Alert.alert(
+            'Advertencia',
+            'No se pudieron guardar los documentos adjuntos. ¿Deseas continuar creando la reserva sin documentos?',
+            [
+              { text: 'Cancelar', style: 'cancel', onPress: () => {} },
+              { text: 'Continuar', onPress: () => proceedWithReservation(documentoIds) }
+            ]
+          );
+          return;
+        }
+      }
+
+      await proceedWithReservation(documentoIds);
+    } catch (error) {
+      console.error('[AddReservation] Error al guardar:', error);
+      Alert.alert(
+        'Error',
+        `Ocurrió un error al guardar: ${error instanceof Error ? error.message : 'Error desconocido'}`
+      );
+    }
+  };
+
+  const proceedWithReservation = async (documentoIds: string[]) => {
+    try {
+      console.log('[AddReservation] ===== CREANDO RESERVA =====');
+
+      // Validar que categoria y nombre existan (ya se validó en handleSave, pero TypeScript no lo sabe)
+      if (!formData.categoria || !formData.nombre) {
+        throw new Error('Categoría y nombre son requeridos');
       }
 
       // Crear la reserva (sin documentoId, ya que usaremos la tabla intermedia)
@@ -234,43 +282,64 @@ export default function AddReservationScreen({ route, navigation }: Props) {
       };
 
       const result = await addReserva(input);
-      if (result) {
-        // Vincular todos los documentos a la reserva
-        if (documentoIds.length > 0) {
-          await linkMultipleDocumentosToReserva(result.reserva.id, documentoIds);
-          console.log('[AddReservation] Documentos vinculados a la reserva');
-        }
 
-        // Manejar el resultado del place matching
-        if (result.placeMatch) {
-          handlePlaceMatch(
-            result.placeMatch,
-            // onConfirmSuggestion: cuando el usuario confirma una sugerencia
-            async (placeResult: PlaceResult) => {
-              const categoria = mapReservaCategoriaToLugarCategoria(result.reserva.categoria);
-              const diaId = result.reserva.diaId ?? undefined;
-              await confirmPlaceSuggestion(
-                result.reserva.id,
-                viajeId,
-                diaId,
-                placeResult,
-                categoria
-              );
-            },
-            // onReject: no hacer nada
-            undefined,
-            // onNavigateToMap: navegar al mapa (si tienes la navegación disponible)
-            undefined
+      if (!result) {
+        Alert.alert('Error', 'No se pudo crear la reserva');
+        return;
+      }
+
+      console.log('[AddReservation] Reserva creada con ID:', result.reserva.id);
+
+      // Vincular todos los documentos a la reserva
+      if (documentoIds.length > 0) {
+        console.log('[AddReservation] ===== VINCULANDO', documentoIds.length, 'DOCUMENTOS A RESERVA =====');
+
+        try {
+          const vinculacionExitosa = await linkMultipleDocumentosToReserva(result.reserva.id, documentoIds);
+
+          if (vinculacionExitosa) {
+            console.log('[AddReservation] Todos los documentos vinculados exitosamente');
+          } else {
+            console.warn('[AddReservation] Algunos documentos no se pudieron vincular');
+          }
+        } catch (linkError) {
+          console.error('[AddReservation] Error al vincular documentos:', linkError);
+          // No fallar la creación de la reserva por esto
+          Alert.alert(
+            'Advertencia',
+            'La reserva se creó pero hubo un problema al vincular algunos documentos adjuntos'
           );
         }
-
-        navigation.goBack();
-      } else {
-        Alert.alert('Error', 'No se pudo crear la reserva');
       }
+
+      // Manejar el resultado del place matching
+      if (result.placeMatch) {
+        handlePlaceMatch(
+          result.placeMatch,
+          // onConfirmSuggestion: cuando el usuario confirma una sugerencia
+          async (placeResult: PlaceResult) => {
+            const categoria = mapReservaCategoriaToLugarCategoria(result.reserva.categoria);
+            const diaId = result.reserva.diaId ?? undefined;
+            await confirmPlaceSuggestion(
+              result.reserva.id,
+              viajeId,
+              diaId,
+              placeResult,
+              categoria
+            );
+          },
+          // onReject: no hacer nada
+          undefined,
+          // onNavigateToMap: navegar al mapa (si tienes la navegación disponible)
+          undefined
+        );
+      }
+
+      console.log('[AddReservation] ===== GUARDADO COMPLETADO EXITOSAMENTE =====');
+      navigation.goBack();
     } catch (error) {
-      console.error('[AddReservation] Error al guardar:', error);
-      Alert.alert('Error', 'Ocurrió un error al guardar la reserva y los documentos');
+      console.error('[AddReservation] Error en proceedWithReservation:', error);
+      throw error;
     }
   };
 
