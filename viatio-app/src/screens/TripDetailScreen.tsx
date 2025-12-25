@@ -20,12 +20,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ScreenContainer, Card } from '@/components';
+import { ScreenContainer, Card, SmartFAB, AssistantBottomSheet } from '@/components';
 import { getViajeById, getViajeStats } from '@/services';
 import type { Viaje, ViajeStats } from '@/types/viaje';
 import { theme } from '@/config';
 import type { HomeStackParamList } from '@/navigation/types';
 import { parseLocalDate } from '@/utils';
+import { useAssistantContext } from '@/hooks/useAssistantContext';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'TripDetail'>;
 
@@ -34,6 +35,15 @@ export default function TripDetailScreen({ navigation, route }: Props) {
   const [viaje, setViaje] = useState<Viaje | null>(null);
   const [stats, setStats] = useState<ViajeStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [assistantVisible, setAssistantVisible] = useState(false);
+
+  // Contexto del asistente
+  const assistantContext = useAssistantContext({
+    screenName: 'TripDetail',
+    viajeId,
+    viaje,
+    reservasCount: stats?.reservasCount || 0,
+  });
 
   useEffect(() => {
     loadData();
@@ -236,6 +246,20 @@ export default function TripDetailScreen({ navigation, route }: Props) {
           </View>
         </View>
       </ScrollView>
+
+      {/* SmartFAB - Botón flotante del asistente */}
+      <SmartFAB
+        context={assistantContext}
+        onPress={() => setAssistantVisible(true)}
+      />
+
+      {/* Modal del asistente */}
+      <AssistantBottomSheet
+        visible={assistantVisible}
+        onClose={() => setAssistantVisible(false)}
+        viajeId={viajeId}
+        destino={viaje?.destino}
+      />
     </ScreenContainer>
   );
 }

@@ -9,6 +9,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TripCalendarScreen } from '@/screens';
+import AssistantScreen from '@/screens/AssistantScreen';
 import { HomeStackNavigator } from './HomeStackNavigator';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
 import type { RootTabParamList } from './types';
@@ -60,6 +61,17 @@ export function RootTabs() {
           tabBarLabel: 'Calendario',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="calendar-outline" size={size} color={color} />
+          ),
+        }}
+      />
+
+      <Tab.Screen
+        name="Assistant"
+        component={AssistantScreen}
+        options={{
+          tabBarLabel: 'Asistente',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="chatbubble-ellipses-outline" size={size} color={color} />
           ),
         }}
       />

@@ -11,7 +11,8 @@
       "Bash(if [ -d \"ios\" ])",
       "Bash(then echo \"ios exists\")",
       "Bash(adb devices:*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(mkdir:*)"
     ]
   }
 }

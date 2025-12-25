@@ -17,6 +17,18 @@ export interface AssistantRequest {
     startDate?: string;
     endDate?: string;
     destination?: string;
+    // Nuevos campos para contexto completo
+    reservations?: Array<{
+      nombre: string;
+      categoria: string;
+      fecha: string;
+    }>;
+    places?: Array<{
+      nombre: string;
+      categoria: string;
+    }>;
+    budget?: number;
+    currentExpense?: number;
   };
   conversationHistory?: Array<{
     role: 'user' | 'model';

@@ -20,12 +20,16 @@ import {
   AgendaCard,
   NavigationChoiceModal,
   PrimaryButton,
+  SmartFAB,
+  AssistantBottomSheet,
 } from '@/components';
 import { theme } from '@/config';
 import { getAgendaByViajeId } from '@/services/agendaService';
 import type { DiaAgenda, EventoAgenda } from '@/types/diaViaje';
 import type { HomeStackParamList } from '@/navigation/types';
 import { useEventosStore } from '@/store/eventosStore';
+import { useAssistantContext } from '@/hooks/useAssistantContext';
+import { getViajeById } from '@/services';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'TripAgenda'>;
 
@@ -39,6 +43,19 @@ export default function TripAgendaScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [showChoiceModal, setShowChoiceModal] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<EventoAgenda | null>(null);
+  const [assistantVisible, setAssistantVisible] = useState(false);
+  const [viaje, setViaje] = useState<any>(null);
+
+  // Calcular días vacíos
+  const emptyDaysCount = agenda.filter((day) => day.data.length === 0).length;
+
+  // Contexto del asistente
+  const assistantContext = useAssistantContext({
+    screenName: 'TripAgenda',
+    viajeId,
+    viaje,
+    emptyDaysCount,
+  });
 
   useEffect(() => {
     loadAgenda();
@@ -56,13 +73,17 @@ export default function TripAgendaScreen({ route, navigation }: Props) {
   const loadAgenda = async () => {
     try {
       setLoading(true);
-      const data = await getAgendaByViajeId(viajeId);
+      const [data, viajeData] = await Promise.all([
+        getAgendaByViajeId(viajeId),
+        getViajeById(viajeId),
+      ]);
       // Transformar a formato de SectionList
       const sections: AgendaSection[] = data.map((dia) => ({
         ...dia,
         data: dia.eventos,
       }));
       setAgenda(sections);
+      setViaje(viajeData);
     } catch (error) {
       console.error('Error loading agenda:', error);
     } finally {
@@ -219,6 +240,20 @@ export default function TripAgendaScreen({ route, navigation }: Props) {
           Añadir evento
         </PrimaryButton>
       </View>
+
+      {/* SmartFAB - Botón flotante del asistente */}
+      <SmartFAB
+        context={assistantContext}
+        onPress={() => setAssistantVisible(true)}
+      />
+
+      {/* Modal del asistente */}
+      <AssistantBottomSheet
+        visible={assistantVisible}
+        onClose={() => setAssistantVisible(false)}
+        viajeId={viajeId}
+        destino={viaje?.destino}
+      />
     </View>
   );
 }

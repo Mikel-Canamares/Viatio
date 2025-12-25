@@ -48,3 +48,15 @@ export type {
 } from './placeMatching';
 
 export { DEFAULT_PLACE_MATCHING_CONFIG, DEFAULT_AUTO_CREATION_OPTIONS } from './placeMatching';
+
+export type {
+  MensajeChat,
+  MensajeChatAPI,
+  ContextoViaje,
+  ContextoViajeAPI,
+  ConversacionAsistente,
+  TipoAccion,
+  AccionSugerida,
+  AssistantAPIRequest,
+  AssistantAPIResponse,
+} from './asistente';

@@ -26,6 +26,7 @@ import { ExpensesScreen } from '@/screens/ExpensesScreen';
 import { AddExpenseScreen } from '@/screens/AddExpenseScreen';
 import { AddEventoScreen } from '@/screens/AddEventoScreen';
 import { EventoDetailScreen } from '@/screens/EventoDetailScreen';
+import AssistantScreen from '@/screens/AssistantScreen';
 import type { HomeStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<HomeStackParamList>();
@@ -59,6 +60,7 @@ export function HomeStackNavigator() {
       <Stack.Screen name="AddExpense" component={AddExpenseScreen} />
       <Stack.Screen name="AddEvento" component={AddEventoScreen} />
       <Stack.Screen name="EventoDetail" component={EventoDetailScreen} />
+      <Stack.Screen name="Assistant" component={AssistantScreen} />
     </Stack.Navigator>
   );
 }

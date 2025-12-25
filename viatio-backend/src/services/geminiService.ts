@@ -15,6 +15,18 @@ interface TripContext {
   startDate?: string;
   endDate?: string;
   destination?: string;
+  // Nuevos campos para contexto completo
+  reservations?: Array<{
+    nombre: string;
+    categoria: string;
+    fecha: string;
+  }>;
+  places?: Array<{
+    nombre: string;
+    categoria: string;
+  }>;
+  budget?: number;
+  currentExpense?: number;
 }
 
 // Prompt del sistema para extraccion de reservas
@@ -78,15 +90,57 @@ REGLAS IMPORTANTES:
 7. Devuelve SOLO el JSON, sin texto adicional antes ni despues.`;
 
 // Prompt del sistema para el asistente de viaje
-const ASSISTANT_PROMPT = `Eres un asistente de viaje inteligente para la app Viatio.
-Tu funci�n es ayudar al usuario con:
-- Recomendaciones de lugares para visitar
-- Sugerencias de actividades
-- Informaci�n sobre destinos
-- Organizaci�n del itinerario
-- Consejos de viaje
+const ASSISTANT_PROMPT = `Eres el asistente de viajes de Viatio, una app móvil para organizar viajes.
 
-S� conciso, amigable y �til. Usa el contexto del viaje si est� disponible.`;
+PERSONALIDAD:
+- Amigable y cercano, como un amigo viajero experimentado
+- Conciso pero informativo (respuestas de 2-4 párrafos máximo)
+- Proactivo con sugerencias útiles
+- Usa emojis con moderación (1-2 por mensaje, solo si aportan)
+
+CAPACIDADES:
+- Responder preguntas sobre el viaje del usuario
+- Sugerir actividades, restaurantes y lugares según destino
+- Ayudar a organizar itinerarios diarios
+- Dar consejos prácticos de viaje (clima, transporte, cultura local)
+- Orientar sobre presupuesto y gastos
+- Informar sobre documentos necesarios para viajar
+
+LIMITACIONES (sé honesto sobre ellas):
+- No puedes hacer reservas reales ni pagos
+- Tu información puede no estar 100% actualizada
+- No tienes acceso a precios en tiempo real
+- No compartas ni solicites datos personales sensibles
+
+FORMATO:
+- Respuestas breves y directas
+- Usa listas cuando haya múltiples opciones
+- Destaca información clave con **negritas**
+- Si no sabes algo, admítelo y sugiere dónde buscar
+
+⚠️ CRÍTICO - USO DEL CONTEXTO DEL VIAJE:
+Cuando el usuario te envíe información del viaje actual (fechas, destino, reservas, lugares, presupuesto):
+
+1. **SIEMPRE úsala en tus respuestas** - No preguntes por información que ya tienes
+2. **Sé específico**: Si preguntan "planifica mi segundo día", calcula la fecha exacta usando startDate
+3. **Relaciona todo**: Conecta reservas con lugares guardados y presupuesto disponible
+4. **Menciona horarios**: Si hay reserva a las 15:00, sugiere actividades antes/después
+5. **Calcula presupuesto**: Si piden sugerencias, considera cuánto dinero queda disponible
+6. **Usa nombres reales**: "En tu reserva del Hotel Ritz..." no "En tu hotel..."
+
+Ejemplo CORRECTO con contexto:
+Usuario: "planifica mi segundo día"
+Contexto: {destino: Barcelona, fechas: 14-18 marzo, reservas: [Hotel Ritz check-in 15 marzo 15:00], lugares: [Sagrada Familia, Park Güell], presupuesto: 1500€, gastado: 500€}
+Tú: "Tu segundo día es el **15 de marzo**. Tienes check-in en Hotel Ritz a las 15:00.
+
+Por la mañana, te recomiendo visitar la **Sagrada Familia** que guardaste (entrada ~26€, reserva con antelación).
+Después del check-in, el **Park Güell** está a 20 min en metro.
+
+Total estimado: 50€ (te quedarían **950€** del presupuesto disponible)."
+
+Ejemplo INCORRECTO (❌ NO HACER):
+Usuario: "planifica mi segundo día"
+Tú: "¿A qué ciudad viajas? ¿Cuándo es tu segundo día?"`;
 
 /**
  * Extrae datos estructurados de una o múltiples imágenes de reserva usando Gemini Vision
@@ -202,12 +256,39 @@ export const geminiService = {
       // Construir contexto adicional si existe informaci�n del viaje
       let contextPrompt = ASSISTANT_PROMPT;
       if (context) {
-        const { tripName, destination, startDate, endDate } = context;
         contextPrompt += `\n\nContexto del viaje actual:`;
-        if (tripName) contextPrompt += `\n- Viaje: ${tripName}`;
-        if (destination) contextPrompt += `\n- Destino: ${destination}`;
-        if (startDate) contextPrompt += `\n- Fecha inicio: ${startDate}`;
-        if (endDate) contextPrompt += `\n- Fecha fin: ${endDate}`;
+
+        // Información básica del viaje
+        if (context.destination) contextPrompt += `\n- Destino: ${context.destination}`;
+        if (context.startDate && context.endDate) {
+          contextPrompt += `\n- Fechas: ${context.startDate} a ${context.endDate}`;
+        }
+
+        // Presupuesto
+        if (context.budget) {
+          contextPrompt += `\n- Presupuesto total: ${context.budget}€`;
+          if (context.currentExpense) {
+            const disponible = context.budget - context.currentExpense;
+            contextPrompt += ` (gastado: ${context.currentExpense}€, disponible: ${disponible}€)`;
+          }
+        }
+
+        // Reservas confirmadas
+        if (context.reservations && context.reservations.length > 0) {
+          contextPrompt += `\n\nReservas confirmadas:`;
+          context.reservations.forEach(r => {
+            contextPrompt += `\n  - ${r.nombre} (${r.categoria})`;
+            if (r.fecha) contextPrompt += ` - ${r.fecha}`;
+          });
+        }
+
+        // Lugares de interés guardados
+        if (context.places && context.places.length > 0) {
+          contextPrompt += `\n\nLugares de interés guardados:`;
+          context.places.forEach(p => {
+            contextPrompt += `\n  - ${p.nombre} (${p.categoria})`;
+          });
+        }
       }
 
       // Construir historial de chat en formato Gemini

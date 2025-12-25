@@ -64,5 +64,13 @@ export { SelectItem } from './SelectItem';
 export type { SelectOption } from './SelectItem';
 export { Accordion } from './Accordion';
 
+// Componentes de Asistente IA
+export { ChatBubble } from './ChatBubble';
+export { SuggestionChips } from './SuggestionChips';
+export { TypingIndicator } from './TypingIndicator';
+export { SmartFAB } from './SmartFAB';
+export { AssistantBottomSheet } from './AssistantBottomSheet';
+export { ConversationHistoryList } from './ConversationHistoryList';
+
 // Los siguientes se crearán en fases posteriores:
 // export { EmptyState } from './EmptyState';

@@ -11,12 +11,13 @@ import MapView, { Marker, Region, PROVIDER_GOOGLE, MapPressEvent } from 'react-n
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { ScreenContainer, PageHeader } from '@/components';
+import { ScreenContainer, PageHeader, SmartFAB, AssistantBottomSheet } from '@/components';
 import { PlaceSearchBar } from '@/components/PlaceSearchBar';
 import { PlaceDetailCard } from '@/components/PlaceDetailCard';
 import { AddToTripModal } from '@/components/AddToTripModal';
 import { SavedPlacesAccordion } from '@/components/SavedPlacesAccordion';
 import { MapMarker, SelectedPlaceMarker } from '@/components/MapMarker';
+import { useAssistantContext } from '@/hooks/useAssistantContext';
 import { PlaceResult } from '@/types/googlePlaces';
 import { Lugar, LUGAR_CATEGORIAS, CategoriaLugar } from '@/types/lugar';
 import { Viaje } from '@/types/viaje';
@@ -73,6 +74,15 @@ export default function TripMapScreen() {
   const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
   const [initialMapCentered, setInitialMapCentered] = useState(false);
+  const [assistantVisible, setAssistantVisible] = useState(false);
+
+  // Contexto del asistente
+  const assistantContext = useAssistantContext({
+    screenName: 'TripMap',
+    viajeId,
+    viaje,
+    nearbyPlacesCount: lugares.length,
+  });
 
   // Cargar viaje y centrar mapa en destino al montar (solo si no viene de agenda)
   useEffect(() => {
@@ -688,6 +698,20 @@ export default function TripMapScreen() {
         }}
         onConfirm={handleConfirmAdd}
         loading={loadingAdd}
+      />
+
+      {/* SmartFAB - Botón flotante del asistente */}
+      <SmartFAB
+        context={assistantContext}
+        onPress={() => setAssistantVisible(true)}
+      />
+
+      {/* Modal del asistente */}
+      <AssistantBottomSheet
+        visible={assistantVisible}
+        onClose={() => setAssistantVisible(false)}
+        viajeId={viajeId}
+        destino={viaje?.destino}
       />
     </ScreenContainer>
   );
