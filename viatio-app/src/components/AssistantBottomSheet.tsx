@@ -38,6 +38,15 @@ import { getSugerenciasIniciales } from '@/services/ai/assistantPrompt';
 import { theme } from '@/config/theme';
 
 import type { MensajeChat, ContextoViaje } from '@/types/asistente';
+import type { Reserva } from '@/types/reserva';
+import type { Lugar } from '@/types/lugar';
+import type { Gasto } from '@/types/gasto';
+
+// Para cargar contexto del viaje
+import { getViajeById } from '@/services/viajesService';
+import { getReservasByViajeId } from '@/services/reservasService';
+import { getLugaresByViajeId } from '@/services/lugaresService';
+import { getGastosByViajeId } from '@/services/gastosService';
 
 // ============================================
 // TIPOS
@@ -75,9 +84,17 @@ export function AssistantBottomSheet({
     error,
     contexto,
     sendMessage,
+    setContexto,
     clearError,
     clearChat,
   } = useChatStore();
+
+  // Cargar contexto del viaje cuando se abre el modal
+  useEffect(() => {
+    if (visible && viajeId) {
+      loadContexto(viajeId);
+    }
+  }, [visible, viajeId]);
 
   // Limpiar chat cuando cambia el viajeId (cambio de módulo/viaje)
   useEffect(() => {
@@ -87,6 +104,45 @@ export function AssistantBottomSheet({
       previousViajeIdRef.current = viajeId;
     }
   }, [viajeId, clearChat]);
+
+  // Función para cargar el contexto completo del viaje
+  const loadContexto = async (id: string) => {
+    try {
+      const viaje = await getViajeById(id);
+      if (!viaje) return;
+
+      const [reservas, lugares, gastos] = await Promise.all([
+        getReservasByViajeId(id),
+        getLugaresByViajeId(id),
+        getGastosByViajeId(id),
+      ]);
+
+      const gastoTotal = gastos.reduce((sum: number, g: Gasto) => sum + g.monto, 0);
+
+      const nuevoContexto: ContextoViaje = {
+        viajeId: id,
+        destino: viaje.destino,
+        fechaInicio: viaje.fechaInicio,
+        fechaFin: viaje.fechaFin,
+        reservas: reservas.map((r: Reserva) => ({
+          nombre: r.nombre,
+          categoria: r.categoria,
+          fecha: r.fechaInicio,
+        })),
+        lugares: lugares.map((l: Lugar) => ({
+          nombre: l.nombre,
+          categoria: l.categoria || 'other',
+        })),
+        gastoActual: gastoTotal,
+        presupuesto: viaje.presupuesto || undefined,
+      };
+
+      setContexto(nuevoContexto);
+      console.log('[AssistantBottomSheet] Contexto cargado:', nuevoContexto);
+    } catch (error) {
+      console.error('[AssistantBottomSheet] Error cargando contexto:', error);
+    }
+  };
 
   // Animación de entrada/salida
   useEffect(() => {

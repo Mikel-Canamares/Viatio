@@ -250,46 +250,70 @@ export const geminiService = {
     conversationHistory?: ChatMessage[]
   ): Promise<string> {
     try {
-      // Usar gemini-2.0-flash-exp para chat assistant
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+      // Construir system instruction COMPLETA con contexto del viaje
+      let systemInstruction = ASSISTANT_PROMPT;
 
-      // Construir contexto adicional si existe informaci�n del viaje
-      let contextPrompt = ASSISTANT_PROMPT;
       if (context) {
-        contextPrompt += `\n\nContexto del viaje actual:`;
+        systemInstruction += `\n\n═══════════════════════════════════════════════════\n`;
+        systemInstruction += `📋 INFORMACIÓN DEL VIAJE DEL USUARIO (USA ESTA INFORMACIÓN EN TUS RESPUESTAS):\n`;
+        systemInstruction += `═══════════════════════════════════════════════════\n`;
 
-        // Información básica del viaje
-        if (context.destination) contextPrompt += `\n- Destino: ${context.destination}`;
+        // Información básica
+        if (context.destination) {
+          systemInstruction += `\n🌍 DESTINO: ${context.destination}`;
+        }
+
         if (context.startDate && context.endDate) {
-          contextPrompt += `\n- Fechas: ${context.startDate} a ${context.endDate}`;
+          systemInstruction += `\n📅 FECHAS: ${context.startDate} hasta ${context.endDate}`;
+          // Calcular duración
+          const start = new Date(context.startDate);
+          const end = new Date(context.endDate);
+          const dias = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+          systemInstruction += ` (${dias} días)`;
         }
 
         // Presupuesto
         if (context.budget) {
-          contextPrompt += `\n- Presupuesto total: ${context.budget}€`;
-          if (context.currentExpense) {
-            const disponible = context.budget - context.currentExpense;
-            contextPrompt += ` (gastado: ${context.currentExpense}€, disponible: ${disponible}€)`;
+          const disponible = context.currentExpense ? context.budget - context.currentExpense : context.budget;
+          systemInstruction += `\n💰 PRESUPUESTO: ${context.budget}€ total`;
+          if (context.currentExpense && context.currentExpense > 0) {
+            systemInstruction += ` | Gastado: ${context.currentExpense}€ | **Disponible: ${disponible}€**`;
           }
         }
 
-        // Reservas confirmadas
+        // Reservas (CRÍTICO: incluir TODOS los detalles)
         if (context.reservations && context.reservations.length > 0) {
-          contextPrompt += `\n\nReservas confirmadas:`;
-          context.reservations.forEach(r => {
-            contextPrompt += `\n  - ${r.nombre} (${r.categoria})`;
-            if (r.fecha) contextPrompt += ` - ${r.fecha}`;
+          systemInstruction += `\n\n🏨 RESERVAS CONFIRMADAS (${context.reservations.length}):`;
+          context.reservations.forEach((r, index) => {
+            systemInstruction += `\n  ${index + 1}. ${r.nombre}`;
+            systemInstruction += ` [${r.categoria}]`;
+            if (r.fecha) systemInstruction += ` - Fecha: ${r.fecha}`;
           });
+        } else {
+          systemInstruction += `\n\n🏨 RESERVAS: Ninguna reserva confirmada todavía`;
         }
 
-        // Lugares de interés guardados
+        // Lugares guardados
         if (context.places && context.places.length > 0) {
-          contextPrompt += `\n\nLugares de interés guardados:`;
-          context.places.forEach(p => {
-            contextPrompt += `\n  - ${p.nombre} (${p.categoria})`;
+          systemInstruction += `\n\n📍 LUGARES DE INTERÉS GUARDADOS (${context.places.length}):`;
+          context.places.forEach((p, index) => {
+            systemInstruction += `\n  ${index + 1}. ${p.nombre} [${p.categoria}]`;
           });
+        } else {
+          systemInstruction += `\n\n📍 LUGARES: No ha guardado lugares todavía`;
         }
+
+        systemInstruction += `\n\n═══════════════════════════════════════════════════\n`;
+        systemInstruction += `⚡ INSTRUCCIÓN: Usa TODA esta información para dar respuestas específicas y útiles.\n`;
+        systemInstruction += `NO preguntes por información que YA TIENES arriba.\n`;
+        systemInstruction += `═══════════════════════════════════════════════════\n`;
       }
+
+      // Crear modelo CON system instruction (esto hace que Gemini siempre tenga el contexto)
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-2.0-flash-exp',
+        systemInstruction: systemInstruction,
+      });
 
       // Construir historial de chat en formato Gemini
       const history = conversationHistory?.map(m => ({
@@ -305,12 +329,8 @@ export const geminiService = {
         },
       });
 
-      // Enviar mensaje con contexto en el primer mensaje
-      const prompt = history.length === 0
-        ? `${contextPrompt}\n\nUsuario: ${message}`
-        : message;
-
-      const result = await chat.sendMessage(prompt);
+      // Enviar SOLO el mensaje del usuario (el contexto ya está en systemInstruction)
+      const result = await chat.sendMessage(message);
       const response = result.response;
 
       return response.text();
