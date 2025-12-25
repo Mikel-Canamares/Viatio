@@ -16,6 +16,8 @@ export type CategoriaDocumento =
   | 'transporte' // Billetes de avión, tren
   | 'alojamiento' // Confirmaciones de hotel
   | 'seguro' // Pólizas de seguro (categoría especial)
+  | 'comida' // Reservas de restaurantes
+  | 'compras' // Facturas, recibos de compras
   | 'actividades' // Entradas, reservas
   | 'otros';
 
@@ -74,6 +76,16 @@ export const DOCUMENTO_CATEGORIAS: Record<
     label: SPECIAL_DOCUMENT_CATEGORIES.insurance.label,
     icon: SPECIAL_DOCUMENT_CATEGORIES.insurance.icon,
     color: SPECIAL_DOCUMENT_CATEGORIES.insurance.color,
+  },
+  comida: {
+    label: BASE_CATEGORIES.food.label,
+    icon: BASE_CATEGORIES.food.icon,
+    color: BASE_CATEGORIES.food.color,
+  },
+  compras: {
+    label: BASE_CATEGORIES.shopping.label,
+    icon: BASE_CATEGORIES.shopping.icon,
+    color: BASE_CATEGORIES.shopping.color,
   },
   actividades: {
     label: BASE_CATEGORIES.activity.label,

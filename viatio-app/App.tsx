@@ -10,6 +10,7 @@ import { AuthProvider } from '@/context';
 import { initializeDatabase, clearDatabase } from '@/database';
 import { logError } from '@/utils';
 import { theme } from '@/config';
+import { requestNotificationPermissions } from '@/services/notificationsService';
 
 // DEVELOPMENT: Cambiar a true para limpiar la BD al iniciar
 const CLEAR_DB_ON_START = false;
@@ -28,6 +29,11 @@ export default function App() {
         console.log('[App] Limpiando base de datos (desarrollo)...');
         await clearDatabase();
       }
+
+      // Solicitar permisos de notificaciones
+      console.log('[App] Solicitando permisos de notificaciones...');
+      const notifPermissions = await requestNotificationPermissions();
+      console.log('[App] Permisos de notificaciones:', notifPermissions ? 'concedidos' : 'denegados');
 
       setDbReady(true);
       setDbError(null);

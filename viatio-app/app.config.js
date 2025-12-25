@@ -56,6 +56,14 @@ export default {
             'Viatio necesita acceso a tu ubicación para mostrarte lugares cercanos y calcular rutas en el mapa.',
         },
       ],
+      [
+        'expo-notifications',
+        {
+          color: '#0066CC',
+          androidMode: 'default',
+          androidCollapsedTitle: '#{unread_notifications} notificaciones nuevas',
+        },
+      ],
     ],
   },
 };

@@ -173,11 +173,11 @@ export const SUBTIPOS_ACTIVIDAD: Record<SubtipoActividad, { label: string; icon:
 
 /**
  * Mapea una categoría de reserva a categoría de documento
- * Solo para las categorías compatibles: transporte, alojamiento, actividades
+ * Mapea todas las categorías de reserva a su equivalente en documentos
  */
 export function mapReservaToCategoriaDocumento(
   categoria: CategoriaReserva
-): 'transporte' | 'alojamiento' | 'actividades' | 'otros' {
+): 'transporte' | 'alojamiento' | 'actividades' | 'comida' | 'compras' | 'otros' {
   switch (categoria) {
     case 'transport':
       return 'transporte';
@@ -185,6 +185,10 @@ export function mapReservaToCategoriaDocumento(
       return 'alojamiento';
     case 'activity':
       return 'actividades';
+    case 'food':
+      return 'comida';
+    case 'shopping':
+      return 'compras';
     default:
       return 'otros';
   }
