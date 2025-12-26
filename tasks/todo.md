@@ -1,188 +1,244 @@
-# Plan de Mejora: Viatio Copilot (Agente IA)
+# Plan de Mejora: Viatio Copilot v2
 
-## 📊 Estado Actual vs Objetivo
+## 📊 Análisis del Estado Actual
 
-| Aspecto | Estado Actual | Objetivo |
-|---------|---------------|----------|
-| **Tipo** | Chat contextual básico | Agente con acciones ejecutables |
-| **Contexto** | Viaje + reservas + lugares + gastos | Context Pack completo (UI, preferencias, agenda, rutas) |
-| **Respuesta** | Solo texto natural | Texto + JSON de acciones propuestas |
-| **Interacción** | Preguntas/respuestas pasivas | Proactivo, sugiere siguiente mejor acción |
-| **Modelo** | gemini-2.0-flash-exp | Mantener (buena relación costo/calidad) |
-| **Seguridad** | Sin confirmaciones | Acciones reversibles con confirmación |
+### Lo que YA tenemos funcionando:
+- ✅ Chat con Gemini 2.0 Flash (modelo adecuado, mantener)
+- ✅ Contexto básico: viaje, reservas, lugares, gastos
+- ✅ OCR de documentos con visión
+- ✅ Persistencia de conversaciones en SQLite (`conversacionesService.ts`)
+- ✅ Google Places API integrada (búsqueda, detalles, fotos)
+- ✅ Google Directions API integrada
+- ✅ Sistema de configuración con AsyncStorage (`useConfiguracionStore`)
+- ✅ Hook `useAssistantContext` para sugerencias por pantalla
 
-## 🎯 Objetivos del Plan
-
-1. **Convertir el chat en un agente accionable** - Respuestas con botones de acción
-2. **Context Pack enriquecido** - Incluir pantalla actual, preferencias, agenda detallada
-3. **Acciones atómicas y seguras** - Crear/editar eventos, buscar lugares, optimizar rutas
-4. **Modo por pantalla** - Comportamiento adaptado según dónde esté el usuario
-5. **UX de "efecto wow"** - Sugerencias proactivas, alternativas A/B, anticipación
+### Lo que FALTA para ser un verdadero agente:
+- ❌ Configuración específica del agente (tono, módulos, estilo)
+- ❌ Respuestas con acciones ejecutables
+- ❌ Integración real con Google Places desde el agente
+- ❌ Context Pack completo (pantalla actual, día seleccionado, etc.)
+- ❌ UI para historial de conversaciones tipo ChatGPT
+- ❌ Comportamiento diferenciado por módulo (Agenda, Mapa, Detalle viaje)
 
 ---
 
-## ✅ TODOs
+## 🎯 Objetivos Refinados
 
-### FASE 1: Infraestructura del Context Pack
-- [ ] 1.1 Crear interfaz `ContextPack` completa en `types/asistente.ts`
-- [ ] 1.2 Crear `contextPackBuilder.ts` para construir el contexto dinámicamente
-- [ ] 1.3 Añadir campo `currentScreen` al contexto (detectar pantalla actual)
-- [ ] 1.4 Añadir campo `selectedItems` (día, lugar, reserva seleccionados)
-- [ ] 1.5 Crear interfaz `UserPreferences` (estilo viaje, ritmo, presupuesto, restricciones)
-- [ ] 1.6 Persistir preferencias de usuario en AsyncStorage/SQLite
+1. **Pantalla de Configuración del Copilot** - El usuario personaliza el agente
+2. **Context Pack enriquecido** - Información completa del estado actual
+3. **Respuestas accionables** - Texto + botones que ejecutan acciones
+4. **Integración con Google Places** - Sugerencias reales basadas en ubicación
+5. **Historial de conversaciones** - Como ChatGPT, con lista y reanudación
+6. **Módulos activos**: Chat propio, Agenda, Mapa, Detalle del viaje (NO reservas)
 
-### FASE 2: Sistema de Acciones
-- [ ] 2.1 Definir interfaz `AgentAction` con tipos de acción estandarizados
-- [ ] 2.2 Crear interfaz `AgentResponse` (mensaje + acciones + notas)
-- [ ] 2.3 Implementar `actionExecutor.ts` para ejecutar acciones desde el agente
-- [ ] 2.4 Crear componente `ActionButton` para renderizar acciones propuestas
-- [ ] 2.5 Implementar sistema de confirmación para acciones destructivas
-- [ ] 2.6 Añadir soporte de rollback/deshacer para acciones reversibles
+---
 
-### FASE 3: Herramientas del Agente (Backend)
-- [ ] 3.1 Refactorizar `geminiService.ts` para usar function calling de Gemini
-- [ ] 3.2 Implementar tool `viatio.getAgenda({ tripId, date? })`
-- [ ] 3.3 Implementar tool `viatio.createAgendaItem({ ... })`
-- [ ] 3.4 Implementar tool `viatio.searchPlaces({ query, nearLat, nearLng, categories })`
-- [ ] 3.5 Implementar tool `viatio.getDirections({ origin, destination, mode })`
-- [ ] 3.6 Implementar tool `viatio.suggestActivities({ tripId, date, preferences })`
+## ✅ TODOs - Plan de Implementación
+
+### FASE 0: Configuración del Copilot (Nueva Pantalla)
+- [ ] 0.1 Crear interfaz `CopilotPreferences` en `types/asistente.ts`
+- [ ] 0.2 Crear `useCopilotStore.ts` para persistir preferencias del agente
+- [ ] 0.3 Crear pantalla `CopilotSettingsScreen.tsx` con:
+  - Módulos donde aparece (toggles: Agenda, Mapa, Detalle viaje, Chat propio)
+  - Tono de respuestas (Profesional / Amigable / Conciso)
+  - Longitud de respuestas (Breve / Normal / Detallada)
+  - Idioma de respuestas (Mismo del dispositivo / Forzar español/inglés)
+  - Preferencias de viaje (ritmo, intereses, restricciones alimentarias, movilidad)
+- [ ] 0.4 Añadir entrada "Configurar Copilot" en SettingsScreen
+- [ ] 0.5 Crear migración para tabla `copilot_preferences` en SQLite
+
+### FASE 1: Context Pack Completo
+- [ ] 1.1 Crear interfaz `ContextPack` completa en `types/asistente.ts`:
+  ```
+  - app: { version, platform, locale, timezone }
+  - user: { name, travelStyle[], pace, budget, mobility, food }
+  - ui: { currentScreen, selectedTripId, selectedDayId, selectedPlaceId }
+  - trip: { id, title, destination, dateRange, party, lodgingBase }
+  - agenda: { days: [{ date, items: [...] }] }
+  - reservations: [...] (solo como contexto, sin acciones)
+  - places: { saved: [...] }
+  - documents: [...]
+  - expenses: { items: [...], total, budget }
+  - capabilities: { availableActions[], canWriteData }
+  ```
+- [ ] 1.2 Crear `contextPackBuilder.ts` que construya el pack dinámicamente
+- [ ] 1.3 Modificar `chatStore.ts` para pasar pantalla actual y selecciones
+- [ ] 1.4 Incluir preferencias del usuario desde `useCopilotStore`
+
+### FASE 2: Sistema de Acciones del Agente
+- [ ] 2.1 Definir interfaz `AgentAction` en `types/asistente.ts`:
+  ```typescript
+  type ActionType =
+    | 'create_agenda_item'    // Añadir evento a la agenda
+    | 'search_places'         // Buscar lugares con Google Places
+    | 'get_directions'        // Calcular ruta
+    | 'add_place_to_saved'    // Guardar lugar
+    | 'suggest_itinerary'     // Proponer itinerario completo
+    | 'navigate_to'           // Navegar a otra pantalla
+    | 'show_on_map';          // Mostrar punto en el mapa
+  ```
+- [ ] 2.2 Crear interfaz `AgentResponse` (mensaje + actions[])
+- [ ] 2.3 Crear `actionExecutor.ts` que ejecute cada tipo de acción
+- [ ] 2.4 Crear componente `ActionButton.tsx` para renderizar acciones
+- [ ] 2.5 Crear componente `ActionConfirmModal.tsx` para acciones que requieren confirmación
+- [ ] 2.6 Modificar `ChatBubble.tsx` para mostrar botones de acción al final del mensaje
+
+### FASE 3: Integración con Google Places (Sugerencias Reales)
+- [ ] 3.1 Crear `copilotPlacesService.ts` que use `googlePlacesService.ts`:
+  - `suggestNearbyActivities(lat, lng, preferences)` → POIs cercanos
+  - `suggestRestaurants(lat, lng, preferences)` → Restaurantes según restricciones
+  - `getPointsOfInterest(destination, categories)` → Atracciones principales
+- [ ] 3.2 Crear función `buildPlacesSuggestions()` para formatear resultados para el agente
+- [ ] 3.3 Integrar en el backend para que Gemini pueda "llamar" a estas funciones (function calling)
+- [ ] 3.4 Cachear resultados de Places para reducir llamadas a la API
 
 ### FASE 4: Prompt del Agente Mejorado
-- [ ] 4.1 Reescribir `ASSISTANT_PROMPT` con personalidad de "Viatio Copilot"
-- [ ] 4.2 Definir comportamiento por pantalla (agenda, mapa, reservas, chat)
-- [ ] 4.3 Añadir instrucciones de formato JSON para acciones
-- [ ] 4.4 Implementar sistema de "siguiente mejor acción"
-- [ ] 4.5 Añadir ejemplos de alternativas A/B en el prompt
+- [ ] 4.1 Reescribir `ASSISTANT_PROMPT` como "Viatio Copilot":
+  - Personalidad configurable según preferencias del usuario
+  - Instrucciones de formato JSON para acciones
+  - Comportamiento diferenciado por `currentScreen`
+- [ ] 4.2 Definir comportamiento por módulo:
+  - **Agenda**: Detectar huecos, sugerir actividades, optimizar tiempos
+  - **Mapa**: Sugerir rutas, POIs cercanos, crear listas de lugares
+  - **Detalle viaje**: Visión global, checklist de preparación, itinerarios
+  - **Chat propio**: Modo conversacional libre, planificación general
+- [ ] 4.3 Implementar "siguiente mejor acción" basada en contexto
+- [ ] 4.4 Añadir ejemplos de alternativas A/B en el prompt
 
-### FASE 5: UI del Agente
-- [ ] 5.1 Rediseñar `ChatBubble` para soportar acciones embebidas
-- [ ] 5.2 Crear componente `ActionChip` para botones de acción rápida
-- [ ] 5.3 Añadir indicador visual de "acción en progreso"
-- [ ] 5.4 Implementar animación de "acción completada"
-- [ ] 5.5 Crear componente `ContextBadge` que muestra qué contexto tiene el agente
+### FASE 5: Herramientas del Backend (Function Calling)
+- [ ] 5.1 Refactorizar `geminiService.ts` para usar function calling de Gemini
+- [ ] 5.2 Definir tools disponibles:
+  ```
+  - viatio.searchPlaces({ query, nearLat, nearLng, categories })
+  - viatio.getDirections({ origin, destination, mode })
+  - viatio.suggestItinerary({ tripId, date, preferences })
+  - viatio.getWeather({ destination, date }) // Opcional, API externa
+  ```
+- [ ] 5.3 Crear endpoint `/api/copilot` separado de `/api/assistant` actual
+- [ ] 5.4 Implementar parsing de function calls y ejecución
 
-### FASE 6: Integración por Pantalla
-- [ ] 6.1 En TripAgenda: detectar huecos, conflictos, sugerir actividades
-- [ ] 6.2 En TripMap: sugerir rutas, optimizar paradas, crear listas
-- [ ] 6.3 En ReservationDetail: resumir, detectar conflictos, crear eventos
-- [ ] 6.4 En TripDetail: visión global, itinerarios, preparación del viaje
-- [ ] 6.5 Actualizar `useAssistantContext` con sugerencias más inteligentes
+### FASE 6: UI del Historial de Conversaciones
+- [ ] 6.1 Crear `ConversationListScreen.tsx` (lista tipo ChatGPT):
+  - Lista de conversaciones agrupadas por viaje
+  - Conversaciones generales (sin viaje asociado)
+  - Búsqueda en historial
+  - Deslizar para eliminar
+- [ ] 6.2 Modificar `AssistantScreen.tsx`:
+  - Botón "Nueva conversación" en header
+  - Botón "Historial" que navega a ConversationListScreen
+  - Auto-guardar conversación al salir
+- [ ] 6.3 Implementar reanudación de conversaciones:
+  - Cargar mensajes previos
+  - Restaurar contexto del viaje
+  - Indicador visual de "conversación reanudada"
+- [ ] 6.4 Añadir funcionalidad de renombrar conversación
+
+### FASE 7: Integración por Módulo
+- [ ] 7.1 En `TripDetailScreen`:
+  - FAB que abre el Copilot con contexto del viaje
+  - Sugerencias proactivas ("Tu viaje empieza en 3 días, ¿revisamos el checklist?")
+- [ ] 7.2 En `TripAgendaScreen`:
+  - Detectar días vacíos y sugerir actividades
+  - Botón "Planificar con Copilot" en días sin eventos
+  - Alertar sobre conflictos horarios
+- [ ] 7.3 En `TripMapScreen`:
+  - Sugerir rutas optimizadas entre lugares guardados
+  - Botón "¿Qué hay cerca?" que consulta al Copilot
+  - Crear lista de lugares desde sugerencias del Copilot
+- [ ] 7.4 Actualizar `useAssistantContext` con sugerencias más inteligentes
 
 ---
 
-## 📋 Detalle de Implementación
+## 📋 Detalle de Interfaces Clave
 
-### 1. Interfaz ContextPack (Fase 1.1)
-
+### CopilotPreferences (Fase 0.1)
 ```typescript
-interface ContextPack {
-  app: {
-    version: string;
-    platform: 'ios' | 'android';
-    locale: string;
-    timezone: string;
+interface CopilotPreferences {
+  // Módulos donde aparece el Copilot
+  enabledModules: {
+    agenda: boolean;      // default: true
+    map: boolean;         // default: true
+    tripDetail: boolean;  // default: true
+    standalone: boolean;  // default: true (chat propio)
   };
-  user: {
-    name?: string;
-    travelStyle: string[];        // ['cultura', 'gastronomia', 'aventura']
-    pace: 'relajado' | 'equilibrado' | 'intenso';
-    budget?: { level: string; currency: string; dailyCap?: number };
-    mobility?: { walkingToleranceKmPerDay?: number };
-    food?: { preferences: string[]; restrictions: string[] };
-  };
-  ui: {
-    currentScreen: ScreenName;
-    selectedTripId?: string;
-    selectedDayId?: string;
-    selectedPlaceId?: string;
-    selectedReservationId?: string;
-  };
-  trip: { ... };      // Datos del viaje actual
-  agenda: { ... };    // Días con items detallados
-  reservations: [...];
-  places: { saved: [...], recentSearch?: {...} };
-  documents: [...];
-  expenses: { currency: string; items: [...]; total: number; budget?: number };
-  capabilities: {
-    availableActions: string[];  // Acciones que puede ejecutar
-    canWriteData: boolean;
+
+  // Personalidad y estilo
+  tone: 'professional' | 'friendly' | 'concise';  // default: 'friendly'
+  responseLength: 'brief' | 'normal' | 'detailed'; // default: 'normal'
+  language: 'device' | 'es' | 'en';               // default: 'device'
+  useEmojis: boolean;                              // default: true
+
+  // Preferencias de viaje (para sugerencias personalizadas)
+  travelPreferences: {
+    pace: 'relaxed' | 'balanced' | 'intense';     // default: 'balanced'
+    interests: string[];   // ['cultura', 'gastronomía', 'naturaleza', 'aventura', ...]
+    avoidances: string[];  // ['multitudes', 'madrugar', 'caminar mucho', ...]
+    foodRestrictions: string[]; // ['vegetariano', 'sin gluten', 'halal', ...]
+    mobilityLevel: 'full' | 'limited' | 'wheelchair'; // default: 'full'
+    budget: 'budget' | 'moderate' | 'luxury';     // default: 'moderate'
   };
 }
 ```
 
-### 2. Interfaz AgentResponse (Fase 2.2)
-
+### AgentResponse (Fase 2.2)
 ```typescript
 interface AgentResponse {
-  message: string;           // Respuesta natural para el usuario
-  actions: AgentAction[];    // Acciones propuestas (0-3)
-  notes?: string;            // Notas técnicas opcionales
+  message: string;           // Texto natural para el usuario
+  actions: AgentAction[];    // 0-3 acciones propuestas
+  metadata?: {
+    confidence: number;      // 0.0 - 1.0
+    sourcesUsed: string[];   // ['google_places', 'trip_context', ...]
+  };
 }
 
 interface AgentAction {
   id: string;
-  label: string;             // "Añadir a agenda", "Buscar cerca"
-  type: ActionType;          // 'create_agenda_item' | 'search_places' | ...
+  label: string;             // Texto del botón: "Añadir a agenda", "Ver en mapa"
+  type: ActionType;
   requiresConfirmation: boolean;
-  params: Record<string, any>;
-  confidence: number;        // 0.0 - 1.0
-  rollback?: { supported: boolean; how: string };
+  params: Record<string, unknown>;
+  icon?: string;             // Icono Ionicons opcional
 }
-
-type ActionType =
-  | 'create_agenda_item'
-  | 'update_agenda_item'
-  | 'delete_agenda_item'
-  | 'search_places'
-  | 'get_directions'
-  | 'optimize_route'
-  | 'add_expense'
-  | 'extract_document'
-  | 'navigate_to';           // Navegar a otra pantalla
 ```
 
-### 3. Ejemplo de Respuesta del Agente
+### Ejemplo de Respuesta del Copilot
 
-**Usuario (en pantalla Agenda, día 2 vacío):** "¿Qué puedo hacer mañana?"
+**Usuario (en Mapa de Barcelona):** "¿Qué puedo visitar cerca del hotel?"
 
-**Respuesta del agente:**
+**Respuesta:**
 ```json
 {
-  "message": "Tu día 2 (15 marzo) está libre. Basándome en tu check-in del Hotel Ritz a las 15:00, te sugiero:\n\n**Opción A - Cultural:**\n- 10:00-12:30 Sagrada Familia (ya la tienes guardada)\n- 13:00 Almuerzo en Born\n- 15:00 Check-in hotel\n\n**Opción B - Relajada:**\n- 11:00 Paseo por Las Ramblas\n- 13:30 Mercado de la Boquería\n- 15:00 Check-in hotel\n\n¿Cuál prefieres o quieres que la ajuste?",
+  "message": "Cerca de tu hotel (Hotel Ritz, Eixample) hay varias opciones interesantes:\n\n**Cultura:**\n• Casa Batlló (400m) - Obra maestra de Gaudí, imprescindible\n• La Pedrera (600m) - Otra joya modernista\n\n**Gastronomía:**\n• Cervecería Catalana (300m) - Tapas excelentes, rating 4.5\n• Tickets Bar (800m) - De los hermanos Adrià\n\n¿Te gustaría añadir alguno a tus lugares guardados o planificarlo para un día específico?",
   "actions": [
     {
       "id": "a1",
-      "label": "Aplicar Opción A",
-      "type": "create_agenda_item",
-      "requiresConfirmation": true,
-      "params": {
-        "items": [
-          { "title": "Sagrada Familia", "start": "10:00", "end": "12:30", "type": "visit" },
-          { "title": "Almuerzo en Born", "start": "13:00", "end": "14:30", "type": "meal" },
-          { "title": "Check-in Hotel Ritz", "start": "15:00", "type": "checkin" }
-        ]
-      },
-      "confidence": 0.8,
-      "rollback": { "supported": true, "how": "Eliminar los 3 eventos creados" }
+      "label": "Guardar Casa Batlló",
+      "type": "add_place_to_saved",
+      "requiresConfirmation": false,
+      "params": { "placeId": "ChIJ...", "name": "Casa Batlló", "category": "attraction" },
+      "icon": "bookmark-outline"
     },
     {
       "id": "a2",
-      "label": "Aplicar Opción B",
-      "type": "create_agenda_item",
-      "requiresConfirmation": true,
-      "params": { "items": [...] },
-      "confidence": 0.7,
-      "rollback": { "supported": true, "how": "Eliminar los 3 eventos creados" }
+      "label": "Ver todos en mapa",
+      "type": "show_on_map",
+      "requiresConfirmation": false,
+      "params": { "places": ["ChIJ...", "ChIJ...", "ChIJ...", "ChIJ..."] },
+      "icon": "map-outline"
     },
     {
       "id": "a3",
-      "label": "Buscar más actividades",
-      "type": "search_places",
-      "requiresConfirmation": false,
-      "params": { "nearLat": 41.4036, "nearLng": 2.1744, "categories": ["activity", "culture"] },
-      "confidence": 0.9
+      "label": "Planificar visita mañana",
+      "type": "create_agenda_item",
+      "requiresConfirmation": true,
+      "params": { "date": "2024-03-15", "title": "Visita Casa Batlló", "placeId": "ChIJ..." },
+      "icon": "calendar-outline"
     }
-  ]
+  ],
+  "metadata": {
+    "confidence": 0.9,
+    "sourcesUsed": ["google_places", "trip_context"]
+  }
 }
 ```
 
@@ -190,58 +246,96 @@ type ActionType =
 
 ## 🔧 Consideraciones Técnicas
 
-### Modelo Recomendado
-**Mantener `gemini-2.0-flash-exp`** por:
+### Modelo
+**Mantener `gemini-2.0-flash-exp`**:
 - Gratuito durante preview
 - Soporta function calling nativo
-- Buena velocidad de respuesta (UX móvil)
 - Context window de 1M tokens
+- Buena velocidad (~1-2s respuesta)
 
-### Function Calling
-Gemini 2.0 soporta function calling nativo. En lugar de parsear JSON manualmente, definimos las herramientas como funciones y Gemini decide cuándo usarlas.
+### Function Calling vs JSON Parsing
+Usar function calling nativo de Gemini en lugar de pedir JSON en el prompt:
+- Más fiable (menos errores de parsing)
+- Gemini decide cuándo ejecutar herramientas
+- Respuestas más naturales
 
-### Seguridad
-- Acciones de escritura siempre requieren confirmación
-- Límite de 3 acciones por respuesta
-- Rollback disponible para todas las acciones de creación/edición
-- No ejecutar acciones sin contexto suficiente
+### Límites de la API de Google Places
+- 100,000 requests/mes en el plan gratuito
+- Cachear resultados agresivamente (1h mínimo)
+- Priorizar búsquedas por destino sobre coordenadas exactas
+
+### Persistencia
+- Preferencias del Copilot: AsyncStorage (simple key-value)
+- Conversaciones: SQLite (ya implementado)
+- Caché de Places: AsyncStorage con TTL
 
 ---
 
 ## 🚀 Orden de Implementación Recomendado
 
-1. **Fase 1** (Contexto) → Base necesaria para todo
-2. **Fase 2** (Acciones) → Sistema de respuesta enriquecida
-3. **Fase 4** (Prompt) → Comportamiento del agente
-4. **Fase 5** (UI) → Visualización de acciones
-5. **Fase 3** (Tools) → Herramientas ejecutables (opcional, se puede simular primero)
-6. **Fase 6** (Integración) → Pulir por pantalla
+```
+FASE 0 (Configuración)     ████████░░ 2-3 días
+     ↓
+FASE 1 (Context Pack)      ██████░░░░ 2 días
+     ↓
+FASE 2 (Sistema Acciones)  ████████░░ 3 días
+     ↓
+FASE 4 (Prompt)            ██████░░░░ 2 días
+     ↓
+FASE 5 (Backend Tools)     ████████░░ 3 días
+     ↓
+FASE 3 (Google Places)     ██████░░░░ 2 días
+     ↓
+FASE 6 (UI Historial)      ██████░░░░ 2 días
+     ↓
+FASE 7 (Integración)       ████████░░ 3 días
+```
+
+**Prioridad**: 0 → 1 → 2 → 4 → 5 → 3 → 6 → 7
+
+La Fase 3 (Google Places) se puede hacer en paralelo con Fase 5 (Backend).
+
+---
+
+## 📱 Flujo de Usuario Final
+
+1. **Configuración inicial**: Usuario abre Settings → Configurar Copilot → Ajusta preferencias
+2. **En cualquier módulo habilitado**: Ve el FAB del Copilot con badge contextual
+3. **Abre el Copilot**: Chat con contexto precargado según la pantalla
+4. **Recibe sugerencias**: Texto + botones de acción
+5. **Ejecuta acciones**: Un tap añade evento, guarda lugar, etc.
+6. **Historial**: Puede ver, buscar y reanudar conversaciones anteriores
 
 ---
 
 ## Review
 
 ### Resumen
-Plan completo para transformar el chat contextual actual en un agente proactivo con:
-- Context Pack enriquecido con pantalla actual, preferencias y datos detallados
-- Sistema de acciones atómicas con confirmación y rollback
-- Respuestas estructuradas (mensaje + acciones JSON)
-- Comportamiento adaptado por pantalla
-- Sugerencias de "siguiente mejor acción"
+Plan v2 mejorado con:
+- **Pantalla de configuración** para personalizar el Copilot
+- **Módulos específicos**: Solo Agenda, Mapa, Detalle viaje y Chat propio (NO reservas)
+- **Acciones ejecutables** con botones en las respuestas
+- **Google Places integrado** para sugerencias reales
+- **Historial tipo ChatGPT** con reanudación
 
-### Riesgos potenciales
-- **Complejidad del prompt**: Un prompt muy largo puede degradar la calidad
-- **Parsing de respuestas**: Gemini puede no siempre devolver JSON válido
-- **Latencia**: Más contexto = más tokens = más tiempo de respuesta
-- **Sincronización**: Ejecutar acciones puede requerir actualizar múltiples stores
+### Diferencias vs Plan v1
+| Aspecto | Plan v1 | Plan v2 |
+|---------|---------|---------|
+| Configuración usuario | No | Pantalla completa |
+| Módulos | Todos | Solo 4 (sin reservas) |
+| Google Places | Mencionado | Integración detallada |
+| Historial | Básico | Como ChatGPT |
+| Preferencias viaje | Básico | Detallado (ritmo, intereses, restricciones) |
 
-### Mitigaciones
-- Usar function calling nativo de Gemini en lugar de parsing manual
-- Implementar validación robusta de respuestas con fallback a texto plano
-- Comprimir contexto inteligentemente (solo datos relevantes por pantalla)
-- Usar optimistic updates en UI + sincronización en background
+### Riesgos y Mitigaciones
+| Riesgo | Mitigación |
+|--------|------------|
+| Parsing de acciones falle | Fallback a texto plano si no hay JSON válido |
+| Latencia alta | Caché agresivo de Places, optimistic UI updates |
+| Límites API Places | Cachear 1h+, priorizar búsquedas generales |
+| Prompt muy largo | Comprimir contexto por pantalla (solo datos relevantes) |
 
 ### Siguientes pasos
-1. **Aprobación del plan** - ¿Ajustar prioridades o alcance?
-2. **Empezar por Fase 1.1** - Definir interfaces TypeScript
-3. **Iterar incrementalmente** - Cada fase es testeable independientemente
+1. **Confirmar este plan** - ¿Algún ajuste antes de empezar?
+2. **Empezar por Fase 0** - Configuración del Copilot (base para todo)
+3. **Iterar incrementalmente** - Cada fase es testeable por separado
