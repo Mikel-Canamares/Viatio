@@ -200,16 +200,24 @@ export interface ContextoViaje {
   destino: string;
   fechaInicio: string;
   fechaFin: string;
+  // Coordenadas del destino para búsquedas contextuales
+  destinoLat?: number;
+  destinoLng?: number;
   reservas: Array<{
     nombre: string;
     categoria: string;
     fecha?: string;
+    // Coordenadas de la reserva si están disponibles
+    lat?: number;
+    lng?: number;
   }>;
   lugares: Array<{
     nombre: string;
     categoria: string;
+    // Coordenadas del lugar
+    lat?: number;
+    lng?: number;
   }>;
-  // NOTA: gastoActual y presupuesto eliminados - el módulo de gastos es independiente
 }
 
 /**
@@ -221,16 +229,22 @@ export interface ContextoViajeAPI {
   startDate?: string;
   endDate?: string;
   destination?: string;
+  // Coordenadas del destino para búsquedas contextuales
+  destinationLat?: number;
+  destinationLng?: number;
   reservations?: Array<{
     nombre: string;
     categoria: string;
     fecha?: string;
+    lat?: number;
+    lng?: number;
   }>;
   places?: Array<{
     nombre: string;
     categoria: string;
+    lat?: number;
+    lng?: number;
   }>;
-  // NOTA: budget y currentExpense eliminados - el módulo de gastos es independiente
 }
 
 // ============================================

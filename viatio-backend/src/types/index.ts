@@ -146,11 +146,13 @@ export interface CopilotRequest {
       id: string;
       title: string;
       destination: string;
+      destinationCoords?: { lat: number; lng: number };
       startDate: string;
       endDate: string;
       totalDays: number;
       daysUntilTrip: number;
       party?: { adults: number; kids: number };
+      lodgingBase?: { name: string; lat: number; lng: number };
     };
     agenda?: {
       days: Array<{

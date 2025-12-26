@@ -15,6 +15,7 @@ import { getLugaresByViajeId } from '@/services/lugaresService';
 import { getDocumentosByViajeId } from '@/services/documentosService';
 import { getDiasByViajeId } from '@/services/diasViajeService';
 import { getEventosByDiaId } from '@/services/eventosService';
+import { getPlaceDetails } from '@/services/googlePlacesService';
 import { useCopilotStore } from '@/store/useCopilotStore';
 import type {
   ContextPack,
@@ -182,12 +183,40 @@ export async function buildContextPack(
       return baseContextPack;
     }
 
+    // Obtener coordenadas del destino si hay placeId
+    let destinationCoords: { lat: number; lng: number } | undefined;
+    if (viaje.destinoPlaceId) {
+      try {
+        const placeDetails = await getPlaceDetails(viaje.destinoPlaceId);
+        if (placeDetails && placeDetails.latitude && placeDetails.longitude) {
+          destinationCoords = {
+            lat: placeDetails.latitude,
+            lng: placeDetails.longitude,
+          };
+        }
+      } catch (error) {
+        console.warn('[ContextPackBuilder] No se pudieron obtener coordenadas del destino:', error);
+      }
+    }
+
+    // Si no hay coordenadas del destino, usar las del primer lugar guardado
+    if (!destinationCoords && lugares.length > 0) {
+      const primerLugarConCoords = lugares.find((l: Lugar) => l.latitud && l.longitud);
+      if (primerLugarConCoords) {
+        destinationCoords = {
+          lat: primerLugarConCoords.latitud!,
+          lng: primerLugarConCoords.longitud!,
+        };
+      }
+    }
+
     // Construir datos del viaje
     const totalDays = daysBetween(viaje.fechaInicio, viaje.fechaFin) + 1;
     const tripInfo: ContextPack['trip'] = {
       id: viaje.id,
       title: viaje.destino,
       destination: viaje.destino,
+      destinationCoords,
       startDate: viaje.fechaInicio,
       endDate: viaje.fechaFin,
       totalDays,
@@ -323,6 +352,11 @@ export function contextPackToPromptString(pack: ContextPack): string {
   if (pack.trip) {
     lines.push(`VIAJE: ${pack.trip.destination}`);
     lines.push(`Fechas: ${pack.trip.startDate} → ${pack.trip.endDate} (${pack.trip.totalDays} días)`);
+
+    // Coordenadas del destino para búsquedas contextuales
+    if (pack.trip.destinationCoords) {
+      lines.push(`Ubicación: ${pack.trip.destinationCoords.lat.toFixed(4)}, ${pack.trip.destinationCoords.lng.toFixed(4)}`);
+    }
 
     if (pack.trip.daysUntilTrip > 0) {
       lines.push(`Faltan ${pack.trip.daysUntilTrip} días para el viaje`);

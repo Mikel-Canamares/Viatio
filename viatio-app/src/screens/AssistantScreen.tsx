@@ -38,7 +38,7 @@ import { getSugerenciasIniciales } from '@/services/ai/assistantPrompt';
 import { theme } from '@/config/theme';
 
 import type { HomeStackParamList, RootTabParamList } from '@/navigation/types';
-import type { MensajeChat, ContextoViaje } from '@/types/asistente';
+import type { MensajeChatConAcciones, ContextoViaje } from '@/types/asistente';
 import type { Reserva } from '@/types/reserva';
 import type { Lugar } from '@/types/lugar';
 
@@ -46,6 +46,11 @@ import type { Lugar } from '@/types/lugar';
 import { getViajeById } from '@/services/viajesService';
 import { getReservasByViajeId } from '@/services/reservasService';
 import { getLugaresByViajeId } from '@/services/lugaresService';
+import { getPlaceDetails } from '@/services/googlePlacesService';
+
+// Ejecutor de acciones
+import { executeAction } from '@/services/ai/actionExecutor';
+import type { AgentAction } from '@/types/asistente';
 
 // ============================================
 // TIPOS
@@ -66,10 +71,12 @@ export default function AssistantScreen({ route, navigation }: Props) {
   // Extraer viajeId de manera segura, ya que puede o no existir
   const viajeId = (route.params as any)?.viajeId;
   const insets = useSafeAreaInsets();
-  const flatListRef = useRef<FlatList<MensajeChat>>(null);
+  const flatListRef = useRef<FlatList<MensajeChatConAcciones>>(null);
 
   // Estado local
   const [inputText, setInputText] = useState('');
+  // Estado para forzar mostrar el chat en lugar del historial
+  const [forceShowChat, setForceShowChat] = useState(false);
 
   // Store
   const {
@@ -80,6 +87,7 @@ export default function AssistantScreen({ route, navigation }: Props) {
     historial,
     sendMessage,
     setContexto,
+    setCurrentScreen,
     clearChat,
     clearError,
     loadConversacion,
@@ -91,6 +99,9 @@ export default function AssistantScreen({ route, navigation }: Props) {
 
   // Cargar contexto del viaje al montar
   useEffect(() => {
+    // Establecer pantalla actual para el contexto del Copilot
+    setCurrentScreen(viajeId ? 'trip_detail' : 'standalone_chat');
+
     if (viajeId) {
       loadContexto(viajeId);
     } else {
@@ -130,11 +141,34 @@ export default function AssistantScreen({ route, navigation }: Props) {
         getLugaresByViajeId(id),
       ]);
 
+      // Obtener coordenadas del destino si hay placeId
+      let destinoLat: number | undefined;
+      let destinoLng: number | undefined;
+
+      if (viaje.destinoPlaceId) {
+        const placeDetails = await getPlaceDetails(viaje.destinoPlaceId);
+        if (placeDetails) {
+          destinoLat = placeDetails.latitude;
+          destinoLng = placeDetails.longitude;
+        }
+      }
+
+      // Si no hay coordenadas del destino, usar las del primer lugar
+      if (!destinoLat && lugares.length > 0) {
+        const primerLugarConCoords = lugares.find(l => l.latitud && l.longitud);
+        if (primerLugarConCoords) {
+          destinoLat = primerLugarConCoords.latitud;
+          destinoLng = primerLugarConCoords.longitud;
+        }
+      }
+
       const nuevoContexto: ContextoViaje = {
         viajeId: id,
         destino: viaje.destino,
         fechaInicio: viaje.fechaInicio,
         fechaFin: viaje.fechaFin,
+        destinoLat,
+        destinoLng,
         reservas: reservas.map((r: Reserva) => ({
           nombre: r.nombre,
           categoria: r.categoria,
@@ -143,6 +177,8 @@ export default function AssistantScreen({ route, navigation }: Props) {
         lugares: lugares.map((l: Lugar) => ({
           nombre: l.nombre,
           categoria: l.categoria || 'other',
+          lat: l.latitud,
+          lng: l.longitud,
         })),
       };
 
@@ -171,15 +207,45 @@ export default function AssistantScreen({ route, navigation }: Props) {
     navigation.goBack();
   }, [navigation]);
 
+  // Handler para ejecutar acciones del Copilot
+  const handleActionPress = useCallback(async (action: AgentAction) => {
+    const result = await executeAction(action, {
+      navigation: navigation as any,
+      onShowOnMap: (params) => {
+        // Navegar al mapa con el lugar
+        if (viajeId) {
+          (navigation as any).navigate('TripMap', {
+            viajeId,
+            centerLat: params.lat,
+            centerLng: params.lng,
+          });
+        }
+      },
+    });
+
+    // Marcar la acción como ejecutada en el store
+    // El mensaje que contiene la acción se identificará por el ID de la acción
+    useChatStore.getState().markActionExecuted(
+      '', // messageId - se podría mejorar para identificar el mensaje correcto
+      action.id,
+      result.success,
+      result.message
+    );
+
+    if (!result.success) {
+      throw new Error(result.message);
+    }
+  }, [navigation, viajeId]);
+
   // ============================================
   // RENDER HELPERS
   // ============================================
 
-  const renderMessage = useCallback(({ item }: { item: MensajeChat }) => (
-    <ChatBubble mensaje={item} />
-  ), []);
+  const renderMessage = useCallback(({ item }: { item: MensajeChatConAcciones }) => (
+    <ChatBubble mensaje={item} onActionPress={handleActionPress} />
+  ), [handleActionPress]);
 
-  const keyExtractor = useCallback((item: MensajeChat) => item.id, []);
+  const keyExtractor = useCallback((item: MensajeChatConAcciones) => item.id, []);
 
   const showSuggestions = mensajes.length === 0 && !loading;
   const sugerencias = getSugerenciasIniciales(!!contexto);
@@ -188,6 +254,8 @@ export default function AssistantScreen({ route, navigation }: Props) {
 
   const handleLoadConversacion = useCallback((conversacionId: string) => {
     loadConversacion(conversacionId);
+    // Mostrar el chat con la conversación cargada
+    setForceShowChat(true);
   }, [loadConversacion]);
 
   const handleDeleteConversacion = useCallback((conversacionId: string) => {
@@ -200,6 +268,8 @@ export default function AssistantScreen({ route, navigation }: Props) {
 
   const handleNewConversation = useCallback(() => {
     startNewConversation();
+    // Forzar mostrar el chat vacío en lugar del historial
+    setForceShowChat(true);
   }, [startNewConversation]);
 
   const handleBackToHistory = useCallback(() => {
@@ -208,10 +278,12 @@ export default function AssistantScreen({ route, navigation }: Props) {
       useChatStore.getState().saveConversacion();
     }
     startNewConversation();
+    // Volver al historial
+    setForceShowChat(false);
   }, [mensajes.length, startNewConversation]);
 
-  // Mostrar historial solo si: no hay viajeId Y no hay mensajes activos
-  const showHistorial = !viajeId && mensajes.length === 0;
+  // Mostrar historial solo si: no hay viajeId Y no hay mensajes activos Y no se forzó el chat
+  const showHistorial = !viajeId && mensajes.length === 0 && !forceShowChat;
 
   // ============================================
   // RENDER

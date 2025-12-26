@@ -351,3 +351,31 @@ El módulo de gastos es independiente del asistente. Se eliminaron todas las ref
 ### Fases 6 y 7 completadas
 - UI de historial con agrupación por fecha, búsqueda y renombrado
 - CopilotFAB integrado en TripDetail, Agenda y Map
+
+### Correcciones de bugs (26/12/2024)
+
+**Problema 1: Botón "Nueva conversación" no funcionaba**
+- **Causa**: Al llamar `startNewConversation()`, los mensajes se limpiaban y `showHistorial` volvía a ser `true` (porque `showHistorial = !viajeId && mensajes.length === 0`)
+- **Solución**: Añadido estado `forceShowChat` en `AssistantScreen.tsx` que se activa al pulsar "Nueva conversación" y permite mostrar el chat vacío
+- **Archivos modificados**: `AssistantScreen.tsx`
+
+**Problema 2: Copilot no usaba coordenadas para búsquedas contextuales**
+- **Causa**: Los tipos `ContextoViaje` y `ContextoViajeAPI` no incluían coordenadas del destino ni de los lugares
+- **Solución**:
+  - Añadidas coordenadas a los tipos en `asistente.ts`
+  - Actualizado `loadContexto` en `AssistantScreen.tsx` para obtener coordenadas del `destinoPlaceId` vía Google Places
+  - Actualizado `contextPackBuilder.ts` para incluir `destinationCoords` en el ContextPack
+  - Las coordenadas se incluyen en el resumen del prompt para que Gemini las use en búsquedas
+- **Archivos modificados**: `asistente.ts`, `AssistantScreen.tsx`, `contextPackBuilder.ts`
+
+**Problema 3: Copilot no usaba búsquedas automáticas con coordenadas**
+- **Causa**: El prompt del backend no instruía al modelo para usar las coordenadas disponibles automáticamente
+- **Solución**:
+  - Actualizado `viatio-backend/src/routes/copilot.ts`:
+    - Añadidas coordenadas del destino y alojamiento al prompt
+    - Añadidas coordenadas de lugares guardados al prompt
+    - Añadidas instrucciones explícitas para inferir ubicación ("cerca del hotel" → usar coords del hotel)
+    - Reglas claras: NUNCA pedir coordenadas al usuario, siempre usar las del contexto
+  - Actualizado `viatio-backend/src/types/index.ts`:
+    - Añadido `destinationCoords` y `lodgingBase` al tipo `trip`
+- **Archivos modificados**: `viatio-backend/src/routes/copilot.ts`, `viatio-backend/src/types/index.ts`

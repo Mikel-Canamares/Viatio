@@ -2,12 +2,18 @@
  * CHAT STORE - ZUSTAND
  *
  * Maneja el estado de la conversación con el asistente.
- * Patrón: State + Actions en un solo store.
+ * Usa el endpoint /api/copilot para respuestas con acciones.
  */
 
 import { create } from 'zustand';
-import type { MensajeChat, ContextoViaje, ConversacionGuardada } from '@/types/asistente';
-import * as assistantService from '@/services/ai/assistantService';
+import type {
+  MensajeChatConAcciones,
+  ContextoViaje,
+  ConversacionGuardada,
+  CopilotScreen,
+  MensajeChatAPI,
+} from '@/types/asistente';
+import * as copilotService from '@/services/ai/copilotService';
 import * as conversacionesService from '@/services/conversacionesService';
 
 // ============================================
@@ -16,17 +22,19 @@ import * as conversacionesService from '@/services/conversacionesService';
 
 interface ChatState {
   // Estado
-  mensajes: MensajeChat[];
+  mensajes: MensajeChatConAcciones[];
   loading: boolean;
   error: string | null;
   contexto: ContextoViaje | null;
-  conversacionId: string | null; // ID de la conversación actual (si está guardada)
-  historial: ConversacionGuardada[]; // Historial de conversaciones
+  conversacionId: string | null;
+  historial: ConversacionGuardada[];
+  currentScreen: CopilotScreen;
 }
 
 interface ChatActions {
-  // Acciones
+  // Acciones principales
   setContexto: (contexto: ContextoViaje | null) => void;
+  setCurrentScreen: (screen: CopilotScreen) => void;
   sendMessage: (content: string) => Promise<void>;
   clearChat: () => void;
   clearError: () => void;
@@ -38,9 +46,32 @@ interface ChatActions {
   deleteConversacion: (conversacionId: string) => Promise<void>;
   renameConversacion: (conversacionId: string, nuevoTitulo: string) => Promise<void>;
   loadHistorial: () => Promise<void>;
+
+  // Acciones del agente
+  markActionExecuted: (messageId: string, actionId: string, success: boolean, resultMessage?: string) => void;
 }
 
 type ChatStore = ChatState & ChatActions;
+
+// ============================================
+// HELPERS
+// ============================================
+
+function generateId(): string {
+  return `msg_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+}
+
+function getCurrentTimestamp(): string {
+  return new Date().toISOString();
+}
+
+// Convertir mensajes al formato de la API
+function toAPIFormat(mensajes: MensajeChatConAcciones[]): MensajeChatAPI[] {
+  return mensajes.map(m => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    content: m.content,
+  }));
+}
 
 // ============================================
 // ESTADO INICIAL
@@ -53,6 +84,7 @@ const initialState: ChatState = {
   contexto: null,
   conversacionId: null,
   historial: [],
+  currentScreen: 'standalone_chat',
 };
 
 // ============================================
@@ -70,14 +102,28 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   /**
-   * Envía un mensaje y recibe respuesta del asistente
+   * Establece la pantalla actual (para contexto del copilot)
+   */
+  setCurrentScreen: (screen) => {
+    set({ currentScreen: screen });
+  },
+
+  /**
+   * Envía un mensaje y recibe respuesta del Copilot con acciones
    */
   sendMessage: async (content: string) => {
     const trimmedContent = content.trim();
     if (!trimmedContent) return;
 
+    const { mensajes, contexto, currentScreen } = get();
+
     // Crear mensaje del usuario
-    const userMessage = assistantService.createUserMessage(trimmedContent);
+    const userMessage: MensajeChatConAcciones = {
+      id: generateId(),
+      role: 'user',
+      content: trimmedContent,
+      timestamp: getCurrentTimestamp(),
+    };
 
     // Añadir mensaje del usuario inmediatamente
     set((state) => ({
@@ -86,29 +132,65 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       error: null,
     }));
 
-    // Obtener estado actual
-    const { mensajes, contexto } = get();
+    try {
+      // Preparar historial para la API (sin el mensaje actual del usuario)
+      const historyForAPI = toAPIFormat(mensajes);
 
-    // Enviar al backend
-    const response = await assistantService.sendMessage(
-      trimmedContent,
-      mensajes, // Incluye el mensaje del usuario recién añadido
-      contexto || undefined
-    );
+      // Enviar al Copilot con ContextPack completo
+      const response = await copilotService.sendMessageToCopilot(trimmedContent, {
+        currentScreen,
+        tripId: contexto?.viajeId,
+        conversationHistory: historyForAPI,
+      });
 
-    if (response.success && response.message) {
+      // Crear mensaje del asistente con acciones
+      const assistantMessage: MensajeChatConAcciones = {
+        id: generateId(),
+        role: 'assistant',
+        content: response.message,
+        timestamp: getCurrentTimestamp(),
+        actions: response.actions,
+      };
+
       // Añadir respuesta del asistente
       set((state) => ({
-        mensajes: [...state.mensajes, response.message!],
+        mensajes: [...state.mensajes, assistantMessage],
         loading: false,
       }));
-    } else {
-      // Mostrar error
+
+      // Guardar conversación automáticamente después de cada intercambio
+      await get().saveConversacion();
+
+    } catch (error) {
+      console.error('[ChatStore] Error enviando mensaje:', error);
       set({
         loading: false,
-        error: response.error || 'Error al enviar mensaje',
+        error: error instanceof Error ? error.message : 'Error al enviar mensaje',
       });
     }
+  },
+
+  /**
+   * Marca una acción como ejecutada
+   */
+  markActionExecuted: (messageId, actionId, success, resultMessage) => {
+    set((state) => ({
+      mensajes: state.mensajes.map(msg => {
+        if (msg.id !== messageId) return msg;
+
+        const actionResults = msg.actionResults || [];
+        return {
+          ...msg,
+          actionResults: [
+            ...actionResults,
+            { actionId, success, message: resultMessage },
+          ],
+        };
+      }),
+    }));
+
+    // Guardar después de ejecutar acción
+    get().saveConversacion();
   },
 
   /**
@@ -130,15 +212,24 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   /**
-   * Inicia una nueva conversación (limpia chat y vuelve al historial)
+   * Inicia una nueva conversación
    */
   startNewConversation: () => {
+    // Guardar conversación actual antes de limpiar si tiene mensajes
+    const { mensajes } = get();
+    if (mensajes.length > 0) {
+      get().saveConversacion();
+    }
+
     set({
       mensajes: [],
       error: null,
       conversacionId: null,
-      contexto: null,
+      // NO limpiar contexto si venimos de un viaje
     });
+
+    // Recargar historial
+    get().loadHistorial();
   },
 
   /**
@@ -148,7 +239,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const { mensajes, contexto, conversacionId } = get();
 
     if (mensajes.length === 0) {
-      console.log('[ChatStore] No hay mensajes para guardar');
       return;
     }
 
@@ -156,7 +246,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       if (conversacionId) {
         // Actualizar conversación existente
         await conversacionesService.updateConversacion(conversacionId, mensajes, contexto || undefined);
-        console.log('[ChatStore] Conversación actualizada');
+        console.log('[ChatStore] Conversación actualizada:', conversacionId);
       } else {
         // Crear nueva conversación
         const newId = await conversacionesService.saveConversacion(mensajes, contexto || undefined);
@@ -168,7 +258,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       await get().loadHistorial();
     } catch (error) {
       console.error('[ChatStore] Error guardando conversación:', error);
-      set({ error: 'No se pudo guardar la conversación' });
     }
   },
 
@@ -188,7 +277,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       const contexto = conversacionesService.parseContexto(conversacion);
 
       set({
-        mensajes,
+        mensajes: mensajes as MensajeChatConAcciones[],
         contexto: contexto || null,
         conversacionId,
         error: null,
@@ -230,10 +319,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   renameConversacion: async (conversacionId: string, nuevoTitulo: string) => {
     try {
       await conversacionesService.renameConversacion(conversacionId, nuevoTitulo);
-
-      // Recargar historial para reflejar el cambio
       await get().loadHistorial();
-
       console.log('[ChatStore] Conversación renombrada:', conversacionId);
     } catch (error) {
       console.error('[ChatStore] Error renombrando conversación:', error);
@@ -264,3 +350,4 @@ export const selectLoading = (state: ChatStore) => state.loading;
 export const selectError = (state: ChatStore) => state.error;
 export const selectContexto = (state: ChatStore) => state.contexto;
 export const selectTieneMensajes = (state: ChatStore) => state.mensajes.length > 0;
+export const selectHistorial = (state: ChatStore) => state.historial;

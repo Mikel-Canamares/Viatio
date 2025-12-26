@@ -244,6 +244,8 @@ VIAJE: ${trip.title} → ${trip.destination}
 - Fechas: ${trip.startDate} → ${trip.endDate} (${trip.totalDays} días)
 - ${trip.daysUntilTrip > 0 ? `Faltan ${trip.daysUntilTrip} días para el viaje` : trip.daysUntilTrip === 0 ? '¡El viaje es HOY!' : `El viaje ya comenzó (día ${Math.abs(trip.daysUntilTrip) + 1})`}
 ${trip.party ? `- Viajeros: ${trip.party.adults} adultos${trip.party.kids > 0 ? `, ${trip.party.kids} niños` : ''}` : ''}
+${trip.destinationCoords ? `- COORDENADAS DEL DESTINO: lat=${trip.destinationCoords.lat}, lng=${trip.destinationCoords.lng} (usa estas coordenadas para búsquedas de lugares)` : ''}
+${trip.lodgingBase ? `- ALOJAMIENTO BASE: ${trip.lodgingBase.name} (lat=${trip.lodgingBase.lat}, lng=${trip.lodgingBase.lng})` : ''}
 `;
   }
 
@@ -263,19 +265,27 @@ AGENDA: ${agenda.totalItems} eventos planificados, ${agenda.emptyDays} días vac
     }
   }
 
-  // Reservas
+  // Reservas (incluyendo ubicación del hotel como referencia clave)
   if (reservations && reservations.length > 0) {
+    // Buscar hotel en reservas para usarlo como punto de referencia
+    const hotelReservation = reservations.find(r =>
+      r.category === 'hotel' || r.category === 'accommodation' ||
+      r.name.toLowerCase().includes('hotel') || r.name.toLowerCase().includes('hostal') ||
+      r.name.toLowerCase().includes('apartamento')
+    );
+
     prompt += `
 RESERVAS (${reservations.length}):
-${reservations.slice(0, 5).map(r => `  - ${r.name} [${r.category}] ${r.date || ''} ${r.time || ''}`).join('\n')}
+${reservations.slice(0, 5).map(r => `  - ${r.name} [${r.category}] ${r.date || ''} ${r.time || ''} ${r.location || ''}`).join('\n')}
+${hotelReservation ? `\n📍 ALOJAMIENTO PRINCIPAL: "${hotelReservation.name}" - cuando el usuario diga "cerca del hotel", usa las coordenadas del destino o busca este lugar` : ''}
 `;
   }
 
-  // Lugares guardados
+  // Lugares guardados (con coordenadas para búsquedas contextuales)
   if (places && places.totalSaved > 0) {
     prompt += `
 LUGARES GUARDADOS (${places.totalSaved}):
-${places.saved.slice(0, 5).map(p => `  - ${p.name} [${p.category}]`).join('\n')}
+${places.saved.slice(0, 5).map(p => `  - ${p.name} [${p.category}]${p.lat && p.lng ? ` (lat=${p.lat}, lng=${p.lng})` : ''}`).join('\n')}
 `;
   }
 
@@ -283,21 +293,39 @@ ${places.saved.slice(0, 5).map(p => `  - ${p.name} [${p.category}]`).join('\n')}
 ═══════════════════════════════════════════════════
 CAPACIDADES Y ACCIONES
 ═══════════════════════════════════════════════════
-Puedes proponer ACCIONES que el usuario puede ejecutar con un clic.
+Puedes ejecutar ACCIONES directamente para ayudar al usuario.
 Acciones disponibles: ${contextPack.capabilities.availableActions.join(', ')}
 
-IMPORTANTE SOBRE ACCIONES:
-1. Solo propón acciones cuando sean útiles para el usuario
-2. Máximo 3 acciones por respuesta
-3. Las acciones que modifican datos (crear evento, guardar lugar) requieren confirmación
-4. Usa create_agenda_item para añadir eventos a días específicos
-5. Usa search_places cuando el usuario pida recomendaciones de lugares
-6. Usa show_on_map para visualizar ubicaciones
+⚠️ REGLAS CRÍTICAS - LEE ATENTAMENTE:
+
+1. BÚSQUEDAS AUTOMÁTICAS - SÉ PROACTIVO:
+   - Cuando el usuario pregunte por restaurantes, lugares, actividades, etc., SIEMPRE ejecuta search_places inmediatamente
+   - USA LAS COORDENADAS que tienes en el contexto (destino, alojamiento, lugares guardados)
+   - Si el usuario dice "cerca del hotel", usa las coordenadas del lugar tipo "hotel" en los lugares guardados
+   - Si el usuario dice "cerca de aquí" o "en el destino", usa las coordenadas del destino
+   - NUNCA pidas coordenadas al usuario - YA LAS TIENES en el contexto
+
+2. INFERENCIA DE UBICACIÓN:
+   - "cerca del hotel" → buscar lugar con categoría "hotel" en lugares guardados, usar sus coordenadas
+   - "restaurantes por la zona" → usar coordenadas del destino o del alojamiento base
+   - "qué hay cerca de [nombre lugar]" → buscar ese lugar en lugares guardados, usar sus coordenadas
+   - Si no encuentras coordenadas específicas, usa las coordenadas del destino
+
+3. EJECUCIÓN DE BÚSQUEDAS:
+   - Llama a search_places con: query (qué buscar), nearLat, nearLng (coordenadas), radiusMeters (500-2000m)
+   - Ejemplo: usuario dice "restaurantes cerca del hotel", hotel está en lat=40.42, lng=-3.70
+     → Ejecuta: search_places({ query: "restaurantes", nearLat: 40.42, nearLng: -3.70, radiusMeters: 1000 })
+
+4. OTRAS ACCIONES:
+   - Máximo 3 acciones por respuesta
+   - create_agenda_item: para añadir eventos a días específicos (requiere confirmación)
+   - add_place_to_saved: para guardar lugares encontrados (requiere confirmación)
+   - show_on_map: para visualizar ubicaciones en el mapa
 
 FORMATO DE RESPUESTA:
-- Primero da tu respuesta conversacional
-- Si propones acciones, el sistema las mostrará como botones al usuario
-- NO menciones las acciones en el texto, simplemente propónlas
+- Da tu respuesta conversacional CON RESULTADOS de las búsquedas
+- Las acciones se mostrarán como botones
+- NO digas "no tengo las coordenadas" - SIEMPRE las tienes en el contexto
 
 ═══════════════════════════════════════════════════
 COMPORTAMIENTO POR PANTALLA
