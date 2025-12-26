@@ -30,11 +30,13 @@ interface ChatActions {
   sendMessage: (content: string) => Promise<void>;
   clearChat: () => void;
   clearError: () => void;
+  startNewConversation: () => void;
 
   // Historial
   saveConversacion: () => Promise<void>;
   loadConversacion: (conversacionId: string) => Promise<void>;
   deleteConversacion: (conversacionId: string) => Promise<void>;
+  renameConversacion: (conversacionId: string, nuevoTitulo: string) => Promise<void>;
   loadHistorial: () => Promise<void>;
 }
 
@@ -128,6 +130,18 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   /**
+   * Inicia una nueva conversación (limpia chat y vuelve al historial)
+   */
+  startNewConversation: () => {
+    set({
+      mensajes: [],
+      error: null,
+      conversacionId: null,
+      contexto: null,
+    });
+  },
+
+  /**
    * Guarda la conversación actual en el historial
    */
   saveConversacion: async () => {
@@ -207,6 +221,23 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     } catch (error) {
       console.error('[ChatStore] Error eliminando conversación:', error);
       set({ error: 'No se pudo eliminar la conversación' });
+    }
+  },
+
+  /**
+   * Renombra una conversación
+   */
+  renameConversacion: async (conversacionId: string, nuevoTitulo: string) => {
+    try {
+      await conversacionesService.renameConversacion(conversacionId, nuevoTitulo);
+
+      // Recargar historial para reflejar el cambio
+      await get().loadHistorial();
+
+      console.log('[ChatStore] Conversación renombrada:', conversacionId);
+    } catch (error) {
+      console.error('[ChatStore] Error renombrando conversación:', error);
+      set({ error: 'No se pudo renombrar la conversación' });
     }
   },
 

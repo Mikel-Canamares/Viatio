@@ -86,7 +86,9 @@ export default function AssistantScreen({ route, navigation }: Props) {
     clearError,
     loadConversacion,
     deleteConversacion,
+    renameConversacion,
     loadHistorial,
+    startNewConversation,
   } = useChatStore();
 
   // Cargar contexto del viaje al montar
@@ -199,6 +201,22 @@ export default function AssistantScreen({ route, navigation }: Props) {
     deleteConversacion(conversacionId);
   }, [deleteConversacion]);
 
+  const handleRenameConversacion = useCallback((conversacionId: string, nuevoTitulo: string) => {
+    renameConversacion(conversacionId, nuevoTitulo);
+  }, [renameConversacion]);
+
+  const handleNewConversation = useCallback(() => {
+    startNewConversation();
+  }, [startNewConversation]);
+
+  const handleBackToHistory = useCallback(() => {
+    // Guardar conversación actual si tiene mensajes antes de volver al historial
+    if (mensajes.length > 0) {
+      useChatStore.getState().saveConversacion();
+    }
+    startNewConversation();
+  }, [mensajes.length, startNewConversation]);
+
   // Mostrar historial solo si: no hay viajeId Y no hay mensajes activos
   const showHistorial = !viajeId && mensajes.length === 0;
 
@@ -206,11 +224,35 @@ export default function AssistantScreen({ route, navigation }: Props) {
   // RENDER
   // ============================================
 
+  // Header dinámico según el estado
+  const headerTitle = contexto
+    ? `Asistente - ${contexto.destino}`
+    : showHistorial
+      ? 'Conversaciones'
+      : 'Asistente';
+
+  // Botón de volver: si hay viajeId vuelve atrás, si hay chat activo vuelve al historial
+  const handleHeaderBack = viajeId
+    ? handleBack
+    : (!showHistorial ? handleBackToHistory : undefined);
+
   return (
     <ScreenContainer scroll={false}>
       <PageHeader
-        title={contexto ? `Asistente - ${contexto.destino}` : 'Asistente'}
-        onBack={viajeId ? handleBack : undefined}
+        title={headerTitle}
+        onBack={handleHeaderBack}
+        rightElement={
+          // Mostrar botón de nueva conversación si estamos en el chat (no en historial)
+          !showHistorial && !viajeId ? (
+            <Pressable
+              onPress={handleNewConversation}
+              style={styles.headerButton}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="add" size={24} color="#FFFFFF" />
+            </Pressable>
+          ) : undefined
+        }
       />
 
       {showHistorial ? (
@@ -220,6 +262,8 @@ export default function AssistantScreen({ route, navigation }: Props) {
             conversaciones={historial}
             onSelect={handleLoadConversacion}
             onDelete={handleDeleteConversacion}
+            onRename={handleRenameConversacion}
+            onNewConversation={handleNewConversation}
             loading={loading}
           />
         </View>
@@ -307,6 +351,10 @@ export default function AssistantScreen({ route, navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+
+  headerButton: {
+    padding: theme.spacing.xs,
   },
 
   historialContainer: {

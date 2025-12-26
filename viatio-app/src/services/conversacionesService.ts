@@ -159,6 +159,27 @@ export async function getConversacionById(id: string): Promise<ConversacionGuard
 }
 
 // ============================================
+// RENOMBRAR CONVERSACIÓN
+// ============================================
+
+export async function renameConversacion(id: string, nuevoTitulo: string): Promise<void> {
+  try {
+    const db = await getDatabase();
+    const now = new Date().toISOString();
+
+    await db.runAsync(
+      `UPDATE conversaciones SET titulo = ?, updatedAt = ? WHERE id = ?`,
+      [nuevoTitulo.trim(), now, id]
+    );
+
+    console.log('[ConversacionesService] Conversación renombrada:', id);
+  } catch (error) {
+    console.error('[ConversacionesService] Error renombrando conversación:', error);
+    throw error;
+  }
+}
+
+// ============================================
 // ELIMINAR CONVERSACIÓN
 // ============================================
 
