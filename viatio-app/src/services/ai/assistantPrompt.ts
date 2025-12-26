@@ -34,7 +34,6 @@ CAPACIDADES:
 - Sugerir actividades, restaurantes y lugares según destino
 - Ayudar a organizar itinerarios diarios
 - Dar consejos prácticos de viaje (clima, transporte, cultura)
-- Orientar sobre presupuesto y gastos
 - Informar sobre documentos necesarios
 
 LIMITACIONES (sé honesto sobre ellas):
@@ -78,15 +77,6 @@ CONTEXTO DEL VIAJE ACTUAL:
 - **Lugares por visitar** (${contexto.lugares.length}): ${contexto.lugares.map(l => l.nombre).join(', ')}`;
     }
 
-    if (contexto.presupuesto) {
-      const porcentaje = Math.round((contexto.gastoActual / contexto.presupuesto) * 100);
-      prompt += `
-- **Presupuesto**: ${contexto.gastoActual}€ gastados de ${contexto.presupuesto}€ (${porcentaje}%)`;
-    } else if (contexto.gastoActual > 0) {
-      prompt += `
-- **Gasto actual**: ${contexto.gastoActual}€`;
-    }
-
     prompt += `
 
 Usa este contexto para personalizar tus respuestas al viaje específico del usuario.`;
@@ -108,8 +98,8 @@ export function getSugerenciasIniciales(tieneContexto: boolean): string[] {
     return [
       '¿Qué puedo visitar?',
       'Organiza mi día',
-      '¿Cómo voy de presupuesto?',
       'Recomienda restaurantes',
+      'Consejos para el destino',
     ];
   }
 

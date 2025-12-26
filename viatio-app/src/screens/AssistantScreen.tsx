@@ -41,13 +41,11 @@ import type { HomeStackParamList, RootTabParamList } from '@/navigation/types';
 import type { MensajeChat, ContextoViaje } from '@/types/asistente';
 import type { Reserva } from '@/types/reserva';
 import type { Lugar } from '@/types/lugar';
-import type { Gasto } from '@/types/gasto';
 
 // Para cargar contexto del viaje
 import { getViajeById } from '@/services/viajesService';
 import { getReservasByViajeId } from '@/services/reservasService';
 import { getLugaresByViajeId } from '@/services/lugaresService';
-import { getGastosByViajeId } from '@/services/gastosService';
 
 // ============================================
 // TIPOS
@@ -127,13 +125,10 @@ export default function AssistantScreen({ route, navigation }: Props) {
       const viaje = await getViajeById(id);
       if (!viaje) return;
 
-      const [reservas, lugares, gastos] = await Promise.all([
+      const [reservas, lugares] = await Promise.all([
         getReservasByViajeId(id),
         getLugaresByViajeId(id),
-        getGastosByViajeId(id),
       ]);
-
-      const gastoTotal = gastos.reduce((sum: number, g: Gasto) => sum + g.monto, 0);
 
       const nuevoContexto: ContextoViaje = {
         viajeId: id,
@@ -149,8 +144,6 @@ export default function AssistantScreen({ route, navigation }: Props) {
           nombre: l.nombre,
           categoria: l.categoria || 'other',
         })),
-        gastoActual: gastoTotal,
-        presupuesto: viaje.presupuesto || undefined,
       };
 
       setContexto(nuevoContexto);

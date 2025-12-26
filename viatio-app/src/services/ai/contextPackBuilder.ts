@@ -2,7 +2,8 @@
  * CONTEXT PACK BUILDER
  *
  * Construye el ContextPack completo para enviar al Copilot.
- * Recopila información del viaje, agenda, lugares, gastos, etc.
+ * Recopila información del viaje, agenda, lugares, documentos, etc.
+ * NOTA: Los gastos/presupuesto NO se incluyen - ese módulo es independiente.
  */
 
 import { Platform } from 'react-native';
@@ -11,7 +12,6 @@ import { getLocales, getCalendars } from 'expo-localization';
 import { getViajeById } from '@/services/viajesService';
 import { getReservasByViajeId } from '@/services/reservasService';
 import { getLugaresByViajeId } from '@/services/lugaresService';
-import { getGastosByViajeId } from '@/services/gastosService';
 import { getDocumentosByViajeId } from '@/services/documentosService';
 import { getDiasByViajeId } from '@/services/diasViajeService';
 import { getEventosByDiaId } from '@/services/eventosService';
@@ -21,12 +21,10 @@ import type {
   CopilotScreen,
   ActionType,
 } from '@/types/asistente';
-import type { Viaje } from '@/types/viaje';
 import type { DiaViaje } from '@/types/diaViaje';
 import type { EventoPersonalizado } from '@/types/evento';
 import type { Reserva } from '@/types/reserva';
 import type { Lugar } from '@/types/lugar';
-import type { Gasto } from '@/types/gasto';
 import type { Documento } from '@/types/documento';
 
 // ============================================
@@ -172,11 +170,10 @@ export async function buildContextPack(
 
   // Cargar datos del viaje
   try {
-    const [viaje, reservas, lugares, gastos, documentos, dias] = await Promise.all([
+    const [viaje, reservas, lugares, documentos, dias] = await Promise.all([
       getViajeById(tripId),
       getReservasByViajeId(tripId),
       getLugaresByViajeId(tripId),
-      getGastosByViajeId(tripId),
       getDocumentosByViajeId(tripId),
       getDiasByViajeId(tripId),
     ]);
@@ -265,23 +262,9 @@ export async function buildContextPack(
       byCategory: docsByCategory,
     };
 
-    // Construir gastos
-    const totalGastos = gastos.reduce((sum: number, g: Gasto) => sum + g.monto, 0);
-    const gastosByCategory: Record<string, number> = {};
-    gastos.forEach((g: Gasto) => {
-      const cat = g.categoria;
-      gastosByCategory[cat] = (gastosByCategory[cat] || 0) + g.monto;
-    });
+    // NOTA: Los gastos NO se incluyen - el módulo de presupuesto es independiente del asistente
 
-    const expensesInfo: ContextPack['expenses'] = {
-      total: totalGastos,
-      budget: viaje.presupuesto || undefined,
-      percentUsed: viaje.presupuesto ? (totalGastos / viaje.presupuesto) * 100 : undefined,
-      currency: viaje.moneda || 'EUR',
-      byCategory: gastosByCategory,
-    };
-
-    // Retornar ContextPack completo
+    // Retornar ContextPack completo (sin expenses)
     return {
       ...baseContextPack,
       trip: tripInfo,
@@ -289,7 +272,6 @@ export async function buildContextPack(
       reservations: reservationsInfo,
       places: placesInfo,
       documents: documentsInfo,
-      expenses: expensesInfo,
     };
   } catch (error) {
     console.error('[ContextPackBuilder] Error cargando datos del viaje:', error);
@@ -375,13 +357,7 @@ export function contextPackToPromptString(pack: ContextPack): string {
     lines.push(`\nLUGARES GUARDADOS: ${pack.places.totalSaved}`);
   }
 
-  // Gastos
-  if (pack.expenses) {
-    lines.push(`\nGASTOS: ${pack.expenses.total.toFixed(2)} ${pack.expenses.currency}`);
-    if (pack.expenses.budget) {
-      lines.push(`Presupuesto: ${pack.expenses.budget} ${pack.expenses.currency} (${pack.expenses.percentUsed?.toFixed(0)}% usado)`);
-    }
-  }
+  // NOTA: Los gastos NO se incluyen - módulo independiente
 
   // Preferencias del usuario
   lines.push(`\nPREFERENCIAS DEL USUARIO:`);

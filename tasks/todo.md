@@ -4,7 +4,7 @@
 
 ### Lo que YA tenemos funcionando:
 - ✅ Chat con Gemini 2.0 Flash (modelo adecuado, mantener)
-- ✅ Contexto básico: viaje, reservas, lugares, gastos
+- ✅ Contexto básico: viaje, reservas, lugares (gastos excluidos - módulo independiente)
 - ✅ OCR de documentos con visión
 - ✅ Persistencia de conversaciones en SQLite (`conversacionesService.ts`)
 - ✅ Google Places API integrada (búsqueda, detalles, fotos)
@@ -58,8 +58,8 @@
   - reservations: [...] (solo como contexto, sin acciones)
   - places: { saved: [...] }
   - documents: [...]
-  - expenses: { items: [...], total, budget }
   - capabilities: { availableActions[], canWriteData }
+  - (gastos/expenses excluidos - módulo independiente del Copilot)
   ```
 - [x] 1.2 Crear `contextPackBuilder.ts` que construya el pack dinámicamente
 - [ ] 1.3 Modificar `chatStore.ts` para pasar pantalla actual y selecciones
@@ -117,35 +117,28 @@
 - [x] 5.3 Crear `copilotService.ts` en frontend para comunicación con nuevo endpoint
 - [x] 5.4 Implementar parsing de function calls y conversión a acciones
 
-### FASE 6: UI del Historial de Conversaciones
-- [ ] 6.1 Crear `ConversationListScreen.tsx` (lista tipo ChatGPT):
-  - Lista de conversaciones agrupadas por viaje
-  - Conversaciones generales (sin viaje asociado)
+### FASE 6: UI del Historial de Conversaciones ✅ COMPLETADA
+- [x] 6.1 Reescribir `ConversationHistoryList.tsx` (lista tipo ChatGPT):
+  - Lista de conversaciones agrupadas por fecha (Hoy, Ayer, Esta semana, etc.)
   - Búsqueda en historial
-  - Deslizar para eliminar
-- [ ] 6.2 Modificar `AssistantScreen.tsx`:
+  - Long-press para renombrar/eliminar
+- [x] 6.2 Modificar `AssistantScreen.tsx`:
+  - Header dinámico con título de conversación
   - Botón "Nueva conversación" en header
-  - Botón "Historial" que navega a ConversationListScreen
-  - Auto-guardar conversación al salir
-- [ ] 6.3 Implementar reanudación de conversaciones:
+  - Navegación back al historial
+- [x] 6.3 Implementar reanudación de conversaciones:
   - Cargar mensajes previos
   - Restaurar contexto del viaje
-  - Indicador visual de "conversación reanudada"
-- [ ] 6.4 Añadir funcionalidad de renombrar conversación
+- [x] 6.4 Añadir funcionalidad de renombrar conversación (renameConversacion en store y service)
 
-### FASE 7: Integración por Módulo
-- [ ] 7.1 En `TripDetailScreen`:
-  - FAB que abre el Copilot con contexto del viaje
-  - Sugerencias proactivas ("Tu viaje empieza en 3 días, ¿revisamos el checklist?")
-- [ ] 7.2 En `TripAgendaScreen`:
-  - Detectar días vacíos y sugerir actividades
-  - Botón "Planificar con Copilot" en días sin eventos
-  - Alertar sobre conflictos horarios
-- [ ] 7.3 En `TripMapScreen`:
-  - Sugerir rutas optimizadas entre lugares guardados
-  - Botón "¿Qué hay cerca?" que consulta al Copilot
-  - Crear lista de lugares desde sugerencias del Copilot
-- [ ] 7.4 Actualizar `useAssistantContext` con sugerencias más inteligentes
+### FASE 7: Integración por Módulo ✅ COMPLETADA
+- [x] 7.1 En `TripDetailScreen`:
+  - CopilotFAB que navega a AssistantScreen con viajeId
+- [x] 7.2 En `TripAgendaScreen`:
+  - CopilotFAB que navega a AssistantScreen con viajeId (posición ajustada para botón "Añadir evento")
+- [x] 7.3 En `TripMapScreen`:
+  - CopilotFAB que navega a AssistantScreen con viajeId (posición bottom-left)
+- [x] 7.4 Creado componente `CopilotFAB.tsx` reutilizable con animaciones Reanimated
 
 ---
 
@@ -336,6 +329,25 @@ Plan v2 mejorado con:
 | Prompt muy largo | Comprimir contexto por pantalla (solo datos relevantes) |
 
 ### Siguientes pasos
-1. **Confirmar este plan** - ¿Algún ajuste antes de empezar?
-2. **Empezar por Fase 0** - Configuración del Copilot (base para todo)
-3. **Iterar incrementalmente** - Cada fase es testeable por separado
+1. ~~**Confirmar este plan** - ¿Algún ajuste antes de empezar?~~
+2. ~~**Empezar por Fase 0** - Configuración del Copilot (base para todo)~~
+3. ~~**Iterar incrementalmente** - Cada fase es testeable por separado~~
+
+---
+
+## Cambios Recientes (26/12/2024)
+
+### Gastos/Presupuesto eliminados del Copilot
+El módulo de gastos es independiente del asistente. Se eliminaron todas las referencias a gastos/presupuesto de:
+- `contextPackBuilder.ts` - Ya no carga ni incluye gastos
+- `asistente.ts` (tipos) - Eliminados gastoActual, presupuesto de ContextoViaje
+- `assistantPrompt.ts` - Eliminadas referencias a presupuesto en el prompt y sugerencias
+- `assistantService.ts` - Eliminados budget, currentExpense del contexto API
+- `AssistantBottomSheet.tsx` - Ya no carga gastos
+- `AssistantScreen.tsx` - Ya no carga gastos
+- `viatio-backend/src/types/index.ts` - Eliminado expenses de CopilotRequest
+- `viatio-backend/src/routes/copilot.ts` - Eliminada sección de gastos del prompt
+
+### Fases 6 y 7 completadas
+- UI de historial con agrupación por fecha, búsqueda y renombrado
+- CopilotFAB integrado en TripDetail, Agenda y Map

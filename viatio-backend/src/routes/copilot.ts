@@ -183,7 +183,7 @@ const copilotFunctions = [
 // ============================================
 
 function buildCopilotPrompt(contextPack: CopilotRequest['contextPack']): string {
-  const { user, ui, trip, agenda, reservations, places, expenses } = contextPack;
+  const { user, ui, trip, agenda, reservations, places } = contextPack;
   const settings = user.copilotSettings;
   const prefs = user.preferences;
 
@@ -277,16 +277,6 @@ ${reservations.slice(0, 5).map(r => `  - ${r.name} [${r.category}] ${r.date || '
 LUGARES GUARDADOS (${places.totalSaved}):
 ${places.saved.slice(0, 5).map(p => `  - ${p.name} [${p.category}]`).join('\n')}
 `;
-  }
-
-  // Gastos
-  if (expenses) {
-    prompt += `
-GASTOS: ${expenses.total.toFixed(2)} ${expenses.currency}`;
-    if (expenses.budget) {
-      prompt += ` / Presupuesto: ${expenses.budget} ${expenses.currency} (${expenses.percentUsed?.toFixed(0)}% usado)`;
-    }
-    prompt += '\n';
   }
 
   prompt += `

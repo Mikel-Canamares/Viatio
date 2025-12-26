@@ -209,8 +209,7 @@ export interface ContextoViaje {
     nombre: string;
     categoria: string;
   }>;
-  gastoActual: number;
-  presupuesto?: number;
+  // NOTA: gastoActual y presupuesto eliminados - el módulo de gastos es independiente
 }
 
 /**
@@ -222,7 +221,6 @@ export interface ContextoViajeAPI {
   startDate?: string;
   endDate?: string;
   destination?: string;
-  // Nuevos campos para contexto completo
   reservations?: Array<{
     nombre: string;
     categoria: string;
@@ -232,8 +230,7 @@ export interface ContextoViajeAPI {
     nombre: string;
     categoria: string;
   }>;
-  budget?: number;
-  currentExpense?: number;
+  // NOTA: budget y currentExpense eliminados - el módulo de gastos es independiente
 }
 
 // ============================================
@@ -423,14 +420,7 @@ export interface ContextPack {
     byCategory: Record<string, number>;
   };
 
-  // Gastos
-  expenses?: {
-    total: number;
-    budget?: number;
-    percentUsed?: number;
-    currency: string;
-    byCategory: Record<string, number>;
-  };
+  // NOTA: Los gastos/presupuesto NO se incluyen - el módulo de gastos es independiente del Copilot
 
   // Capacidades disponibles (qué acciones puede ejecutar)
   capabilities: {

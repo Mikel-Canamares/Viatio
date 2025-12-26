@@ -195,13 +195,7 @@ export interface CopilotRequest {
       total: number;
       byCategory: Record<string, number>;
     };
-    expenses?: {
-      total: number;
-      budget?: number;
-      percentUsed?: number;
-      currency: string;
-      byCategory: Record<string, number>;
-    };
+    // NOTA: expenses eliminado - el módulo de gastos es independiente del Copilot
     capabilities: {
       availableActions: string[];
       canWriteData: boolean;

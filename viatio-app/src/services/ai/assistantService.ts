@@ -59,18 +59,15 @@ export async function sendMessage(
       content: m.content,
     }));
 
-    // Transformar contexto al formato de la API (enviar TODA la información)
+    // Transformar contexto al formato de la API (enviar información del viaje)
     const contextForAPI: ContextoViajeAPI | undefined = contexto ? {
       tripId: contexto.viajeId,
       tripName: contexto.destino,
       destination: contexto.destino,
       startDate: contexto.fechaInicio,
       endDate: contexto.fechaFin,
-      // Nuevos campos: enviar contexto completo
       reservations: contexto.reservas,
       places: contexto.lugares,
-      budget: contexto.presupuesto,
-      currentExpense: contexto.gastoActual,
     } : undefined;
 
     // Preparar request
