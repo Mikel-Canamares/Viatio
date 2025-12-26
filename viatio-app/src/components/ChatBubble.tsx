@@ -3,27 +3,32 @@
  *
  * Burbuja de mensaje para el chat del asistente.
  * Diferencia visualmente mensajes del usuario y del asistente.
+ * Soporta acciones ejecutables del Copilot.
  */
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '@/config/theme';
-import type { MensajeChat } from '@/types/asistente';
+import { ActionButtonsContainer } from './ActionButton';
+import type { MensajeChat, MensajeChatConAcciones, AgentAction } from '@/types/asistente';
 
 // ============================================
 // PROPS
 // ============================================
 
 interface ChatBubbleProps {
-  mensaje: MensajeChat;
+  mensaje: MensajeChat | MensajeChatConAcciones;
+  onActionPress?: (action: AgentAction) => Promise<void>;
 }
 
 // ============================================
 // COMPONENT
 // ============================================
 
-export function ChatBubble({ mensaje }: ChatBubbleProps) {
+export function ChatBubble({ mensaje, onActionPress }: ChatBubbleProps) {
   const isUser = mensaje.role === 'user';
+  const actions = 'actions' in mensaje ? mensaje.actions : undefined;
+  const hasActions = actions && actions.length > 0 && !isUser;
 
   return (
     <View style={[styles.container, isUser ? styles.containerUser : styles.containerAssistant]}>
@@ -31,6 +36,14 @@ export function ChatBubble({ mensaje }: ChatBubbleProps) {
         <Text style={[styles.content, isUser ? styles.contentUser : styles.contentAssistant]}>
           {mensaje.content}
         </Text>
+
+        {/* Botones de acción (solo para mensajes del asistente) */}
+        {hasActions && onActionPress && (
+          <ActionButtonsContainer
+            actions={actions!}
+            onActionPress={onActionPress}
+          />
+        )}
       </View>
       <Text style={[styles.timestamp, isUser ? styles.timestampUser : styles.timestampAssistant]}>
         {formatTime(mensaje.timestamp)}

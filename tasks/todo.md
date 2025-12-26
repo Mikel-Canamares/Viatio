@@ -35,20 +35,20 @@
 
 ## ✅ TODOs - Plan de Implementación
 
-### FASE 0: Configuración del Copilot (Nueva Pantalla)
-- [ ] 0.1 Crear interfaz `CopilotPreferences` en `types/asistente.ts`
-- [ ] 0.2 Crear `useCopilotStore.ts` para persistir preferencias del agente
-- [ ] 0.3 Crear pantalla `CopilotSettingsScreen.tsx` con:
+### FASE 0: Configuración del Copilot (Nueva Pantalla) ✅ COMPLETADA
+- [x] 0.1 Crear interfaz `CopilotPreferences` en `types/asistente.ts`
+- [x] 0.2 Crear `useCopilotStore.ts` para persistir preferencias del agente
+- [x] 0.3 Crear pantalla `CopilotSettingsScreen.tsx` con:
   - Módulos donde aparece (toggles: Agenda, Mapa, Detalle viaje, Chat propio)
   - Tono de respuestas (Profesional / Amigable / Conciso)
   - Longitud de respuestas (Breve / Normal / Detallada)
   - Idioma de respuestas (Mismo del dispositivo / Forzar español/inglés)
   - Preferencias de viaje (ritmo, intereses, restricciones alimentarias, movilidad)
-- [ ] 0.4 Añadir entrada "Configurar Copilot" en SettingsScreen
-- [ ] 0.5 Crear migración para tabla `copilot_preferences` en SQLite
+- [x] 0.4 Añadir entrada "Configurar Copilot" en SettingsScreen
+- [ ] 0.5 Crear migración para tabla `copilot_preferences` en SQLite (Usa AsyncStorage por ahora)
 
-### FASE 1: Context Pack Completo
-- [ ] 1.1 Crear interfaz `ContextPack` completa en `types/asistente.ts`:
+### FASE 1: Context Pack Completo ✅ COMPLETADA
+- [x] 1.1 Crear interfaz `ContextPack` completa en `types/asistente.ts`:
   ```
   - app: { version, platform, locale, timezone }
   - user: { name, travelStyle[], pace, budget, mobility, food }
@@ -61,12 +61,12 @@
   - expenses: { items: [...], total, budget }
   - capabilities: { availableActions[], canWriteData }
   ```
-- [ ] 1.2 Crear `contextPackBuilder.ts` que construya el pack dinámicamente
+- [x] 1.2 Crear `contextPackBuilder.ts` que construya el pack dinámicamente
 - [ ] 1.3 Modificar `chatStore.ts` para pasar pantalla actual y selecciones
-- [ ] 1.4 Incluir preferencias del usuario desde `useCopilotStore`
+- [x] 1.4 Incluir preferencias del usuario desde `useCopilotStore`
 
-### FASE 2: Sistema de Acciones del Agente
-- [ ] 2.1 Definir interfaz `AgentAction` en `types/asistente.ts`:
+### FASE 2: Sistema de Acciones del Agente ✅ COMPLETADA
+- [x] 2.1 Definir interfaz `AgentAction` en `types/asistente.ts`:
   ```typescript
   type ActionType =
     | 'create_agenda_item'    // Añadir evento a la agenda
@@ -77,11 +77,11 @@
     | 'navigate_to'           // Navegar a otra pantalla
     | 'show_on_map';          // Mostrar punto en el mapa
   ```
-- [ ] 2.2 Crear interfaz `AgentResponse` (mensaje + actions[])
-- [ ] 2.3 Crear `actionExecutor.ts` que ejecute cada tipo de acción
-- [ ] 2.4 Crear componente `ActionButton.tsx` para renderizar acciones
-- [ ] 2.5 Crear componente `ActionConfirmModal.tsx` para acciones que requieren confirmación
-- [ ] 2.6 Modificar `ChatBubble.tsx` para mostrar botones de acción al final del mensaje
+- [x] 2.2 Crear interfaz `AgentResponse` (mensaje + actions[])
+- [x] 2.3 Crear `actionExecutor.ts` que ejecute cada tipo de acción
+- [x] 2.4 Crear componente `ActionButton.tsx` para renderizar acciones
+- [x] 2.5 Confirmación integrada en `actionExecutor.ts` con Alert.alert
+- [x] 2.6 Modificar `ChatBubble.tsx` para mostrar botones de acción al final del mensaje
 
 ### FASE 3: Integración con Google Places (Sugerencias Reales)
 - [ ] 3.1 Crear `copilotPlacesService.ts` que use `googlePlacesService.ts`:

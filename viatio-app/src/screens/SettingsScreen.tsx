@@ -8,6 +8,8 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Alert, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { ProfileStackParamList } from '@/navigation/types';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { PageHeader } from '@/components/PageHeader';
 import { Card } from '@/components/Card';
@@ -37,8 +39,10 @@ const FORMATOS_FECHA: SelectOption[] = [
   { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD' },
 ];
 
+type NavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'Settings'>;
+
 export default function SettingsScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp>();
   const { config, isLoading, loadConfig, updateConfig, resetConfig } = useConfiguracionStore();
   const [cacheSize, setCacheSize] = useState<string>('Calculando...');
 
@@ -237,6 +241,17 @@ export default function SettingsScreen() {
             options={idiomasOptions}
             onSelect={handleIdiomaChange}
             icon="language-outline"
+          />
+        </Card>
+
+        {/* VIATIO COPILOT */}
+        <SectionTitle title="Asistente IA" />
+        <Card padding={0} style={styles.card}>
+          <ProfileMenuItem
+            icon="sparkles-outline"
+            label="Configurar Copilot"
+            value="Personaliza tu asistente"
+            onPress={() => navigation.navigate('CopilotSettings')}
           />
         </Card>
 
