@@ -83,21 +83,21 @@
 - [x] 2.5 Confirmación integrada en `actionExecutor.ts` con Alert.alert
 - [x] 2.6 Modificar `ChatBubble.tsx` para mostrar botones de acción al final del mensaje
 
-### FASE 3: Integración con Google Places (Sugerencias Reales)
-- [ ] 3.1 Crear `copilotPlacesService.ts` que use `googlePlacesService.ts`:
+### FASE 3: Integración con Google Places (Sugerencias Reales) ✅ COMPLETADA
+- [x] 3.1 Crear `copilotPlacesService.ts` que use `googlePlacesService.ts`:
   - `suggestNearbyActivities(lat, lng, preferences)` → POIs cercanos
   - `suggestRestaurants(lat, lng, preferences)` → Restaurantes según restricciones
   - `getPointsOfInterest(destination, categories)` → Atracciones principales
-- [ ] 3.2 Crear función `buildPlacesSuggestions()` para formatear resultados para el agente
-- [ ] 3.3 Integrar en el backend para que Gemini pueda "llamar" a estas funciones (function calling)
-- [ ] 3.4 Cachear resultados de Places para reducir llamadas a la API
+- [x] 3.2 Crear función `buildPlacesSuggestions()` para formatear resultados para el agente
+- [x] 3.3 Integrar en el backend para que Gemini pueda "llamar" a estas funciones (function calling)
+- [x] 3.4 Cachear resultados de Places para reducir llamadas a la API (AsyncStorage con TTL 1h)
 
-### FASE 4: Prompt del Agente Mejorado
-- [ ] 4.1 Reescribir `ASSISTANT_PROMPT` como "Viatio Copilot":
+### FASE 4: Prompt del Agente Mejorado ✅ COMPLETADA (integrado en Fase 3)
+- [x] 4.1 Reescribir `ASSISTANT_PROMPT` como "Viatio Copilot":
   - Personalidad configurable según preferencias del usuario
   - Instrucciones de formato JSON para acciones
   - Comportamiento diferenciado por `currentScreen`
-- [ ] 4.2 Definir comportamiento por módulo:
+- [x] 4.2 Definir comportamiento por módulo:
   - **Agenda**: Detectar huecos, sugerir actividades, optimizar tiempos
   - **Mapa**: Sugerir rutas, POIs cercanos, crear listas de lugares
   - **Detalle viaje**: Visión global, checklist de preparación, itinerarios
@@ -105,17 +105,17 @@
 - [ ] 4.3 Implementar "siguiente mejor acción" basada en contexto
 - [ ] 4.4 Añadir ejemplos de alternativas A/B en el prompt
 
-### FASE 5: Herramientas del Backend (Function Calling)
-- [ ] 5.1 Refactorizar `geminiService.ts` para usar function calling de Gemini
-- [ ] 5.2 Definir tools disponibles:
-  ```
-  - viatio.searchPlaces({ query, nearLat, nearLng, categories })
-  - viatio.getDirections({ origin, destination, mode })
-  - viatio.suggestItinerary({ tripId, date, preferences })
-  - viatio.getWeather({ destination, date }) // Opcional, API externa
-  ```
-- [ ] 5.3 Crear endpoint `/api/copilot` separado de `/api/assistant` actual
-- [ ] 5.4 Implementar parsing de function calls y ejecución
+### FASE 5: Herramientas del Backend (Function Calling) ✅ COMPLETADA
+- [x] 5.1 Crear nuevo endpoint `/api/copilot` con function calling de Gemini
+- [x] 5.2 Definir tools disponibles:
+  - `create_agenda_item` - Añadir evento a la agenda
+  - `search_places` - Buscar lugares
+  - `add_place_to_saved` - Guardar lugar
+  - `show_on_map` - Mostrar en mapa
+  - `navigate_to` - Navegar a pantalla
+  - `suggest_itinerary` - Proponer itinerario
+- [x] 5.3 Crear `copilotService.ts` en frontend para comunicación con nuevo endpoint
+- [x] 5.4 Implementar parsing de function calls y conversión a acciones
 
 ### FASE 6: UI del Historial de Conversaciones
 - [ ] 6.1 Crear `ConversationListScreen.tsx` (lista tipo ChatGPT):

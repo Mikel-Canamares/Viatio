@@ -6,6 +6,7 @@ import { apiLimiter, aiLimiter } from './middleware/rateLimiter';
 import healthRouter from './routes/health';
 import extractReservaRouter from './routes/extractReserva';
 import assistantRouter from './routes/assistant';
+import copilotRouter from './routes/copilot';
 
 // Validar configuración antes de iniciar
 validateConfig();
@@ -25,6 +26,7 @@ app.use(apiLimiter);
 app.use('/health', healthRouter);
 app.use('/api/extract-reserva', aiLimiter, extractReservaRouter);
 app.use('/api/assistant', aiLimiter, assistantRouter);
+app.use('/api/copilot', aiLimiter, copilotRouter);
 
 // Error handler
 app.use(errorHandler);
