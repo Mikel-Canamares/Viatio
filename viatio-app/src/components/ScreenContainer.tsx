@@ -7,7 +7,7 @@
 
 import { ReactNode } from 'react';
 import { View, ScrollView, StyleSheet, ViewStyle } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, Edge } from 'react-native-safe-area-context';
 import { theme } from '@/config';
 
 interface ScreenContainerProps {
@@ -19,15 +19,19 @@ interface ScreenContainerProps {
 
   /** Estilos adicionales para el contenedor */
   style?: ViewStyle;
+
+  /** Bordes del SafeArea a aplicar (por defecto: top, left, right) */
+  edges?: Edge[];
 }
 
 export function ScreenContainer({
   children,
   scroll = false,
   style,
+  edges = ['top', 'left', 'right'],
 }: ScreenContainerProps) {
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={edges}>
       {scroll ? (
         <ScrollView
           style={[styles.content, style]}

@@ -14,6 +14,7 @@ export { SecondaryButton } from './SecondaryButton';
 export { Card } from './Card';
 export { Input } from './Input';
 export { DateInput } from './DateInput';
+export { DatePickerInput } from './DatePickerInput';
 export { TimeInput } from './TimeInput';
 export { DateRangePicker } from './DateRangePicker';
 export { CategoryBadge, CATEGORY_COLORS, getCategoryConfig } from './CategoryBadge';

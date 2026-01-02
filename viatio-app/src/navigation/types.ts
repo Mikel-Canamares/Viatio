@@ -35,6 +35,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 export type RootTabParamList = {
   Home: undefined;
   Calendar: undefined;
+  Shared: undefined;
   Assistant: undefined;
   Profile: undefined;
 };
@@ -106,6 +107,46 @@ export type ProfileStackParamList = {
   Settings: undefined;
   CopilotSettings: undefined;
   Help: undefined;
+};
+
+// ============================================
+// SHARED TRIPS STACK NAVIGATOR
+// ============================================
+/**
+ * ParamList para el stack de Viajes Compartidos.
+ *
+ * Rutas disponibles:
+ * - SharedTrips: Lista de viajes compartidos
+ * - SharedTripDetail: Detalle de un viaje compartido
+ * - CreateSharedTrip: Crear nuevo viaje compartido
+ * - EditSharedTrip: Editar viaje compartido
+ * - TripMembers: Lista de miembros del viaje
+ * - InviteToTrip: Invitar usuarios al viaje
+ * - JoinTripByCode: Unirse a viaje con código
+ * - SharedExpenses: Gastos compartidos del viaje
+ * - AddSharedExpense: Añadir/editar gasto compartido
+ * - ExpenseDetail: Detalle de un gasto
+ * - TripSettlements: Liquidaciones del viaje
+ * - RecordSettlement: Registrar pago de liquidación
+ */
+export type SharedStackParamList = {
+  SharedTrips: undefined;
+  SharedTripDetail: { tripId: string };
+  CreateSharedTrip: undefined;
+  EditSharedTrip: { tripId: string };
+  TripMembers: { tripId: string };
+  InviteToTrip: { tripId: string };
+  JoinTripByCode: undefined;
+  SharedExpenses: { tripId: string };
+  AddSharedExpense: { tripId: string; expenseId?: string };
+  ExpenseDetail: { tripId: string; expenseId: string };
+  TripSettlements: { tripId: string };
+  RecordSettlement: {
+    tripId: string;
+    fromUid: string;
+    toUid: string;
+    amount: number;
+  };
 };
 
 // ============================================

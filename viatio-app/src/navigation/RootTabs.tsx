@@ -12,6 +12,7 @@ import { TripCalendarScreen } from '@/screens';
 import AssistantScreen from '@/screens/AssistantScreen';
 import { HomeStackNavigator } from './HomeStackNavigator';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
+import { SharedStackNavigator } from './SharedStackNavigator';
 import type { RootTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -61,6 +62,17 @@ export function RootTabs() {
           tabBarLabel: 'Calendario',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="calendar-outline" size={size} color={color} />
+          ),
+        }}
+      />
+
+      <Tab.Screen
+        name="Shared"
+        component={SharedStackNavigator}
+        options={{
+          tabBarLabel: 'Compartido',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="people-outline" size={size} color={color} />
           ),
         }}
       />

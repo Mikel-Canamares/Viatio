@@ -45,7 +45,7 @@ export default function AddSharedExpenseScreen() {
   // Estado del formulario
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState<CategoriaGasto>('food');
+  const [category, setCategory] = useState<CategoriaGasto>('comida');
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [paidByUid, setPaidByUid] = useState<string>(user?.uid || '');
   const [splitMethod, setSplitMethod] = useState<SplitMethod>('equal');
