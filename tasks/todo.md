@@ -379,3 +379,15 @@ El módulo de gastos es independiente del asistente. Se eliminaron todas las ref
   - Actualizado `viatio-backend/src/types/index.ts`:
     - Añadido `destinationCoords` y `lodgingBase` al tipo `trip`
 - **Archivos modificados**: `viatio-backend/src/routes/copilot.ts`, `viatio-backend/src/types/index.ts`
+
+**Problema 4: Copilot no usaba el mapa como herramienta activa**
+- **Causa**: El Copilot daba información textual pero no ejecutaba acciones automáticamente para mostrar lugares en el mapa
+- **Solución**:
+  - Reescrito el prompt del backend para enfatizar "ACTÚA, NO SOLO INFORMES"
+  - Añadidas instrucciones de "COMBO OBLIGATORIO": search_places + show_on_map
+  - Modificado `actionExecutor.ts`: search_places ahora navega al mapa automáticamente si hay resultados
+  - Añadido useEffect en `AssistantScreen.tsx` que ejecuta acciones automáticas (search_places, show_on_map) sin necesidad de pulsar botón
+- **Archivos modificados**:
+  - `viatio-backend/src/routes/copilot.ts` - Prompt mejorado con instrucciones de herramientas
+  - `viatio-app/src/services/ai/actionExecutor.ts` - search_places ahora llama a onShowOnMap
+  - `viatio-app/src/screens/AssistantScreen.tsx` - Auto-ejecución de acciones

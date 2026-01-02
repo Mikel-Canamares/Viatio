@@ -237,6 +237,35 @@ export default function AssistantScreen({ route, navigation }: Props) {
     }
   }, [navigation, viajeId]);
 
+  // Ejecutar acciones automáticas cuando llega un mensaje del asistente
+  // Acciones como search_places se ejecutan automáticamente sin necesidad de pulsar botón
+  useEffect(() => {
+    if (mensajes.length === 0 || loading) return;
+
+    const lastMessage = mensajes[mensajes.length - 1];
+    if (lastMessage.role !== 'assistant' || !lastMessage.actions) return;
+
+    // Tipos de acciones que se ejecutan automáticamente (sin confirmación del usuario)
+    const autoExecutableTypes = ['search_places', 'show_on_map'];
+
+    // Filtrar acciones autoejecutables que no hayan sido ejecutadas aún
+    const autoActions = lastMessage.actions.filter(
+      action =>
+        autoExecutableTypes.includes(action.type) &&
+        !action.requiresConfirmation &&
+        !lastMessage.actionResults?.some(r => r.actionId === action.id)
+    );
+
+    // Ejecutar solo la primera acción automática (evitar múltiples navegaciones)
+    if (autoActions.length > 0) {
+      const actionToExecute = autoActions[0];
+      console.log('[AssistantScreen] Ejecutando acción automática:', actionToExecute.type);
+      handleActionPress(actionToExecute).catch(err => {
+        console.error('[AssistantScreen] Error en acción automática:', err);
+      });
+    }
+  }, [mensajes, loading, handleActionPress]);
+
   // ============================================
   // RENDER HELPERS
   // ============================================

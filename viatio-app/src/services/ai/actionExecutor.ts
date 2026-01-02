@@ -89,6 +89,7 @@ async function executeCreateAgendaItem(
 
 /**
  * Buscar lugares con Google Places
+ * NOTA: Esta acción ahora también puede mostrar resultados en el mapa automáticamente
  */
 async function executeSearchPlaces(
   params: SearchPlacesParams,
@@ -115,6 +116,15 @@ async function executeSearchPlaces(
 
     if (context.onSearchComplete) {
       context.onSearchComplete(results);
+    }
+
+    // Si hay resultados y tenemos coordenadas, mostrar automáticamente en el mapa
+    if (results.length > 0 && nearLat && nearLng && context.onShowOnMap) {
+      context.onShowOnMap({
+        lat: nearLat,
+        lng: nearLng,
+        title: query ? `Resultados: ${query}` : 'Lugares cercanos',
+      });
     }
 
     return {
