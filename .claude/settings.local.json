@@ -12,7 +12,8 @@
       "Bash(then echo \"ios exists\")",
       "Bash(adb devices:*)",
       "Bash(git restore:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(dir \"d:\\\\PROYECTOS\\\\VIATIO\\\\Viatio\\\\viatio-app\\\\src\")"
     ]
   }
 }
