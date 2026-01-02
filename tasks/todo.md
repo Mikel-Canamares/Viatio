@@ -1,337 +1,413 @@
-# Sistema de Categorías Centralizado
+# Plan de Mejora: Viatio Copilot v2
 
-## ✅ Implementación completada
+## 📊 Análisis del Estado Actual
 
-Se ha creado un sistema centralizado de categorías, colores e iconos para mantener coherencia visual en toda la aplicación.
+### Lo que YA tenemos funcionando:
+- ✅ Chat con Gemini 2.0 Flash (modelo adecuado, mantener)
+- ✅ Contexto básico: viaje, reservas, lugares (gastos excluidos - módulo independiente)
+- ✅ OCR de documentos con visión
+- ✅ Persistencia de conversaciones en SQLite (`conversacionesService.ts`)
+- ✅ Google Places API integrada (búsqueda, detalles, fotos)
+- ✅ Google Directions API integrada
+- ✅ Sistema de configuración con AsyncStorage (`useConfiguracionStore`)
+- ✅ Hook `useAssistantContext` para sugerencias por pantalla
 
-### 📋 Archivos modificados
+### Lo que FALTA para ser un verdadero agente:
+- ❌ Configuración específica del agente (tono, módulos, estilo)
+- ❌ Respuestas con acciones ejecutables
+- ❌ Integración real con Google Places desde el agente
+- ❌ Context Pack completo (pantalla actual, día seleccionado, etc.)
+- ❌ UI para historial de conversaciones tipo ChatGPT
+- ❌ Comportamiento diferenciado por módulo (Agenda, Mapa, Detalle viaje)
 
-#### 1. **Nuevo archivo centralizado**
-- `src/config/categories.ts` - Sistema maestro de categorías
+---
 
-#### 2. **Types actualizados**
-- `src/types/reserva.ts` - Ahora importa del sistema centralizado
-- `src/types/evento.ts` - Colores unificados para eventos
-- `src/types/lugar.ts` - Marcadores de mapa con colores consistentes
-- `src/types/gasto.ts` - Categorías de gastos alineadas
-- `src/types/documento.ts` - Incluye categorías especiales (identidad, seguro)
+## 🎯 Objetivos Refinados
 
-#### 3. **Componentes actualizados**
-- `src/components/CategoryBadge.tsx` - Usa sistema centralizado
-- `src/components/EventoCategoriaSelector.tsx` - Comentario actualizado
+1. **Pantalla de Configuración del Copilot** - El usuario personaliza el agente
+2. **Context Pack enriquecido** - Información completa del estado actual
+3. **Respuestas accionables** - Texto + botones que ejecutan acciones
+4. **Integración con Google Places** - Sugerencias reales basadas en ubicación
+5. **Historial de conversaciones** - Como ChatGPT, con lista y reanudación
+6. **Módulos activos**: Chat propio, Agenda, Mapa, Detalle del viaje (NO reservas)
 
-### 🎨 Paleta de colores unificada
+---
 
-| Categoría | Color | Uso |
-|-----------|-------|-----|
-| **Transporte** | `#0066CC` (Azul) | Vuelos, trenes, autobuses, taxis |
-| **Alojamiento** | `#16A34A` (Verde) | Hoteles, apartamentos, camping |
-| **Comida** | `#EA580C` (Naranja) | Restaurantes, comida |
-| **Actividades** | `#8B5CF6` (Púrpura) | Turismo, cultura, deportes, naturaleza |
-| **Compras** | `#EC4899` (Rosa) | Compras |
-| **Otros** | `#6B7280` (Gris) | Categoría genérica |
-| **Identidad** | `#3B82F6` (Azul claro) | Solo documentos |
-| **Seguro** | `#7C3AED` (Púrpura oscuro) | Solo documentos |
+## ✅ TODOs - Plan de Implementación
 
-### 🏗️ Estructura jerárquica
+### FASE 0: Configuración del Copilot (Nueva Pantalla) ✅ COMPLETADA
+- [x] 0.1 Crear interfaz `CopilotPreferences` en `types/asistente.ts`
+- [x] 0.2 Crear `useCopilotStore.ts` para persistir preferencias del agente
+- [x] 0.3 Crear pantalla `CopilotSettingsScreen.tsx` con:
+  - Módulos donde aparece (toggles: Agenda, Mapa, Detalle viaje, Chat propio)
+  - Tono de respuestas (Profesional / Amigable / Conciso)
+  - Longitud de respuestas (Breve / Normal / Detallada)
+  - Idioma de respuestas (Mismo del dispositivo / Forzar español/inglés)
+  - Preferencias de viaje (ritmo, intereses, restricciones alimentarias, movilidad)
+- [x] 0.4 Añadir entrada "Configurar Copilot" en SettingsScreen
+- [ ] 0.5 Crear migración para tabla `copilot_preferences` en SQLite (Usa AsyncStorage por ahora)
 
-```
-CATEGORÍAS BASE
-├─ transport (Transporte)
-│  ├─ plane (Avión)
-│  ├─ train (Tren)
-│  ├─ bus (Autobús)
-│  ├─ ferry (Ferry)
-│  ├─ taxi (Taxi)
-│  └─ car (Coche)
-│
-├─ accommodation (Alojamiento)
-│  ├─ hotel (Hotel)
-│  ├─ aparthotel (Apartahotel)
-│  ├─ apartment (Apartamento)
-│  ├─ room (Habitación)
-│  └─ camping (Camping)
-│
-├─ food (Comida)
-│  └─ restaurant (Restaurante)
-│
-├─ activity (Actividades)
-│  ├─ sightseeing (Turismo)
-│  ├─ culture (Cultura)
-│  ├─ sports (Deportes)
-│  ├─ nature (Naturaleza)
-│  ├─ entertainment (Ocio)
-│  ├─ nightlife (Noche)
-│  └─ relaxation (Descanso)
-│
-├─ shopping (Compras)
-└─ other (Otros)
-```
+### FASE 1: Context Pack Completo ✅ COMPLETADA
+- [x] 1.1 Crear interfaz `ContextPack` completa en `types/asistente.ts`:
+  ```
+  - app: { version, platform, locale, timezone }
+  - user: { name, travelStyle[], pace, budget, mobility, food }
+  - ui: { currentScreen, selectedTripId, selectedDayId, selectedPlaceId }
+  - trip: { id, title, destination, dateRange, party, lodgingBase }
+  - agenda: { days: [{ date, items: [...] }] }
+  - reservations: [...] (solo como contexto, sin acciones)
+  - places: { saved: [...] }
+  - documents: [...]
+  - capabilities: { availableActions[], canWriteData }
+  - (gastos/expenses excluidos - módulo independiente del Copilot)
+  ```
+- [x] 1.2 Crear `contextPackBuilder.ts` que construya el pack dinámicamente
+- [ ] 1.3 Modificar `chatStore.ts` para pasar pantalla actual y selecciones
+- [x] 1.4 Incluir preferencias del usuario desde `useCopilotStore`
 
-### 🔧 Funciones helper disponibles
+### FASE 2: Sistema de Acciones del Agente ✅ COMPLETADA
+- [x] 2.1 Definir interfaz `AgentAction` en `types/asistente.ts`:
+  ```typescript
+  type ActionType =
+    | 'create_agenda_item'    // Añadir evento a la agenda
+    | 'search_places'         // Buscar lugares con Google Places
+    | 'get_directions'        // Calcular ruta
+    | 'add_place_to_saved'    // Guardar lugar
+    | 'suggest_itinerary'     // Proponer itinerario completo
+    | 'navigate_to'           // Navegar a otra pantalla
+    | 'show_on_map';          // Mostrar punto en el mapa
+  ```
+- [x] 2.2 Crear interfaz `AgentResponse` (mensaje + actions[])
+- [x] 2.3 Crear `actionExecutor.ts` que ejecute cada tipo de acción
+- [x] 2.4 Crear componente `ActionButton.tsx` para renderizar acciones
+- [x] 2.5 Confirmación integrada en `actionExecutor.ts` con Alert.alert
+- [x] 2.6 Modificar `ChatBubble.tsx` para mostrar botones de acción al final del mensaje
 
+### FASE 3: Integración con Google Places (Sugerencias Reales) ✅ COMPLETADA
+- [x] 3.1 Crear `copilotPlacesService.ts` que use `googlePlacesService.ts`:
+  - `suggestNearbyActivities(lat, lng, preferences)` → POIs cercanos
+  - `suggestRestaurants(lat, lng, preferences)` → Restaurantes según restricciones
+  - `getPointsOfInterest(destination, categories)` → Atracciones principales
+- [x] 3.2 Crear función `buildPlacesSuggestions()` para formatear resultados para el agente
+- [x] 3.3 Integrar en el backend para que Gemini pueda "llamar" a estas funciones (function calling)
+- [x] 3.4 Cachear resultados de Places para reducir llamadas a la API (AsyncStorage con TTL 1h)
+
+### FASE 4: Prompt del Agente Mejorado ✅ COMPLETADA (integrado en Fase 3)
+- [x] 4.1 Reescribir `ASSISTANT_PROMPT` como "Viatio Copilot":
+  - Personalidad configurable según preferencias del usuario
+  - Instrucciones de formato JSON para acciones
+  - Comportamiento diferenciado por `currentScreen`
+- [x] 4.2 Definir comportamiento por módulo:
+  - **Agenda**: Detectar huecos, sugerir actividades, optimizar tiempos
+  - **Mapa**: Sugerir rutas, POIs cercanos, crear listas de lugares
+  - **Detalle viaje**: Visión global, checklist de preparación, itinerarios
+  - **Chat propio**: Modo conversacional libre, planificación general
+- [ ] 4.3 Implementar "siguiente mejor acción" basada en contexto
+- [ ] 4.4 Añadir ejemplos de alternativas A/B en el prompt
+
+### FASE 5: Herramientas del Backend (Function Calling) ✅ COMPLETADA
+- [x] 5.1 Crear nuevo endpoint `/api/copilot` con function calling de Gemini
+- [x] 5.2 Definir tools disponibles:
+  - `create_agenda_item` - Añadir evento a la agenda
+  - `search_places` - Buscar lugares
+  - `add_place_to_saved` - Guardar lugar
+  - `show_on_map` - Mostrar en mapa
+  - `navigate_to` - Navegar a pantalla
+  - `suggest_itinerary` - Proponer itinerario
+- [x] 5.3 Crear `copilotService.ts` en frontend para comunicación con nuevo endpoint
+- [x] 5.4 Implementar parsing de function calls y conversión a acciones
+
+### FASE 6: UI del Historial de Conversaciones ✅ COMPLETADA
+- [x] 6.1 Reescribir `ConversationHistoryList.tsx` (lista tipo ChatGPT):
+  - Lista de conversaciones agrupadas por fecha (Hoy, Ayer, Esta semana, etc.)
+  - Búsqueda en historial
+  - Long-press para renombrar/eliminar
+- [x] 6.2 Modificar `AssistantScreen.tsx`:
+  - Header dinámico con título de conversación
+  - Botón "Nueva conversación" en header
+  - Navegación back al historial
+- [x] 6.3 Implementar reanudación de conversaciones:
+  - Cargar mensajes previos
+  - Restaurar contexto del viaje
+- [x] 6.4 Añadir funcionalidad de renombrar conversación (renameConversacion en store y service)
+
+### FASE 7: Integración por Módulo ✅ COMPLETADA
+- [x] 7.1 En `TripDetailScreen`:
+  - CopilotFAB que navega a AssistantScreen con viajeId
+- [x] 7.2 En `TripAgendaScreen`:
+  - CopilotFAB que navega a AssistantScreen con viajeId (posición ajustada para botón "Añadir evento")
+- [x] 7.3 En `TripMapScreen`:
+  - CopilotFAB que navega a AssistantScreen con viajeId (posición bottom-left)
+- [x] 7.4 Creado componente `CopilotFAB.tsx` reutilizable con animaciones Reanimated
+
+---
+
+## 📋 Detalle de Interfaces Clave
+
+### CopilotPreferences (Fase 0.1)
 ```typescript
-// Obtener configuración completa
-getCategoryConfig(category: CategoryBase): CategoryConfig
+interface CopilotPreferences {
+  // Módulos donde aparece el Copilot
+  enabledModules: {
+    agenda: boolean;      // default: true
+    map: boolean;         // default: true
+    tripDetail: boolean;  // default: true
+    standalone: boolean;  // default: true (chat propio)
+  };
 
-// Obtener solo el color
-getCategoryColor(category: CategoryBase): string
+  // Personalidad y estilo
+  tone: 'professional' | 'friendly' | 'concise';  // default: 'friendly'
+  responseLength: 'brief' | 'normal' | 'detailed'; // default: 'normal'
+  language: 'device' | 'es' | 'en';               // default: 'device'
+  useEmojis: boolean;                              // default: true
 
-// Obtener solo el icono
-getCategoryIcon(category: CategoryBase): keyof typeof Ionicons.glyphMap
-
-// Subcategorías
-getTransportSubtypeConfig(subtype: TransportSubtype)
-getAccommodationSubtypeConfig(subtype: AccommodationSubtype)
-getActivitySubtypeConfig(subtype: ActivitySubtype)
-
-// Mapeo entre formatos
-mapCategoryToSpanish(category: CategoryBase): CategoriaGasto
-mapSpanishToCategory(category: CategoriaGasto): CategoryBase
-mapLugarToCategory(lugarCat: CategoriaLugar): CategoryBase
-mapDocumentoToCategory(docCat: CategoriaDocumento): CategoryBase | 'identity' | 'insurance'
+  // Preferencias de viaje (para sugerencias personalizadas)
+  travelPreferences: {
+    pace: 'relaxed' | 'balanced' | 'intense';     // default: 'balanced'
+    interests: string[];   // ['cultura', 'gastronomía', 'naturaleza', 'aventura', ...]
+    avoidances: string[];  // ['multitudes', 'madrugar', 'caminar mucho', ...]
+    foodRestrictions: string[]; // ['vegetariano', 'sin gluten', 'halal', ...]
+    mobilityLevel: 'full' | 'limited' | 'wheelchair'; // default: 'full'
+    budget: 'budget' | 'moderate' | 'luxury';     // default: 'moderate'
+  };
+}
 ```
 
-### ✨ Beneficios
-
-1. ✅ **Coherencia visual** - Mismo color para cada categoría en todos los módulos
-2. ✅ **Mantenimiento simple** - Cambiar un color/icono en un solo lugar
-3. ✅ **Escalabilidad** - Fácil añadir nuevas categorías o subcategorías
-4. ✅ **Tipado fuerte** - TypeScript garantiza uso correcto
-5. ✅ **Subcategorías preservadas** - Mantiene granularidad donde se necesita
-6. ✅ **Experiencia de usuario** - Usuarios identifican categorías visualmente
-
-### 📝 Cómo usar
-
+### AgentResponse (Fase 2.2)
 ```typescript
-// Ejemplo: Obtener color de una categoría
-import { getCategoryColor } from '@/config/categories';
+interface AgentResponse {
+  message: string;           // Texto natural para el usuario
+  actions: AgentAction[];    // 0-3 acciones propuestas
+  metadata?: {
+    confidence: number;      // 0.0 - 1.0
+    sourcesUsed: string[];   // ['google_places', 'trip_context', ...]
+  };
+}
 
-const color = getCategoryColor('transport'); // '#0066CC'
-
-// Ejemplo: Obtener configuración completa
-import { BASE_CATEGORIES } from '@/config/categories';
-
-const config = BASE_CATEGORIES.food;
-// { label: 'Comida', labelShort: 'Comida', icon: 'restaurant',
-//   color: '#EA580C', bgColor: 'rgba(...)', lightBg: '#FFEDD5' }
-
-// Ejemplo: Usar en un componente
-import { EVENTO_CATEGORIAS } from '@/types/evento';
-
-const eventoConfig = EVENTO_CATEGORIAS['sightseeing'];
-// Usa automáticamente el color de 'activity' (#8B5CF6)
+interface AgentAction {
+  id: string;
+  label: string;             // Texto del botón: "Añadir a agenda", "Ver en mapa"
+  type: ActionType;
+  requiresConfirmation: boolean;
+  params: Record<string, unknown>;
+  icon?: string;             // Icono Ionicons opcional
+}
 ```
 
-### 🎯 Próximos pasos sugeridos
+### Ejemplo de Respuesta del Copilot
 
-- [ ] Revisar visualmente en la app que los colores se vean bien
-- [ ] Verificar que todos los iconos sean coherentes
-- [ ] Considerar añadir más subcategorías si se necesitan
-- [ ] Documentar en README principal si es necesario
+**Usuario (en Mapa de Barcelona):** "¿Qué puedo visitar cerca del hotel?"
+
+**Respuesta:**
+```json
+{
+  "message": "Cerca de tu hotel (Hotel Ritz, Eixample) hay varias opciones interesantes:\n\n**Cultura:**\n• Casa Batlló (400m) - Obra maestra de Gaudí, imprescindible\n• La Pedrera (600m) - Otra joya modernista\n\n**Gastronomía:**\n• Cervecería Catalana (300m) - Tapas excelentes, rating 4.5\n• Tickets Bar (800m) - De los hermanos Adrià\n\n¿Te gustaría añadir alguno a tus lugares guardados o planificarlo para un día específico?",
+  "actions": [
+    {
+      "id": "a1",
+      "label": "Guardar Casa Batlló",
+      "type": "add_place_to_saved",
+      "requiresConfirmation": false,
+      "params": { "placeId": "ChIJ...", "name": "Casa Batlló", "category": "attraction" },
+      "icon": "bookmark-outline"
+    },
+    {
+      "id": "a2",
+      "label": "Ver todos en mapa",
+      "type": "show_on_map",
+      "requiresConfirmation": false,
+      "params": { "places": ["ChIJ...", "ChIJ...", "ChIJ...", "ChIJ..."] },
+      "icon": "map-outline"
+    },
+    {
+      "id": "a3",
+      "label": "Planificar visita mañana",
+      "type": "create_agenda_item",
+      "requiresConfirmation": true,
+      "params": { "date": "2024-03-15", "title": "Visita Casa Batlló", "placeId": "ChIJ..." },
+      "icon": "calendar-outline"
+    }
+  ],
+  "metadata": {
+    "confidence": 0.9,
+    "sourcesUsed": ["google_places", "trip_context"]
+  }
+}
+```
+
+---
+
+## 🔧 Consideraciones Técnicas
+
+### Modelo
+**Mantener `gemini-2.0-flash-exp`**:
+- Gratuito durante preview
+- Soporta function calling nativo
+- Context window de 1M tokens
+- Buena velocidad (~1-2s respuesta)
+
+### Function Calling vs JSON Parsing
+Usar function calling nativo de Gemini en lugar de pedir JSON en el prompt:
+- Más fiable (menos errores de parsing)
+- Gemini decide cuándo ejecutar herramientas
+- Respuestas más naturales
+
+### Límites de la API de Google Places
+- 100,000 requests/mes en el plan gratuito
+- Cachear resultados agresivamente (1h mínimo)
+- Priorizar búsquedas por destino sobre coordenadas exactas
+
+### Persistencia
+- Preferencias del Copilot: AsyncStorage (simple key-value)
+- Conversaciones: SQLite (ya implementado)
+- Caché de Places: AsyncStorage con TTL
+
+---
+
+## 🚀 Orden de Implementación Recomendado
+
+```
+FASE 0 (Configuración)     ████████░░ 2-3 días
+     ↓
+FASE 1 (Context Pack)      ██████░░░░ 2 días
+     ↓
+FASE 2 (Sistema Acciones)  ████████░░ 3 días
+     ↓
+FASE 4 (Prompt)            ██████░░░░ 2 días
+     ↓
+FASE 5 (Backend Tools)     ████████░░ 3 días
+     ↓
+FASE 3 (Google Places)     ██████░░░░ 2 días
+     ↓
+FASE 6 (UI Historial)      ██████░░░░ 2 días
+     ↓
+FASE 7 (Integración)       ████████░░ 3 días
+```
+
+**Prioridad**: 0 → 1 → 2 → 4 → 5 → 3 → 6 → 7
+
+La Fase 3 (Google Places) se puede hacer en paralelo con Fase 5 (Backend).
+
+---
+
+## 📱 Flujo de Usuario Final
+
+1. **Configuración inicial**: Usuario abre Settings → Configurar Copilot → Ajusta preferencias
+2. **En cualquier módulo habilitado**: Ve el FAB del Copilot con badge contextual
+3. **Abre el Copilot**: Chat con contexto precargado según la pantalla
+4. **Recibe sugerencias**: Texto + botones de acción
+5. **Ejecuta acciones**: Un tap añade evento, guarda lugar, etc.
+6. **Historial**: Puede ver, buscar y reanudar conversaciones anteriores
 
 ---
 
 ## Review
 
-### Resumen de cambios
-- ✅ Creado sistema centralizado en `src/config/categories.ts`
-- ✅ Actualizados todos los archivos de tipos para usar el sistema central
-- ✅ Componentes principales actualizados (CategoryBadge, EventoCategoriaSelector)
-- ✅ Compilación TypeScript exitosa sin errores
-- ✅ Preservadas todas las subcategorías existentes
-- ✅ Añadida categoría "shopping" que faltaba en algunos módulos
+### Resumen
+Plan v2 mejorado con:
+- **Pantalla de configuración** para personalizar el Copilot
+- **Módulos específicos**: Solo Agenda, Mapa, Detalle viaje y Chat propio (NO reservas)
+- **Acciones ejecutables** con botones en las respuestas
+- **Google Places integrado** para sugerencias reales
+- **Historial tipo ChatGPT** con reanudación
 
-### Riesgos potenciales
-- ⚠️ **Cambio visual**: Algunos colores pueden haber cambiado ligeramente (ej: eventos en calendario)
-- ⚠️ **Testing**: Recomendable probar visualmente todas las pantallas que usan categorías
-- ⚠️ **Migraciones**: Si hay datos antiguos con categorías, seguirán funcionando
+### Diferencias vs Plan v1
+| Aspecto | Plan v1 | Plan v2 |
+|---------|---------|---------|
+| Configuración usuario | No | Pantalla completa |
+| Módulos | Todos | Solo 4 (sin reservas) |
+| Google Places | Mencionado | Integración detallada |
+| Historial | Básico | Como ChatGPT |
+| Preferencias viaje | Básico | Detallado (ritmo, intereses, restricciones) |
 
-### Impacto en la base de datos
-- ✅ **Sin cambios en schema** - Los tipos de datos en SQLite siguen siendo los mismos
-- ✅ **Compatible con datos existentes** - No se requiere migración
+### Riesgos y Mitigaciones
+| Riesgo | Mitigación |
+|--------|------------|
+| Parsing de acciones falle | Fallback a texto plano si no hay JSON válido |
+| Latencia alta | Caché agresivo de Places, optimistic UI updates |
+| Límites API Places | Cachear 1h+, priorizar búsquedas generales |
+| Prompt muy largo | Comprimir contexto por pantalla (solo datos relevantes) |
 
-### 🔧 Correcciones de coherencia visual (23 dic 2025)
-
-**Problema detectado:** Tras pruebas visuales, se encontraron inconsistencias en colores e iconos en varios componentes.
-
-#### Archivos corregidos:
-
-1. **[src/components/ReservationCard.tsx](../viatio-app/src/components/ReservationCard.tsx)**
-   - ❌ Antes: `CATEGORIA_COLORS` hardcodeado con accommodation en rojo `#EF4444`
-   - ✅ Ahora: Importa de `BASE_CATEGORIES`, accommodation en verde `#16A34A`
-
-2. **[src/services/agendaService.ts](../viatio-app/src/services/agendaService.ts)**
-   - ❌ Antes: `CATEGORIA_COLORS` hardcodeado con colores incorrectos
-   - ✅ Ahora: Importa de `BASE_CATEGORIES` del sistema centralizado
-   - **Impacto:** Corrige colores en Agenda y Calendario (dots de eventos)
-
-3. **[src/components/CalendarDay.tsx](../viatio-app/src/components/CalendarDay.tsx)**
-   - ❌ Antes: Importaba `CATEGORY_COLORS` de CategoryBadge
-   - ✅ Ahora: Usa directamente `event.iconColor` (ya viene del sistema centralizado)
-
-4. **[src/components/MapMarker.tsx](../viatio-app/src/components/MapMarker.tsx)**
-   - ⚠️ Antes: Colores correctos pero hardcodeados
-   - ✅ Ahora: Importa de `LUGAR_MARKER_COLORS` para centralización
-
-#### Resultado final - Coherencia visual por pantalla:
-
-| Pantalla | Estado Antes | Estado Ahora |
-|----------|--------------|--------------|
-| **Agenda** | ❌ Hotel en rojo | ✅ Hotel en verde #16A34A |
-| **Reservas (lista)** | ❌ Alojamiento en rojo | ✅ Alojamiento en verde #16A34A |
-| **Reservas (detalle)** | ❌ Badge rojo | ✅ Badge verde #16A34A |
-| **Calendario (dots)** | ❌ Colores incorrectos | ✅ Verde para alojamiento |
-| **Mapa** | ✅ Verde (correcto) | ✅ Verde (ahora centralizado) |
-| **Gastos** | ✅ Verde (correcto) | ✅ Verde (mantiene centralizado) |
-
-### Siguientes pasos recomendados
-1. **Probar visualmente** todas las pantallas:
-   - ✅ Pantalla de reservas
-   - ✅ Calendario de eventos
-   - ✅ Mapa con marcadores de lugares
-   - ✅ Resumen de gastos
-   - ✅ Lista de documentos
-
-2. ✅ **Verificar** que los colores sean distinguibles entre sí
-
-3. **Considerar** si algún icono necesita ajuste para mayor claridad
+### Siguientes pasos
+1. ~~**Confirmar este plan** - ¿Algún ajuste antes de empezar?~~
+2. ~~**Empezar por Fase 0** - Configuración del Copilot (base para todo)~~
+3. ~~**Iterar incrementalmente** - Cada fase es testeable por separado~~
 
 ---
 
-## 🔧 Correcciones finales - Formulario de edición y validaciones (23 dic 2025)
+## Cambios Recientes (26/12/2024)
 
-### Archivos corregidos:
+### Gastos/Presupuesto eliminados del Copilot
+El módulo de gastos es independiente del asistente. Se eliminaron todas las referencias a gastos/presupuesto de:
+- `contextPackBuilder.ts` - Ya no carga ni incluye gastos
+- `asistente.ts` (tipos) - Eliminados gastoActual, presupuesto de ContextoViaje
+- `assistantPrompt.ts` - Eliminadas referencias a presupuesto en el prompt y sugerencias
+- `assistantService.ts` - Eliminados budget, currentExpense del contexto API
+- `AssistantBottomSheet.tsx` - Ya no carga gastos
+- `AssistantScreen.tsx` - Ya no carga gastos
+- `viatio-backend/src/types/index.ts` - Eliminado expenses de CopilotRequest
+- `viatio-backend/src/routes/copilot.ts` - Eliminada sección de gastos del prompt
 
-1. **[EditReservationScreen.tsx](../viatio-app/src/screens/EditReservationScreen.tsx:136)**
-   - ❌ Antes: Al cargar una reserva existente, NO se incluían los `metadatos`
-   - ✅ Ahora: Línea 136 - Se incluye `metadatos: reservaData.metadatos`
-   - **Impacto:** Ahora el formulario de edición pre-selecciona correctamente el subtipo (hotel, apartamento, avión, tren, etc.)
+### Fases 6 y 7 completadas
+- UI de historial con agrupación por fecha, búsqueda y renombrado
+- CopilotFAB integrado en TripDetail, Agenda y Map
 
-2. **[DocumentCard.tsx](../viatio-app/src/components/DocumentCard.tsx)**
-   - ✅ Verificado: Ya usaba correctamente `DOCUMENTO_CATEGORIAS` del sistema centralizado (línea 80)
-   - ✅ Los iconos de documentos son correctos desde el inicio
+### Correcciones de bugs (26/12/2024)
 
-3. **[SavedPlacesAccordion.tsx](../viatio-app/src/components/SavedPlacesAccordion.tsx)**
-   - ✅ Verificado: Usa `LUGAR_CATEGORIAS[categoria]` correctamente (línea 114)
-   - ℹ️ **Nota arquitectural:** Los lugares (`Lugar`) no tienen subtipos como las reservas
-   - ℹ️ Muestran el icono de categoría general (restaurant, hotel, attraction, shopping, transport, other)
-   - ℹ️ Si un lugar está vinculado a una reserva, la reserva mostrará el icono específico del subtipo
+**Problema 1: Botón "Nueva conversación" no funcionaba**
+- **Causa**: Al llamar `startNewConversation()`, los mensajes se limpiaban y `showHistorial` volvía a ser `true` (porque `showHistorial = !viajeId && mensajes.length === 0`)
+- **Solución**: Añadido estado `forceShowChat` en `AssistantScreen.tsx` que se activa al pulsar "Nueva conversación" y permite mostrar el chat vacío
+- **Archivos modificados**: `AssistantScreen.tsx`
 
-### Resultado final - Estado del sistema:
+**Problema 2: Copilot no usaba coordenadas para búsquedas contextuales**
+- **Causa**: Los tipos `ContextoViaje` y `ContextoViajeAPI` no incluían coordenadas del destino ni de los lugares
+- **Solución**:
+  - Añadidas coordenadas a los tipos en `asistente.ts`
+  - Actualizado `loadContexto` en `AssistantScreen.tsx` para obtener coordenadas del `destinoPlaceId` vía Google Places
+  - Actualizado `contextPackBuilder.ts` para incluir `destinationCoords` en el ContextPack
+  - Las coordenadas se incluyen en el resumen del prompt para que Gemini las use en búsquedas
+- **Archivos modificados**: `asistente.ts`, `AssistantScreen.tsx`, `contextPackBuilder.ts`
 
-| Módulo | Colores | Iconos | Subtipo en formulario |
-|--------|---------|--------|----------------------|
-| **Reservas (lista)** | ✅ Verde #16A34A | ✅ Específicos (business, home, etc.) | ✅ Se carga correctamente |
-| **Reservas (detalle)** | ✅ Verde #16A34A | ✅ Específicos | N/A |
-| **Agenda** | ✅ Verde #16A34A | ✅ Específicos | N/A |
-| **Calendario (dots)** | ✅ Verde #16A34A | N/A | N/A |
-| **Calendario (modal)** | ✅ Verde #16A34A | ✅ Específicos | N/A |
-| **Mapa (marcadores)** | ✅ Verde #16A34A | ✅ Genéricos por diseño | N/A |
-| **Mapa (lista lugares)** | ✅ Verde #16A34A | ✅ Genéricos (lugares no tienen subtipo) | N/A |
-| **Gastos** | ✅ Verde #16A34A | ✅ Correcto | N/A |
-| **Documentos** | ✅ Verde #16A34A | ✅ Correcto | N/A |
-| **Formulario edición** | ✅ Correcto | ✅ Correcto | ✅ **CORREGIDO** |
+**Problema 3: Copilot no usaba búsquedas automáticas con coordenadas**
+- **Causa**: El prompt del backend no instruía al modelo para usar las coordenadas disponibles automáticamente
+- **Solución**:
+  - Actualizado `viatio-backend/src/routes/copilot.ts`:
+    - Añadidas coordenadas del destino y alojamiento al prompt
+    - Añadidas coordenadas de lugares guardados al prompt
+    - Añadidas instrucciones explícitas para inferir ubicación ("cerca del hotel" → usar coords del hotel)
+    - Reglas claras: NUNCA pedir coordenadas al usuario, siempre usar las del contexto
+  - Actualizado `viatio-backend/src/types/index.ts`:
+    - Añadido `destinationCoords` y `lodgingBase` al tipo `trip`
+- **Archivos modificados**: `viatio-backend/src/routes/copilot.ts`, `viatio-backend/src/types/index.ts`
 
-### ✅ Problemas resueltos
-
-1. ✅ Alojamiento en verde (#16A34A) en todos los módulos
-2. ✅ Iconos específicos de subtipo en reservas (hotel → business, apartamento → home)
-3. ✅ Iconos específicos en agenda y calendario
-4. ✅ Formulario de edición ahora carga el subtipo seleccionado previamente
-5. ✅ Sistema centralizado de colores e iconos funcionando en toda la app
-6. ✅ TypeScript compilando sin errores
-
-### 📝 Notas importantes
-
-- **Lugares vs Reservas:** Los lugares (`Lugar`) son entidades independientes sin subtipo. Muestran iconos genéricos de categoría (restaurant, hotel, attraction, etc.). Las reservas vinculadas a esos lugares SÍ muestran el icono específico del subtipo.
-- **Coherencia visual:** Todos los módulos ahora usan el mismo color para cada categoría, garantizando que el usuario identifique visualmente las categorías de forma consistente.
-
-### 🎯 Sistema completamente funcional
-
-El sistema de categorías centralizado está completamente implementado y funcionando correctamente en todos los módulos de la aplicación.
+**Problema 4: Copilot no usaba el mapa como herramienta activa**
+- **Causa**: El Copilot daba información textual pero no ejecutaba acciones automáticamente para mostrar lugares en el mapa
+- **Solución**:
+  - Reescrito el prompt del backend para enfatizar "ACTÚA, NO SOLO INFORMES"
+  - Añadidas instrucciones de "COMBO OBLIGATORIO": search_places + show_on_map
+  - Modificado `actionExecutor.ts`: search_places ahora navega al mapa automáticamente si hay resultados
+  - Añadido useEffect en `AssistantScreen.tsx` que ejecuta acciones automáticas (search_places, show_on_map) sin necesidad de pulsar botón
+- **Archivos modificados**:
+  - `viatio-backend/src/routes/copilot.ts` - Prompt mejorado con instrucciones de herramientas
+  - `viatio-app/src/services/ai/actionExecutor.ts` - search_places ahora llama a onShowOnMap
+  - `viatio-app/src/screens/AssistantScreen.tsx` - Auto-ejecución de acciones
 
 ---
 
-## 🔧 Correcciones FINALES - Iconos específicos en TODA la app (23 dic 2025)
+## 🚧 Copilot Temporalmente Desactivado (26/12/2024)
 
-**Problema:** Los iconos de subtipo (hotel → `business`, apartamento → `home`, etc.) NO se mostraban en lugares del mapa ni en gastos vinculados a reservas.
+El Copilot está completamente implementado pero **oculto** hasta una fase más avanzada del desarrollo.
 
-### Archivos corregidos:
+**Cambios realizados**:
+- Tab "Asistente" en menú inferior: **comentado** en `RootTabs.tsx`
+- CopilotFAB en `TripDetailScreen`: **comentado**
+- CopilotFAB en `TripAgendaScreen`: **comentado**
+- CopilotFAB en `TripMapScreen`: **comentado**
 
-1. **[TripMapScreen.tsx](../viatio-app/src/screens/TripMapScreen.tsx)**
-   - Añadido estado `reservas` y carga con `getReservasByViajeId()`
-   - Renombrado `loadLugares()` → `loadLugaresAndReservas()` para cargar ambos
-   - Pasa `reservas` a `SavedPlacesAccordion`
+**Para reactivar**: Simplemente descomentar las líneas marcadas con `/* COPILOT TEMPORALMENTE DESACTIVADO */` en los archivos mencionados.
 
-2. **[SavedPlacesAccordion.tsx](../viatio-app/src/components/SavedPlacesAccordion.tsx)**
-   - ✅ Ahora recibe `reservas: Reserva[]` como prop
-   - ✅ Nueva función `getIconForLugar()` que busca si el lugar está vinculado a una reserva
-   - ✅ Si está vinculado, usa el icono del **subtipo** de la reserva (hotel → `business`)
-   - ✅ Si no está vinculado, usa el icono genérico de la categoría del lugar
-   - ✅ Añadido icono circular individual a cada lugar en la lista
-
-3. **[ExpensesScreen.tsx](../viatio-app/src/screens/ExpensesScreen.tsx)**
-   - Añadido estado `reservas` y carga con `getReservasByViajeId()`
-   - Pasa `reservas` a `ExpenseCategoryGroup`
-
-4. **[ExpenseCategoryGroup.tsx](../viatio-app/src/components/ExpenseCategoryGroup.tsx)**
-   - ✅ Ahora recibe `reservas: Reserva[]` como prop
-   - ✅ Nueva función `getIconForGasto()` que busca si el gasto está vinculado a una reserva
-   - ✅ Si está vinculado, usa el icono del **subtipo** de la reserva
-   - ✅ Si no está vinculado, usa el icono genérico de la categoría del gasto
-   - ✅ Añadido icono circular individual a cada gasto en la lista expandida
-
-### Resultado FINAL - Coherencia de iconos en TODA la app:
-
-| Módulo | Iconos | Lógica |
-|--------|--------|--------|
-| **Reservas (lista)** | ✅ Específicos | Usa subtipo de reserva |
-| **Reservas (detalle)** | ✅ Específicos | Usa subtipo de reserva |
-| **Agenda** | ✅ Específicos | Usa subtipo de reserva |
-| **Calendario (modal)** | ✅ Específicos | Usa event.iconName (del subtipo) |
-| **Mapa (lista lugares)** | ✅ **CORREGIDO** | Si lugar vinculado a reserva → icono del subtipo |
-| **Gastos (lista expandida)** | ✅ **CORREGIDO** | Si gasto vinculado a reserva → icono del subtipo |
-| **Documentos** | ✅ Correcto | Usa DOCUMENTO_CATEGORIAS |
-
-### ✅ Problema COMPLETAMENTE resuelto
-
-Ahora **TODOS** los componentes de la app:
-1. ✅ Usan el **mismo color** para cada categoría (alojamiento → verde #16A34A)
-2. ✅ Usan el **mismo icono específico** del subtipo en TODA la aplicación
-3. ✅ Hotel Mediodía con subtipo "hotel" muestra el icono `business` en:
-   - Lista de reservas
-   - Detalle de reserva
-   - Agenda
-   - Calendario
-   - **Mapa - lista de lugares guardados** ← CORREGIDO
-   - **Gastos vinculados** ← CORREGIDO
-
-### 📝 Arquitectura de la solución
-
-**Patrón usado:**
-1. Componentes que muestran entidades vinculadas a reservas (lugares, gastos) cargan las reservas
-2. Función helper `getIconFor[Entity]()` busca la reserva vinculada
-3. Si hay reserva vinculada → extrae el subtipo de `metadatos` → usa su icono específico
-4. Si NO hay vinculación → usa icono genérico de categoría
-
-**Ejemplo:**
-```typescript
-function getIconForLugar(lugar: Lugar, reservas: Reserva[]): string {
-  const reservaVinculada = reservas.find(r => r.lugarId === lugar.id);
-
-  if (reservaVinculada?.categoria === 'accommodation' &&
-      reservaVinculada.metadatos?.subtipoAlojamiento) {
-    return SUBTIPOS_ALOJAMIENTO[reservaVinculada.metadatos.subtipoAlojamiento].icon;
-    // hotel → 'business', apartment → 'home', etc.
-  }
-
-  return LUGAR_CATEGORIAS[lugar.categoria].icon; // Fallback genérico
-}
-```
-
-### 🎯 Compilación exitosa
-
-✅ TypeScript compiló sin errores
-✅ Todos los tipos correctos
-✅ Sistema completamente coherente
+**Implementación mantenida**:
+- ✅ Toda la lógica del Copilot permanece intacta
+- ✅ Servicios, stores, tipos y componentes sin cambios
+- ✅ Backend del Copilot funcional
+- ✅ No se realizan llamadas a la API mientras está oculto

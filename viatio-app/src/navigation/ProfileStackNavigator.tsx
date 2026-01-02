@@ -14,6 +14,7 @@ import {
 } from '@/screens';
 import NotificationsSettingsScreen from '@/screens/NotificationSettingsScreen';
 import NotificationsManagementScreen from '@/screens/NotificationsManagementScreen';
+import CopilotSettingsScreen from '@/screens/CopilotSettingsScreen';
 import type { ProfileStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -34,6 +35,7 @@ export function ProfileStackNavigator() {
       <Stack.Screen name="NotificationsSettings" component={NotificationsSettingsScreen} />
       <Stack.Screen name="NotificationsManagement" component={NotificationsManagementScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="CopilotSettings" component={CopilotSettingsScreen} />
       <Stack.Screen name="Help" component={HelpScreen} />
     </Stack.Navigator>
   );

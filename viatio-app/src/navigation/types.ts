@@ -35,6 +35,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 export type RootTabParamList = {
   Home: undefined;
   Calendar: undefined;
+  Assistant: undefined;
   Profile: undefined;
 };
 
@@ -81,6 +82,7 @@ export type HomeStackParamList = {
   AddExpense: { viajeId: string };
   AddEvento: { viajeId: string; diaId?: string; eventoId?: string };
   EventoDetail: { eventoId: string };
+  Assistant: { viajeId?: string };
 };
 
 // ============================================
@@ -102,6 +104,7 @@ export type ProfileStackParamList = {
   NotificationsSettings: undefined;
   NotificationsManagement: undefined;
   Settings: undefined;
+  CopilotSettings: undefined;
   Help: undefined;
 };
 

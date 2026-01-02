@@ -114,6 +114,10 @@ export async function runMigrations(
     await migrateToV11(db);
   }
 
+  if (currentVersion < 12) {
+    await migrateToV12(db);
+  }
+
   console.log('[Migrations] Migraciones completadas exitosamente');
 }
 
@@ -559,6 +563,48 @@ async function migrateToV11(db: SQLite.SQLiteDatabase): Promise<void> {
     console.log('[Migrations] Migración a v11 completada');
   } catch (error) {
     console.error('[Migrations] Error en migración a v11:', error);
+    throw error;
+  }
+}
+
+/**
+ * Migración a versión 12: Crear tabla conversaciones
+ * Permite guardar historial de conversaciones del asistente IA
+ */
+async function migrateToV12(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migrations] Ejecutando migración a v12...');
+
+  try {
+    // Crear tabla conversaciones
+    console.log('[Migrations] Creando tabla conversaciones...');
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS conversaciones (
+        id TEXT PRIMARY KEY NOT NULL,
+        viajeId TEXT,
+        titulo TEXT NOT NULL,
+        mensajesJson TEXT NOT NULL,
+        contextoJson TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        FOREIGN KEY (viajeId) REFERENCES viajes(id) ON DELETE CASCADE
+      );
+    `);
+
+    // Crear índices para optimizar búsquedas
+    console.log('[Migrations] Creando índices para conversaciones...');
+    await db.execAsync('CREATE INDEX IF NOT EXISTS idx_conversaciones_viajeId ON conversaciones(viajeId);');
+    await db.execAsync('CREATE INDEX IF NOT EXISTS idx_conversaciones_updatedAt ON conversaciones(updatedAt DESC);');
+
+    // Registrar migración
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'INSERT INTO _migrations (version, appliedAt) VALUES (?, ?)',
+      [12, now]
+    );
+
+    console.log('[Migrations] Migración a v12 completada');
+  } catch (error) {
+    console.error('[Migrations] Error en migración a v12:', error);
     throw error;
   }
 }

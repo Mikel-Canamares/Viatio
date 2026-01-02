@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ScreenContainer, Card } from '@/components';
+import { ScreenContainer, Card, CopilotFAB } from '@/components';
 import { getViajeById, getViajeStats } from '@/services';
 import type { Viaje, ViajeStats } from '@/types/viaje';
 import { theme } from '@/config';
@@ -236,6 +236,12 @@ export default function TripDetailScreen({ navigation, route }: Props) {
           </View>
         </View>
       </ScrollView>
+
+      {/* COPILOT TEMPORALMENTE DESACTIVADO - Mantener implementación pero ocultar acceso
+      <CopilotFAB
+        onPress={() => navigation.navigate('Assistant', { viajeId })}
+      />
+      */}
     </ScreenContainer>
   );
 }

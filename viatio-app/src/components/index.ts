@@ -64,5 +64,16 @@ export { SelectItem } from './SelectItem';
 export type { SelectOption } from './SelectItem';
 export { Accordion } from './Accordion';
 
+// Componentes de Asistente IA (Copilot)
+export { ChatBubble } from './ChatBubble';
+export { SuggestionChips } from './SuggestionChips';
+export { TypingIndicator } from './TypingIndicator';
+export { SmartFAB } from './SmartFAB';
+export { AssistantBottomSheet } from './AssistantBottomSheet';
+export { ConversationHistoryList } from './ConversationHistoryList';
+export { ActionButton, ActionButtonsContainer } from './ActionButton';
+export { SwitchItem } from './SwitchItem';
+export { CopilotFAB } from './CopilotFAB';
+
 // Los siguientes se crearán en fases posteriores:
 // export { EmptyState } from './EmptyState';

@@ -11,7 +11,7 @@ import MapView, { Marker, Region, PROVIDER_GOOGLE, MapPressEvent } from 'react-n
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { ScreenContainer, PageHeader } from '@/components';
+import { ScreenContainer, PageHeader, CopilotFAB } from '@/components';
 import { PlaceSearchBar } from '@/components/PlaceSearchBar';
 import { PlaceDetailCard } from '@/components/PlaceDetailCard';
 import { AddToTripModal } from '@/components/AddToTripModal';
@@ -689,6 +689,14 @@ export default function TripMapScreen() {
         onConfirm={handleConfirmAdd}
         loading={loadingAdd}
       />
+
+      {/* COPILOT TEMPORALMENTE DESACTIVADO - Mantener implementación pero ocultar acceso
+      <CopilotFAB
+        onPress={() => navigation.navigate('Assistant', { viajeId })}
+        position="bottom-left"
+        style={{ bottom: 80 }}
+      />
+      */}
     </ScreenContainer>
   );
 }

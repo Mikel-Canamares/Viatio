@@ -20,6 +20,7 @@ import {
   AgendaCard,
   NavigationChoiceModal,
   PrimaryButton,
+  CopilotFAB,
 } from '@/components';
 import { theme } from '@/config';
 import { getAgendaByViajeId } from '@/services/agendaService';
@@ -219,6 +220,13 @@ export default function TripAgendaScreen({ route, navigation }: Props) {
           Añadir evento
         </PrimaryButton>
       </View>
+
+      {/* COPILOT TEMPORALMENTE DESACTIVADO - Mantener implementación pero ocultar acceso
+      <CopilotFAB
+        onPress={() => navigation.navigate('Assistant', { viajeId })}
+        style={{ bottom: 100 }}
+      />
+      */}
     </View>
   );
 }
