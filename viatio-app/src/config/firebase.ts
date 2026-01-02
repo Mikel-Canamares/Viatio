@@ -1,13 +1,14 @@
-/**
- * FIREBASE CONFIG
- *
- * Configuración de Firebase para autenticación y servicios backend.
- * Se configura persistencia explícita con AsyncStorage para React Native.
- */
-
-import { initializeApp, getApps } from 'firebase/app';
-// @ts-expect-error - getReactNativePersistence existe en runtime pero tiene issues de tipos en Firebase 12
-import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import {
+  initializeAuth,
+  // @ts-expect-error - getReactNativePersistence existe en runtime pero tiene issues de tipos en Firebase 12
+  getReactNativePersistence
+} from 'firebase/auth';
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  CACHE_SIZE_UNLIMITED,
+} from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
@@ -19,18 +20,32 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Inicializar Firebase App
-let app;
-if (getApps().length === 0) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApps()[0];
-}
+// Inicializar app
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Inicializar Auth con persistencia explícita para React Native
-// Se usa AsyncStorage para mantener la sesión entre cierres de app
+// Auth con persistencia
 export const auth = initializeAuth(app, {
   persistence: getReactNativePersistence(AsyncStorage),
 });
 
-export { app };
+// Firestore con persistencia offline
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    cacheSizeBytes: CACHE_SIZE_UNLIMITED,
+  }),
+});
+
+// Función para verificar conexión
+export async function checkFirestoreConnection(): Promise<boolean> {
+  try {
+    const { getDoc, doc } = await import('firebase/firestore');
+    // Intentar leer un documento inexistente (no falla, solo retorna null)
+    await getDoc(doc(db, '_health', 'check'));
+    return true;
+  } catch (error) {
+    console.error('[Firestore] Connection check failed:', error);
+    return false;
+  }
+}
+
+export default app;
