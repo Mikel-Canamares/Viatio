@@ -391,3 +391,23 @@ El módulo de gastos es independiente del asistente. Se eliminaron todas las ref
   - `viatio-backend/src/routes/copilot.ts` - Prompt mejorado con instrucciones de herramientas
   - `viatio-app/src/services/ai/actionExecutor.ts` - search_places ahora llama a onShowOnMap
   - `viatio-app/src/screens/AssistantScreen.tsx` - Auto-ejecución de acciones
+
+---
+
+## 🚧 Copilot Temporalmente Desactivado (26/12/2024)
+
+El Copilot está completamente implementado pero **oculto** hasta una fase más avanzada del desarrollo.
+
+**Cambios realizados**:
+- Tab "Asistente" en menú inferior: **comentado** en `RootTabs.tsx`
+- CopilotFAB en `TripDetailScreen`: **comentado**
+- CopilotFAB en `TripAgendaScreen`: **comentado**
+- CopilotFAB en `TripMapScreen`: **comentado**
+
+**Para reactivar**: Simplemente descomentar las líneas marcadas con `/* COPILOT TEMPORALMENTE DESACTIVADO */` en los archivos mencionados.
+
+**Implementación mantenida**:
+- ✅ Toda la lógica del Copilot permanece intacta
+- ✅ Servicios, stores, tipos y componentes sin cambios
+- ✅ Backend del Copilot funcional
+- ✅ No se realizan llamadas a la API mientras está oculto

@@ -65,6 +65,7 @@ export function RootTabs() {
         }}
       />
 
+      {/* COPILOT TEMPORALMENTE DESACTIVADO - Mantener implementación pero ocultar acceso
       <Tab.Screen
         name="Assistant"
         component={AssistantScreen}
@@ -75,6 +76,7 @@ export function RootTabs() {
           ),
         }}
       />
+      */}
 
       <Tab.Screen
         name="Profile"

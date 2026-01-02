@@ -690,12 +690,13 @@ export default function TripMapScreen() {
         loading={loadingAdd}
       />
 
-      {/* CopilotFAB - Botón flotante del asistente */}
+      {/* COPILOT TEMPORALMENTE DESACTIVADO - Mantener implementación pero ocultar acceso
       <CopilotFAB
         onPress={() => navigation.navigate('Assistant', { viajeId })}
         position="bottom-left"
         style={{ bottom: 80 }}
       />
+      */}
     </ScreenContainer>
   );
 }

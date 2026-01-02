@@ -237,10 +237,11 @@ export default function TripDetailScreen({ navigation, route }: Props) {
         </View>
       </ScrollView>
 
-      {/* CopilotFAB - Botón flotante del asistente */}
+      {/* COPILOT TEMPORALMENTE DESACTIVADO - Mantener implementación pero ocultar acceso
       <CopilotFAB
         onPress={() => navigation.navigate('Assistant', { viajeId })}
       />
+      */}
     </ScreenContainer>
   );
 }
