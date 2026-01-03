@@ -527,8 +527,18 @@ export function subscribeToExpenses(
   return onSnapshot(
     q,
     (snapshot) => {
-      const expenses: SharedExpense[] = snapshot.docs.map(docSnap => {
+      // Filtrar documentos con timestamp pendiente (serverTimestamp emite 2 veces:
+      // primero con null, luego con el valor real - esto causa keys duplicadas)
+      const expenses: SharedExpense[] = snapshot.docs
+        .filter(docSnap => {
+          const data = docSnap.data();
+          return data.createdAt !== null;
+        })
+        .map(docSnap => {
         const data = docSnap.data() as ExpenseDoc;
+        // serverTimestamp() puede ser null temporalmente hasta que el servidor lo resuelva
+        const createdAt = data.createdAt?.toDate() ?? new Date();
+        const updatedAt = data.updatedAt?.toDate() ?? new Date();
         return {
           id: docSnap.id,
           tripId,
@@ -545,8 +555,8 @@ export function subscribeToExpenses(
           receiptUrl: data.receiptUrl,
           notes: data.notes,
           createdBy: data.createdBy,
-          createdAt: data.createdAt.toDate(),
-          updatedAt: data.updatedAt.toDate(),
+          createdAt,
+          updatedAt,
           updatedBy: data.updatedBy,
           deletedAt: null,
         };

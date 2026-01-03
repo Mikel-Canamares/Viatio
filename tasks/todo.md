@@ -504,3 +504,58 @@ Se ha integrado completamente la funcionalidad de viajes compartidos en el flujo
 5. Ver avatares de miembros + botón "Invitar"
 6. Navegar a Gastos → ver UI con balances (si hay otros miembros)
 7. Añadir gasto → formulario con reparto entre participantes
+
+---
+
+## 🐛 Correcciones de Gastos Compartidos (03/01/2026)
+
+### Problemas detectados
+1. **Error `Cannot read property 'toDate' of null`** - Firestore emite documentos 2 veces al usar `serverTimestamp()`
+2. **Error `Encountered two children with the same key`** - Keys duplicadas por el doble snapshot
+3. **Gastos no tocables** - No se podía navegar al detalle para editar/eliminar
+4. **Sin agrupación por categoría** - Los gastos compartidos aparecían en lista plana
+
+### Soluciones implementadas
+
+#### 1. Filtrar snapshots con timestamp pendiente
+**Archivo**: `services/firestore/expensesService.ts`
+- En `subscribeToExpenses`, añadido filtro antes del map:
+  ```typescript
+  .filter(docSnap => docSnap.data().createdAt !== null)
+  ```
+- Añadido optional chaining con fallback en conversión de timestamps:
+  ```typescript
+  const createdAt = data.createdAt?.toDate() ?? new Date();
+  ```
+
+#### 2. Gastos tocables + Agrupación por categoría
+**Archivo**: `screens/ExpensesScreen.tsx`
+- Añadido handler `handleExpensePress` que navega a `ExpenseDetail`
+- Añadido mapeo de categorías inglés→español (`categoryToSpanish`)
+- Añadido agrupación `sharedExpensesPorCategoria` (igual que viajes individuales)
+- Reemplazado render de lista plana por grupos con header de categoría
+- Cada gasto es ahora un `Pressable` que navega al detalle
+- Corregido useEffect para cargar miembros antes de suscribirse
+
+#### 3. Navegación a ExpenseDetail
+**Archivo**: `navigation/types.ts`
+- Añadida ruta `ExpenseDetail: { tripId: string; expenseId: string }` a `HomeStackParamList`
+
+**Archivo**: `navigation/HomeStackNavigator.tsx`
+- Importado `ExpenseDetailScreen`
+- Añadido `<Stack.Screen name="ExpenseDetail" />`
+
+### Archivos Modificados
+| Archivo | Cambios |
+|---------|---------|
+| `services/firestore/expensesService.ts` | Filtro de snapshots pendientes, optional chaining |
+| `screens/ExpensesScreen.tsx` | Handler navegación, agrupación por categoría, nuevos estilos |
+| `navigation/types.ts` | +ExpenseDetail en HomeStackParamList |
+| `navigation/HomeStackNavigator.tsx` | +import y Screen de ExpenseDetail |
+
+### Verificación
+- [x] Crear gasto → no error de keys duplicadas
+- [x] Tocar gasto → navega a ExpenseDetail
+- [x] Gastos agrupados por categoría con totales
+- [x] Botones editar/eliminar visibles en detalle
+- [x] Liquidaciones se actualizan en tiempo real

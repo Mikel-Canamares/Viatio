@@ -23,7 +23,8 @@ import { BalancesList, SettlementSuggestions } from '@/components/shared';
 import { useGastosStore } from '@/store/gastosStore';
 import { useExpensesV2Store } from '@/store/expensesV2Store';
 import { useSharedTripsStore } from '@/store/sharedTripsStore';
-import { Gasto, CategoriaGasto } from '@/types/gasto';
+import { useAuth } from '@/context/AuthContext';
+import { Gasto, CategoriaGasto, GASTO_CATEGORIAS } from '@/types/gasto';
 import { Reserva } from '@/types/reserva';
 import { Viaje } from '@/types/viaje';
 import { centsToDisplay, SharedExpense } from '@/types/shared';
@@ -47,6 +48,7 @@ export function ExpensesScreen() {
   const navigation = useNavigation<ExpensesScreenNavigationProp>();
   const route = useRoute<ExpensesScreenRouteProp>();
   const { viajeId } = route.params;
+  const { user } = useAuth();
 
   // Estado local
   const [viaje, setViaje] = useState<Viaje | null>(null);
@@ -91,21 +93,26 @@ export function ExpensesScreen() {
     }
   };
 
-  // Cargar datos según el tipo de viaje
+  // Cargar miembros cuando es viaje compartido
+  useEffect(() => {
+    if (isShared && firestoreId) {
+      fetchMembers(firestoreId);
+    }
+  }, [isShared, firestoreId]);
+
+  // Suscribirse a gastos cuando hay miembros cargados
   useEffect(() => {
     if (!viaje) return;
 
-    if (isShared && firestoreId) {
-      // Cargar de Firestore
-      fetchMembers(firestoreId);
-      const unsubscribe = subscribeExpenses(firestoreId, members);
-      return unsubscribe;
-    } else {
+    if (isShared && firestoreId && members.length > 0) {
+      // Suscribirse a Firestore con los miembros
+      subscribeExpenses(firestoreId, members);
+    } else if (!isShared) {
       // Cargar de SQLite
       fetchGastos(viajeId);
       fetchResumen(viajeId);
     }
-  }, [viaje, firestoreId, isShared]);
+  }, [viaje, firestoreId, isShared, members.length]);
 
   // Recargar al volver a la pantalla
   useFocusEffect(
@@ -172,11 +179,51 @@ export function ExpensesScreen() {
   const sharedTotal = sharedExpenses.reduce((sum, e) => sum + e.amount, 0);
   const currency = viaje?.moneda || 'EUR';
 
+  // Mapeo de categorías inglés a español para gastos compartidos
+  const categoryToSpanish: Record<string, CategoriaGasto> = {
+    transport: 'transporte',
+    accommodation: 'alojamiento',
+    food: 'comida',
+    activity: 'actividades',
+    shopping: 'compras',
+    other: 'otros',
+    transporte: 'transporte',
+    alojamiento: 'alojamiento',
+    comida: 'comida',
+    actividades: 'actividades',
+    compras: 'compras',
+    otros: 'otros',
+  };
+
+  // Agrupar gastos compartidos por categoría
+  const sharedExpensesPorCategoria = sharedExpenses.reduce((acc, expense) => {
+    const spanishCat = categoryToSpanish[expense.category] || 'otros';
+    if (!acc[spanishCat]) {
+      acc[spanishCat] = [];
+    }
+    acc[spanishCat].push(expense);
+    return acc;
+  }, {} as Record<CategoriaGasto, SharedExpense[]>);
+
+  const sharedCategoriasOrdenadas = Object.keys(sharedExpensesPorCategoria)
+    .map((cat) => cat as CategoriaGasto)
+    .sort((a, b) => {
+      const totalA = sharedExpensesPorCategoria[a].reduce((sum, e) => sum + e.amount, 0);
+      const totalB = sharedExpensesPorCategoria[b].reduce((sum, e) => sum + e.amount, 0);
+      return totalB - totalA;
+    });
+
   // ============================================
   // HANDLERS
   // ============================================
 
   const handleBack = () => navigation.goBack();
+
+  const handleExpensePress = (expense: SharedExpense) => {
+    if (firestoreId) {
+      navigation.navigate('ExpenseDetail', { tripId: firestoreId, expenseId: expense.id });
+    }
+  };
 
   const handleAddExpense = () => {
     // Navegar a la pantalla correcta según si el viaje es compartido
@@ -301,25 +348,81 @@ export function ExpensesScreen() {
             <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} />
           </Pressable>
 
-          {/* Lista de gastos compartidos */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Historial de gastos</Text>
-            {sharedExpenses.map((expense) => (
-              <Card key={expense.id} style={styles.expenseCard}>
-                <View style={styles.expenseRow}>
-                  <View style={styles.expenseInfo}>
-                    <Text style={styles.expenseDescription}>{expense.description}</Text>
-                    <Text style={styles.expensePaidBy}>
-                      Pagado por {expense.paidByName}
+          {/* Historial de gastos agrupados por categoría */}
+          <View style={styles.historialHeader}>
+            <Text style={styles.historialTitle}>Historial</Text>
+          </View>
+
+          {sharedCategoriasOrdenadas.map((categoria) => {
+            const gastosDeCategoria = sharedExpensesPorCategoria[categoria];
+            const totalCategoria = gastosDeCategoria.reduce((sum, e) => sum + e.amount, 0);
+            const categoriaInfo = GASTO_CATEGORIAS[categoria];
+
+            return (
+              <View key={categoria} style={styles.categoryGroup}>
+                {/* Header de categoría */}
+                <Pressable style={styles.categoryHeader}>
+                  <View style={[styles.categoryIcon, { backgroundColor: categoriaInfo.color + '20' }]}>
+                    <Ionicons
+                      name={categoriaInfo.icon as keyof typeof Ionicons.glyphMap}
+                      size={20}
+                      color={categoriaInfo.color}
+                    />
+                  </View>
+                  <View style={styles.categoryInfo}>
+                    <Text style={styles.categoryName}>{categoriaInfo.label}</Text>
+                    <Text style={styles.categoryCount}>
+                      {gastosDeCategoria.length} {gastosDeCategoria.length === 1 ? 'gasto' : 'gastos'}
                     </Text>
                   </View>
-                  <Text style={styles.expenseAmount}>
-                    {centsToDisplay(expense.amount, expense.currency)}
+                  <Text style={styles.categoryTotal}>
+                    {centsToDisplay(totalCategoria, currency)}
                   </Text>
-                </View>
-              </Card>
-            ))}
-          </View>
+                </Pressable>
+
+                {/* Lista de gastos de esta categoría */}
+                {gastosDeCategoria.map((expense) => {
+                  const isPayer = expense.paidByUid === user?.uid;
+                  const myShare = expense.shares.find(s => s.uid === user?.uid);
+                  let myImpact = 0;
+                  if (myShare) {
+                    myImpact = isPayer
+                      ? expense.amount - myShare.calculatedAmount
+                      : -myShare.calculatedAmount;
+                  }
+
+                  return (
+                    <Pressable
+                      key={expense.id}
+                      style={styles.expenseItem}
+                      onPress={() => handleExpensePress(expense)}
+                    >
+                      <View style={styles.expenseInfo}>
+                        <Text style={styles.expenseDescription}>{expense.description}</Text>
+                        <Text style={styles.expensePaidBy}>
+                          {isPayer ? 'Pagaste tú' : `Pagó ${expense.paidByName}`}
+                        </Text>
+                      </View>
+                      <View style={styles.expenseAmounts}>
+                        <Text style={styles.expenseAmount}>
+                          {centsToDisplay(expense.amount, expense.currency)}
+                        </Text>
+                        {myShare && myImpact !== 0 && (
+                          <Text style={[
+                            styles.expenseImpact,
+                            myImpact > 0 ? styles.impactPositive : styles.impactNegative,
+                          ]}>
+                            {myImpact > 0 ? '+' : ''}{centsToDisplay(myImpact, expense.currency)}
+                          </Text>
+                        )}
+                      </View>
+                      <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+                    </Pressable>
+                  );
+                })}
+              </View>
+            );
+          })}
 
           <View style={styles.bottomSpacer} />
         </ScrollView>
@@ -489,34 +592,87 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
   },
 
-  // Gastos compartidos
-  expenseCard: {
-    marginBottom: theme.spacing.sm,
-    padding: theme.spacing.md,
+  // Gastos compartidos - Agrupación por categoría
+  categoryGroup: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius.lg,
+    marginBottom: theme.spacing.md,
+    overflow: 'hidden',
+    ...theme.shadows.card,
   },
-  expenseRow: {
+  categoryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    padding: theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
-  expenseInfo: {
+  categoryIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: theme.spacing.sm,
+  },
+  categoryInfo: {
     flex: 1,
-    marginRight: theme.spacing.md,
   },
-  expenseDescription: {
+  categoryName: {
     fontSize: 15,
     fontWeight: '600',
     color: theme.colors.text,
   },
-  expensePaidBy: {
-    fontSize: 13,
+  categoryCount: {
+    fontSize: 12,
     color: theme.colors.textSecondary,
     marginTop: 2,
   },
-  expenseAmount: {
+  categoryTotal: {
     fontSize: 16,
     fontWeight: '700',
     color: theme.colors.text,
+  },
+  expenseItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  expenseInfo: {
+    flex: 1,
+    marginRight: theme.spacing.sm,
+  },
+  expenseDescription: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: theme.colors.text,
+  },
+  expensePaidBy: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    marginTop: 2,
+  },
+  expenseAmounts: {
+    alignItems: 'flex-end',
+    marginRight: theme.spacing.xs,
+  },
+  expenseAmount: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.colors.text,
+  },
+  expenseImpact: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  impactPositive: {
+    color: theme.colors.success,
+  },
+  impactNegative: {
+    color: theme.colors.error,
   },
 
   // Link a liquidaciones

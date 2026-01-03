@@ -38,6 +38,7 @@ import {
   RecordSettlementScreen,
   JoinTripByCodeScreen,
   AddSharedExpenseScreen,
+  ExpenseDetailScreen,
 } from '@/screens/shared';
 import type { HomeStackParamList } from './types';
 
@@ -79,6 +80,7 @@ export function HomeStackNavigator() {
       <Stack.Screen name="TripSettlements" component={TripSettlementsScreen} />
       <Stack.Screen name="RecordSettlement" component={RecordSettlementScreen} />
       <Stack.Screen name="AddSharedExpense" component={AddSharedExpenseScreen} />
+      <Stack.Screen name="ExpenseDetail" component={ExpenseDetailScreen} />
       <Stack.Screen name="JoinTripByCode" component={JoinTripByCodeScreen} />
     </Stack.Navigator>
   );
