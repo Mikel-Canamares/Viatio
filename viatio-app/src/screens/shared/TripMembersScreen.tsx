@@ -20,13 +20,15 @@ import { theme } from '@/theme';
 import { showToast } from '@/utils/toast';
 
 type RouteParams = {
-  TripMembers: { tripId: string };
+  TripMembers: { viajeId: string; firestoreId: string };
 };
 
 export default function TripMembersScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'TripMembers'>>();
-  const { tripId } = route.params;
+  const { firestoreId } = route.params;
+  // Usamos firestoreId como tripId para las operaciones de Firestore
+  const tripId = firestoreId;
   const { user } = useAuth();
 
   const {

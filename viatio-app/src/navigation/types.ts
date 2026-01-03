@@ -35,8 +35,6 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 export type RootTabParamList = {
   Home: undefined;
   Calendar: undefined;
-  Shared: undefined;
-  Assistant: undefined;
   Profile: undefined;
 };
 
@@ -84,6 +82,19 @@ export type HomeStackParamList = {
   AddEvento: { viajeId: string; diaId?: string; eventoId?: string };
   EventoDetail: { eventoId: string };
   Assistant: { viajeId?: string };
+  // Pantallas de viajes compartidos (integradas desde SharedStack)
+  TripMembers: { viajeId: string; firestoreId: string };
+  InviteToTrip: { viajeId: string; firestoreId: string };
+  TripSettlements: { viajeId: string; firestoreId: string };
+  RecordSettlement: {
+    viajeId: string;
+    firestoreId: string;
+    fromUid: string;
+    toUid: string;
+    amount: number;
+  };
+  AddSharedExpense: { tripId: string; expenseId?: string };
+  JoinTripByCode: undefined;
 };
 
 // ============================================

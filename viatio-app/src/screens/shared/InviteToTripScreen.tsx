@@ -18,13 +18,15 @@ import { theme } from '@/theme';
 import { showToast } from '@/utils/toast';
 
 type RouteParams = {
-  InviteToTrip: { tripId: string };
+  InviteToTrip: { viajeId: string; firestoreId: string };
 };
 
 export default function InviteToTripScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'InviteToTrip'>>();
-  const { tripId } = route.params;
+  const { firestoreId } = route.params;
+  // Usamos firestoreId como tripId para las operaciones de Firestore
+  const tripId = firestoreId;
 
   const { currentTrip, inviteMember, invitations } = useSharedTripsStore();
 

@@ -411,3 +411,96 @@ El Copilot está completamente implementado pero **oculto** hasta una fase más 
 - ✅ Servicios, stores, tipos y componentes sin cambios
 - ✅ Backend del Copilot funcional
 - ✅ No se realizan llamadas a la API mientras está oculto
+
+---
+
+## 🤝 Integración de Viajes Compartidos (02/01/2026)
+
+### Objetivo
+Unificar la funcionalidad de viajes compartidos (antes en tab separado) con el flujo normal de viajes. Los usuarios crean viajes normalmente y pueden añadir personas desde TripDetail. Al compartir, el viaje se migra de SQLite a Firestore automáticamente.
+
+### Cambios Completados
+
+#### Fase 1: Modelo de Datos
+- [x] Extendido tipo `Viaje` con `isShared`, `firestoreId`, `syncedAt`
+- [x] Migración SQLite v13 añadida en `database/schema.ts`
+- [x] Funciones `markViajeAsShared`, `getViajeByFirestoreId` en `viajesService.ts`
+
+#### Fase 2: Servicio de Migración
+- [x] Creado `services/migration/migrateTripToFirestore.ts` para migrar viajes completos de SQLite a Firestore (viaje + reservas + lugares + gastos)
+
+#### Fase 3: UI en TripDetail
+- [x] Creado `components/MembersSection.tsx` - muestra botón "Compartir viaje" o avatares de miembros
+- [x] Creado `components/ShareTripModal.tsx` - modal de confirmación con progreso de migración
+- [x] Integrado en `TripDetailScreen.tsx`
+
+#### Fase 4: Gastos Integrados
+- [x] Modificado `ExpensesScreen.tsx` - detecta `isShared` y muestra balances/liquidaciones si compartido
+- [x] Modificado `AddExpenseScreen.tsx` - redirige a `AddSharedExpenseScreen` si viaje compartido
+
+#### Fase 5: Navegación
+- [x] Actualizado `navigation/types.ts` - eliminado Shared tab, añadidas rutas TripMembers, InviteToTrip, TripSettlements, RecordSettlement al HomeStack
+- [x] Actualizado `RootTabs.tsx` - eliminado tab Shared
+- [x] Actualizado `HomeStackNavigator.tsx` - añadidas pantallas de shared
+- [x] Adaptadas pantallas `TripMembersScreen`, `InviteToTripScreen`, `TripSettlementsScreen`, `RecordSettlementScreen` para usar `firestoreId`
+
+#### Fase 6: Hooks Unificados
+- [x] Creado `hooks/useUnifiedTrip.ts` - acceso unificado a viajes locales y compartidos
+- [x] Creado `hooks/useTripMembers.ts` - gestión de miembros de viajes compartidos
+
+### Archivos Creados
+| Archivo | Propósito |
+|---------|-----------|
+| `services/migration/migrateTripToFirestore.ts` | Migración completa SQLite→Firestore |
+| `components/MembersSection.tsx` | Sección de miembros en TripDetail |
+| `components/ShareTripModal.tsx` | Modal de confirmación para compartir |
+| `hooks/useUnifiedTrip.ts` | Hook para datos unificados |
+| `hooks/useTripMembers.ts` | Hook para gestión de miembros |
+
+### Archivos Modificados
+| Archivo | Cambios |
+|---------|---------|
+| `types/viaje.ts` | +3 campos (isShared, firestoreId, syncedAt) |
+| `database/schema.ts` | Migración v13 |
+| `services/viajesService.ts` | +4 funciones |
+| `screens/TripDetailScreen.tsx` | +MembersSection, +ShareTripModal |
+| `screens/ExpensesScreen.tsx` | Lógica condicional shared |
+| `screens/AddExpenseScreen.tsx` | Redirección a shared |
+| `navigation/types.ts` | -Shared tab, +4 rutas en HomeStack |
+| `navigation/HomeStackNavigator.tsx` | +4 pantallas |
+| `navigation/RootTabs.tsx` | -Shared tab |
+| `screens/shared/TripMembersScreen.tsx` | Params actualizados |
+| `screens/shared/InviteToTripScreen.tsx` | Params actualizados |
+| `screens/shared/TripSettlementsScreen.tsx` | Params actualizados |
+| `screens/shared/RecordSettlementScreen.tsx` | Params actualizados |
+
+### Review
+
+#### Resumen
+Se ha integrado completamente la funcionalidad de viajes compartidos en el flujo normal. Ya no existe un tab separado "Compartido". Los usuarios:
+1. Crean viajes normalmente (SQLite)
+2. Desde TripDetail, pueden "Compartir viaje"
+3. El viaje se migra a Firestore con todos sus datos
+4. Los gastos muestran balances y liquidaciones automáticamente
+
+#### Riesgos Potenciales
+| Riesgo | Mitigación |
+|--------|------------|
+| Pérdida de datos en migración | El viaje local se mantiene, solo se marca como compartido |
+| Conflictos de sincronización | Firestore es fuente de verdad para viajes compartidos |
+| UX confusa para usuarios | MembersSection muestra claramente el estado |
+
+#### Siguientes Pasos Sugeridos
+1. **Testing manual**: Probar flujo completo de compartir → invitar → gastos compartidos
+2. **Testing automático**: Añadir tests para `migrateTripToFirestore`
+3. **Cleanup opcional**: Eliminar `SharedStackNavigator.tsx` y pantallas redundantes en `screens/shared/`
+4. **Sincronización bidireccional**: Implementar sync de cambios de Firestore a SQLite (mejora futura)
+
+### Cómo Probar
+1. Crear viaje normal
+2. Ir a TripDetail → ver botón "Compartir viaje" en sección de miembros
+3. Pulsar → modal muestra preview de datos a migrar
+4. Confirmar → progreso de migración → éxito
+5. Ver avatares de miembros + botón "Invitar"
+6. Navegar a Gastos → ver UI con balances (si hay otros miembros)
+7. Añadir gasto → formulario con reparto entre participantes

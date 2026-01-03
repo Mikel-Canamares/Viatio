@@ -9,11 +9,16 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer, PageHeader, PrimaryButton, Card } from '@/components';
 import { findInviteByCode, acceptInvitation } from '@/services/firestore/invitesService';
+import { downloadSharedTrip } from '@/services/sync/syncDownload';
+import { useViajesStore } from '@/store/viajesStore';
+import { useAuth } from '@/context/AuthContext';
 import { theme } from '@/theme';
 import { showToast } from '@/utils/toast';
 
 export default function JoinTripByCodeScreen() {
   const navigation = useNavigation<any>();
+  const { user } = useAuth();
+  const { fetchViajes } = useViajesStore();
 
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -42,8 +47,24 @@ export default function JoinTripByCodeScreen() {
       // Intentar aceptar la invitación
       await acceptInvitation(tripId, invite.id);
 
+      // Descargar el viaje completo a SQLite local
+      if (user?.uid) {
+        console.log('[JoinTrip] Descargando viaje a local...');
+        const downloadResult = await downloadSharedTrip(tripId, user.uid);
+
+        if (downloadResult.success) {
+          console.log('[JoinTrip] Viaje descargado:', downloadResult.stats);
+          // Refrescar la lista de viajes
+          await fetchViajes(user.uid);
+        } else {
+          console.warn('[JoinTrip] Error al descargar viaje:', downloadResult.error);
+          // Aún así mostramos éxito porque la invitación fue aceptada
+        }
+      }
+
       showToast.success('¡Te has unido!', `Bienvenido a ${invite.tripName}`);
-      navigation.replace('SharedTripDetail', { tripId });
+      // Volver a la lista de viajes
+      navigation.popToTop();
     } catch (error: any) {
       showToast.error('Error', error.message);
     } finally {

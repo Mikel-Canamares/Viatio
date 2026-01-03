@@ -83,6 +83,7 @@ export interface Reserva {
   metadatos?: ReservaMetadatos;
   documentoId?: string; // ID del documento asociado (opcional)
   lugarId?: string; // ID del lugar asociado (opcional, creado automáticamente)
+  firestoreId?: string; // ID en Firestore (para viajes compartidos)
   createdAt: string;
   updatedAt: string;
 }

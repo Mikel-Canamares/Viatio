@@ -20,7 +20,8 @@ import { showToast } from '@/utils/toast';
 
 type RouteParams = {
   RecordSettlement: {
-    tripId: string;
+    viajeId: string;
+    firestoreId: string;
     fromUid: string;
     toUid: string;
     amount: number;
@@ -30,7 +31,9 @@ type RouteParams = {
 export default function RecordSettlementScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'RecordSettlement'>>();
-  const { tripId, fromUid, toUid, amount: suggestedAmount } = route.params;
+  const { firestoreId, fromUid, toUid, amount: suggestedAmount } = route.params;
+  // Usamos firestoreId como tripId para las operaciones de Firestore
+  const tripId = firestoreId;
 
   const { currentTrip, members } = useSharedTripsStore();
   const { addSettlement } = useExpensesV2Store();

@@ -118,6 +118,14 @@ export async function runMigrations(
     await migrateToV12(db);
   }
 
+  if (currentVersion < 13) {
+    await migrateToV13(db);
+  }
+
+  if (currentVersion < 14) {
+    await migrateToV14(db);
+  }
+
   console.log('[Migrations] Migraciones completadas exitosamente');
 }
 
@@ -605,6 +613,125 @@ async function migrateToV12(db: SQLite.SQLiteDatabase): Promise<void> {
     console.log('[Migrations] Migración a v12 completada');
   } catch (error) {
     console.error('[Migrations] Error en migración a v12:', error);
+    throw error;
+  }
+}
+
+/**
+ * Migración a versión 13: Añadir campos para viajes compartidos
+ * isShared, firestoreId, syncedAt permiten migrar viajes a Firestore
+ */
+async function migrateToV13(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migrations] Ejecutando migración a v13...');
+
+  try {
+    // Verificar columnas existentes
+    const viajesInfo = await db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(viajes);'
+    );
+
+    // Añadir isShared si no existe
+    const isSharedExists = viajesInfo.some(col => col.name === 'isShared');
+    if (!isSharedExists) {
+      console.log('[Migrations] Añadiendo columna isShared a viajes...');
+      await db.execAsync('ALTER TABLE viajes ADD COLUMN isShared INTEGER DEFAULT 0;');
+    }
+
+    // Añadir firestoreId si no existe
+    const firestoreIdExists = viajesInfo.some(col => col.name === 'firestoreId');
+    if (!firestoreIdExists) {
+      console.log('[Migrations] Añadiendo columna firestoreId a viajes...');
+      await db.execAsync('ALTER TABLE viajes ADD COLUMN firestoreId TEXT;');
+    }
+
+    // Añadir syncedAt si no existe
+    const syncedAtExists = viajesInfo.some(col => col.name === 'syncedAt');
+    if (!syncedAtExists) {
+      console.log('[Migrations] Añadiendo columna syncedAt a viajes...');
+      await db.execAsync('ALTER TABLE viajes ADD COLUMN syncedAt TEXT;');
+    }
+
+    // Crear índice para firestoreId (útil para búsquedas de sync)
+    console.log('[Migrations] Creando índice para firestoreId...');
+    await db.execAsync('CREATE INDEX IF NOT EXISTS idx_viajes_firestoreId ON viajes(firestoreId);');
+
+    // Registrar migración
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'INSERT INTO _migrations (version, appliedAt) VALUES (?, ?)',
+      [13, now]
+    );
+
+    console.log('[Migrations] Migración a v13 completada');
+  } catch (error) {
+    console.error('[Migrations] Error en migración a v13:', error);
+    throw error;
+  }
+}
+
+/**
+ * Migración a versión 14: Añadir firestoreId a tablas para sincronización
+ * Permite vincular registros locales con Firestore para viajes compartidos
+ */
+async function migrateToV14(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migrations] Ejecutando migración a v14...');
+
+  try {
+    // Añadir firestoreId a reservas
+    const reservasInfo = await db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(reservas);'
+    );
+    if (!reservasInfo.some(col => col.name === 'firestoreId')) {
+      console.log('[Migrations] Añadiendo columna firestoreId a reservas...');
+      await db.execAsync('ALTER TABLE reservas ADD COLUMN firestoreId TEXT;');
+    }
+
+    // Añadir firestoreId a lugares
+    const lugaresInfo = await db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(lugares);'
+    );
+    if (!lugaresInfo.some(col => col.name === 'firestoreId')) {
+      console.log('[Migrations] Añadiendo columna firestoreId a lugares...');
+      await db.execAsync('ALTER TABLE lugares ADD COLUMN firestoreId TEXT;');
+    }
+
+    // Añadir firestoreId a gastos
+    const gastosInfo = await db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(gastos);'
+    );
+    if (!gastosInfo.some(col => col.name === 'firestoreId')) {
+      console.log('[Migrations] Añadiendo columna firestoreId a gastos...');
+      await db.execAsync('ALTER TABLE gastos ADD COLUMN firestoreId TEXT;');
+    }
+
+    // Añadir firestoreId a eventos_personalizados
+    const eventosInfo = await db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(eventos_personalizados);'
+    );
+    if (!eventosInfo.some(col => col.name === 'firestoreId')) {
+      console.log('[Migrations] Añadiendo columna firestoreId a eventos_personalizados...');
+      await db.execAsync('ALTER TABLE eventos_personalizados ADD COLUMN firestoreId TEXT;');
+    }
+
+    // Añadir firestoreId a documentos
+    const documentosInfo = await db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(documentos);'
+    );
+    if (!documentosInfo.some(col => col.name === 'firestoreId')) {
+      console.log('[Migrations] Añadiendo columna firestoreId a documentos...');
+      await db.execAsync('ALTER TABLE documentos ADD COLUMN firestoreId TEXT;');
+    }
+
+    // Registrar migración
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'INSERT INTO _migrations (version, appliedAt) VALUES (?, ?)',
+      [14, now]
+    );
+
+    console.log('[Migrations] Migración a v14 completada');
+  } catch (error) {
+    console.error('[Migrations] Error en migración a v14:', error);
     throw error;
   }
 }

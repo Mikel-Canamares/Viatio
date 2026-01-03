@@ -3,6 +3,9 @@
  *
  * Pantalla para añadir un nuevo gasto al viaje.
  * Incluye input de monto, selector de categoría y detalles adicionales.
+ *
+ * NOTA: Si el viaje es compartido (isShared=1), redirige a AddSharedExpenseScreen
+ * que incluye funcionalidad de reparto entre participantes.
  */
 
 import { useState, useEffect } from 'react';
@@ -19,7 +22,7 @@ import {
   Modal,
   ActivityIndicator,
 } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, CommonActions } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { format, differenceInDays, addDays } from 'date-fns';
@@ -33,17 +36,14 @@ import { CategoriaGasto, GASTO_CATEGORIAS } from '@/types/gasto';
 import { getViajeById } from '@/services';
 import type { Viaje } from '@/types/viaje';
 import { theme } from '@/config';
+import type { HomeStackParamList } from '@/navigation/types';
 
 // ============================================
 // TIPOS
 // ============================================
 
-type RootStackParamList = {
-  AddExpense: { viajeId: string };
-};
-
-type AddExpenseScreenRouteProp = RouteProp<RootStackParamList, 'AddExpense'>;
-type AddExpenseScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type AddExpenseScreenRouteProp = RouteProp<HomeStackParamList, 'AddExpense'>;
+type AddExpenseScreenNavigationProp = NativeStackNavigationProp<HomeStackParamList>;
 
 interface DiaViaje {
   numeroDia: number;
@@ -67,6 +67,9 @@ export function AddExpenseScreen() {
   const [viaje, setViaje] = useState<Viaje | null>(null);
   const [loadingViaje, setLoadingViaje] = useState(true);
   const [diasViaje, setDiasViaje] = useState<DiaViaje[]>([]);
+
+  // NOTA: Esta pantalla solo maneja gastos individuales (SQLite).
+  // Para gastos compartidos, ExpensesScreen navega a AddSharedExpenseScreen.
 
   // Estado del formulario
   const [monto, setMonto] = useState<string>('');

@@ -9,7 +9,7 @@
 // VERSIÓN DEL ESQUEMA
 // ============================================
 
-export const CURRENT_SCHEMA_VERSION = 12;
+export const CURRENT_SCHEMA_VERSION = 14;
 
 // ============================================
 // CREACIÓN DE TABLAS
@@ -29,6 +29,9 @@ const CREATE_VIAJES_TABLE = `
     moneda TEXT DEFAULT 'EUR',
     numViajeros INTEGER DEFAULT 1,
     archived INTEGER DEFAULT 0,
+    isShared INTEGER DEFAULT 0,
+    firestoreId TEXT,
+    syncedAt TEXT,
     createdAt TEXT NOT NULL,
     updatedAt TEXT NOT NULL
   );

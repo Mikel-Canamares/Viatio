@@ -17,6 +17,7 @@ import {
 } from './notificationsService';
 import { deleteLugar } from './lugaresService';
 import { deleteDocumento, getDocumentosByReservaId } from './documentosService';
+import { syncReservaIfShared, syncDeleteIfShared } from './sync/syncUpload';
 
 /**
  * Crea una nueva reserva y opcionalmente busca/crea lugar asociado
@@ -165,7 +166,39 @@ export async function createReserva(
     console.warn('[ReservasService] Error al obtener viaje para notificación:', error);
   }
 
+  // Sincronizar con Firestore si es viaje compartido (no bloqueante)
+  syncReservaIfShared(reserva).catch((error) => {
+    console.warn('[ReservasService] Error al sincronizar reserva:', error);
+  });
+
   return { reserva, placeMatch };
+}
+
+/**
+ * Parsea metadatos de forma segura, manejando casos edge
+ */
+function parseMetadatos(metadatos: any): any {
+  if (!metadatos) return undefined;
+
+  // Si ya es un objeto, retornarlo directamente
+  if (typeof metadatos === 'object') return metadatos;
+
+  // Si es string, intentar parsearlo
+  if (typeof metadatos === 'string') {
+    // Ignorar strings literales "null" o "undefined"
+    if (metadatos === 'null' || metadatos === 'undefined' || metadatos.trim() === '') {
+      return undefined;
+    }
+
+    try {
+      return JSON.parse(metadatos);
+    } catch (error) {
+      console.warn('[ReservasService] Error parseando metadatos:', metadatos, error);
+      return undefined;
+    }
+  }
+
+  return undefined;
 }
 
 /**
@@ -183,7 +216,7 @@ export async function getReservasByViajeId(viajeId: string): Promise<Reserva[]> 
 
   return rows.map((row) => ({
     ...row,
-    metadatos: row.metadatos ? JSON.parse(row.metadatos as unknown as string) : undefined,
+    metadatos: parseMetadatos(row.metadatos),
   }));
 }
 
@@ -205,7 +238,7 @@ export async function getReservasByCategoria(
 
   return rows.map((row) => ({
     ...row,
-    metadatos: row.metadatos ? JSON.parse(row.metadatos as unknown as string) : undefined,
+    metadatos: parseMetadatos(row.metadatos),
   }));
 }
 
@@ -224,7 +257,7 @@ export async function getReservaById(id: string): Promise<Reserva | null> {
 
   return {
     ...row,
-    metadatos: row.metadatos ? JSON.parse(row.metadatos as unknown as string) : undefined,
+    metadatos: parseMetadatos(row.metadatos),
   };
 }
 
@@ -403,7 +436,15 @@ export async function updateReserva(
     }
   }
 
-  return getReservaById(id);
+  // Sincronizar con Firestore si es viaje compartido (no bloqueante)
+  const reservaActualizadaParaSync = await getReservaById(id);
+  if (reservaActualizadaParaSync) {
+    syncReservaIfShared(reservaActualizadaParaSync).catch((error) => {
+      console.warn('[ReservasService] Error al sincronizar reserva actualizada:', error);
+    });
+  }
+
+  return reservaActualizadaParaSync;
 }
 
 /**
@@ -489,7 +530,14 @@ export async function deleteReserva(id: string): Promise<boolean> {
     console.error('[ReservasService] Error al eliminar gasto asociado:', error);
   }
 
-  // 6. Finalmente, eliminar la reserva
+  // 6. Sincronizar eliminación con Firestore si es viaje compartido (antes de eliminar)
+  if (reserva.firestoreId) {
+    syncDeleteIfShared(reserva.viajeId, 'reservations', reserva.firestoreId).catch((error) => {
+      console.warn('[ReservasService] Error al sincronizar eliminación:', error);
+    });
+  }
+
+  // 7. Finalmente, eliminar la reserva
   await db.runAsync('DELETE FROM reservas WHERE id = ?', [id]);
 
   console.log('[ReservasService] Reserva eliminada con cascada completa:', id);

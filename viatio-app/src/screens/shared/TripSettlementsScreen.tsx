@@ -18,13 +18,15 @@ import { theme } from '@/theme';
 import { showToast } from '@/utils/toast';
 
 type RouteParams = {
-  TripSettlements: { tripId: string };
+  TripSettlements: { viajeId: string; firestoreId: string };
 };
 
 export default function TripSettlementsScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'TripSettlements'>>();
-  const { tripId } = route.params;
+  const { firestoreId } = route.params;
+  // Usamos firestoreId como tripId para las operaciones de Firestore
+  const tripId = firestoreId;
   const { user } = useAuth();
 
   const { currentTrip, members } = useSharedTripsStore();
@@ -49,7 +51,8 @@ export default function TripSettlementsScreen() {
 
   const handleSettlePress = (suggestion: SettlementSuggestion) => {
     navigation.navigate('RecordSettlement', {
-      tripId,
+      viajeId: route.params.viajeId,
+      firestoreId,
       fromUid: suggestion.fromUid,
       toUid: suggestion.toUid,
       amount: suggestion.amount,

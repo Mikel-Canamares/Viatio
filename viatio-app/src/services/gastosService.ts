@@ -14,6 +14,7 @@ import type {
 } from '@/types/gasto';
 import { logError } from '@/utils';
 import { getViajeById } from './viajesService';
+import { syncGastoIfShared, syncDeleteIfShared } from './sync/syncUpload';
 
 // ============================================
 // CREAR
@@ -63,6 +64,12 @@ export async function createGasto(input: CreateGastoInput): Promise<Gasto> {
     );
 
     console.log('[GastosService] Gasto creado:', gasto.id);
+
+    // Sincronizar con Firestore si es viaje compartido (no bloqueante)
+    syncGastoIfShared(gasto).catch((error) => {
+      console.warn('[GastosService] Error al sincronizar gasto:', error);
+    });
+
     return gasto;
   } catch (error) {
     logError(error, 'createGasto');
@@ -200,7 +207,16 @@ export async function updateGasto(
     console.log('[GastosService] Gasto actualizado:', id);
 
     // Retornar gasto actualizado
-    return await getGastoById(id);
+    const gastoActualizado = await getGastoById(id);
+
+    // Sincronizar con Firestore si es viaje compartido (no bloqueante)
+    if (gastoActualizado) {
+      syncGastoIfShared(gastoActualizado).catch((error) => {
+        console.warn('[GastosService] Error al sincronizar gasto:', error);
+      });
+    }
+
+    return gastoActualizado;
   } catch (error) {
     logError(error, 'updateGasto');
     throw new Error('Error al actualizar el gasto');
@@ -222,6 +238,13 @@ export async function deleteGasto(id: string): Promise<boolean> {
     const existing = await getGastoById(id);
     if (!existing) {
       return false;
+    }
+
+    // Sincronizar eliminación con Firestore si es viaje compartido
+    if (existing.firestoreId) {
+      syncDeleteIfShared(existing.viajeId, 'expenses', existing.firestoreId).catch((error) => {
+        console.warn('[GastosService] Error al sincronizar eliminación:', error);
+      });
     }
 
     const result = await db.runAsync('DELETE FROM gastos WHERE id = ?', [id]);

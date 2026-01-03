@@ -121,6 +121,10 @@ export default function TripListScreen({ navigation }: Props) {
     navigation.navigate('ArchivedTrips');
   };
 
+  const handleJoinTrip = () => {
+    navigation.navigate('JoinTripByCode');
+  };
+
   // Estado de carga
   if (loading && viajes.length === 0) {
     return (
@@ -143,12 +147,20 @@ export default function TripListScreen({ navigation }: Props) {
         <PageHeader
           title="Mis Viajes"
           rightElement={
-            <Pressable
-              onPress={handleNavigateToArchived}
-              style={styles.archivedButton}
-            >
-              <Ionicons name="archive-outline" size={24} color={theme.colors.primaryForeground} />
-            </Pressable>
+            <View style={styles.headerButtons}>
+              <Pressable
+                onPress={handleJoinTrip}
+                style={styles.headerButton}
+              >
+                <Ionicons name="qr-code-outline" size={24} color={theme.colors.primaryForeground} />
+              </Pressable>
+              <Pressable
+                onPress={handleNavigateToArchived}
+                style={styles.headerButton}
+              >
+                <Ionicons name="archive-outline" size={24} color={theme.colors.primaryForeground} />
+              </Pressable>
+            </View>
           }
         />
         <ScreenContainer>
@@ -161,11 +173,15 @@ export default function TripListScreen({ navigation }: Props) {
             />
             <Text style={styles.emptyTitle}>No tienes viajes</Text>
             <Text style={styles.emptyDescription}>
-              Crea tu primer viaje para empezar a organizar tu aventura
+              Crea tu primer viaje o únete a uno compartido con un código de invitación
             </Text>
             <PrimaryButton onPress={handleCreateTrip}>
               Crear viaje
             </PrimaryButton>
+            <Pressable onPress={handleJoinTrip} style={styles.joinButton}>
+              <Ionicons name="qr-code-outline" size={18} color={theme.colors.primary} />
+              <Text style={styles.joinButtonText}>Tengo un código de invitación</Text>
+            </Pressable>
           </View>
         </ScreenContainer>
       </View>
@@ -178,12 +194,20 @@ export default function TripListScreen({ navigation }: Props) {
       <PageHeader
         title="Mis Viajes"
         rightElement={
-          <Pressable
-            onPress={handleNavigateToArchived}
-            style={styles.archivedButton}
-          >
-            <Ionicons name="archive-outline" size={24} color={theme.colors.primaryForeground} />
-          </Pressable>
+          <View style={styles.headerButtons}>
+            <Pressable
+              onPress={handleJoinTrip}
+              style={styles.headerButton}
+            >
+              <Ionicons name="qr-code-outline" size={24} color={theme.colors.primaryForeground} />
+            </Pressable>
+            <Pressable
+              onPress={handleNavigateToArchived}
+              style={styles.headerButton}
+            >
+              <Ionicons name="archive-outline" size={24} color={theme.colors.primaryForeground} />
+            </Pressable>
+          </View>
         }
       />
       <FlatList
@@ -270,7 +294,24 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
   },
-  archivedButton: {
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerButton: {
     padding: theme.spacing.sm,
+  },
+  joinButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+  },
+  joinButtonText: {
+    fontSize: 14,
+    color: theme.colors.primary,
+    fontWeight: '500',
   },
 });

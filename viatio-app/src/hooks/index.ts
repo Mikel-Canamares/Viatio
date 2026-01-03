@@ -8,3 +8,9 @@
  */
 
 export { useAsync } from './useAsync';
+export { useUnifiedTrip } from './useUnifiedTrip';
+export type { UnifiedTripData } from './useUnifiedTrip';
+export { useTripMembers } from './useTripMembers';
+export type { TripMembersData } from './useTripMembers';
+export { useRealtimeSync } from './useRealtimeSync';
+export type { RealtimeSyncOptions, RealtimeSyncState } from './useRealtimeSync';

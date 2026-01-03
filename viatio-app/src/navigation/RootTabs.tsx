@@ -3,16 +3,17 @@
  *
  * Bottom Tab Navigator principal de la aplicación.
  * Define las 3 tabs principales: Inicio, Calendario, Perfil.
+ *
+ * NOTA: El tab "Shared" fue eliminado. La funcionalidad de viajes compartidos
+ * ahora está integrada en el flujo normal de viajes (desde TripDetailScreen).
  */
 
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TripCalendarScreen } from '@/screens';
-import AssistantScreen from '@/screens/AssistantScreen';
 import { HomeStackNavigator } from './HomeStackNavigator';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
-import { SharedStackNavigator } from './SharedStackNavigator';
 import type { RootTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -66,16 +67,7 @@ export function RootTabs() {
         }}
       />
 
-      <Tab.Screen
-        name="Shared"
-        component={SharedStackNavigator}
-        options={{
-          tabBarLabel: 'Compartido',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="people-outline" size={size} color={color} />
-          ),
-        }}
-      />
+      {/* Tab "Shared" eliminado - funcionalidad integrada en TripDetailScreen */}
 
       {/* COPILOT TEMPORALMENTE DESACTIVADO - Mantener implementación pero ocultar acceso
       <Tab.Screen

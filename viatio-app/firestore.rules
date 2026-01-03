@@ -1,0 +1,210 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================
+    // FUNCIONES HELPER
+    // ============================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function currentUserId() {
+      return request.auth.uid;
+    }
+
+    // Verificar si el usuario esta en memberUids del viaje
+    function isTripMember(tripId) {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/trips/$(tripId)).data.memberUids.hasAny([currentUserId()]);
+    }
+
+    // Verificar si existe el documento de miembro
+    function memberExists(tripId) {
+      return exists(/databases/$(database)/documents/trips/$(tripId)/members/$(currentUserId()));
+    }
+
+    // Obtener el rol del miembro
+    function getMemberRole(tripId) {
+      return get(/databases/$(database)/documents/trips/$(tripId)/members/$(currentUserId())).data.role;
+    }
+
+    // Verificar si es owner
+    function isTripOwner(tripId) {
+      return isTripMember(tripId) && memberExists(tripId) && getMemberRole(tripId) == 'owner';
+    }
+
+    // Verificar si es admin o owner
+    function isTripAdmin(tripId) {
+      return isTripMember(tripId) && memberExists(tripId) && getMemberRole(tripId) in ['owner', 'admin'];
+    }
+
+    // Verificar si puede escribir (owner, admin o member - no read_only)
+    function canWrite(tripId) {
+      return isTripMember(tripId) && memberExists(tripId) && getMemberRole(tripId) in ['owner', 'admin', 'member'];
+    }
+
+    // ============================================
+    // COLECCION: users
+    // ============================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && currentUserId() == userId;
+      allow update: if isAuthenticated() && currentUserId() == userId;
+      allow delete: if false;
+    }
+
+    // ============================================
+    // COLECCION: trips
+    // ============================================
+
+    match /trips/{tripId} {
+      // Leer: cualquier usuario autenticado (necesario para aceptar invitaciones)
+      allow read: if isAuthenticated();
+
+      // Crear: usuario autenticado que se incluye como owner
+      allow create: if isAuthenticated() &&
+        request.resource.data.ownerUid == currentUserId() &&
+        request.resource.data.memberUids.hasAny([currentUserId()]);
+
+      // Actualizar: cualquier usuario autenticado (necesario para anadir miembros al aceptar invitacion)
+      allow update: if isAuthenticated();
+
+      // Eliminar: no permitido (soft delete)
+      allow delete: if false;
+
+      // ============================================
+      // SUBCOLECCION: members
+      // ============================================
+
+      match /members/{memberId} {
+        // Leer: cualquier usuario autenticado
+        allow read: if isAuthenticated();
+
+        // Crear: admin O el propio usuario creandose (aceptar invitacion)
+        allow create: if isAuthenticated() &&
+          (isTripAdmin(tripId) || memberId == currentUserId());
+
+        // Actualizar: admins, no pueden degradar al owner
+        allow update: if isTripAdmin(tripId) &&
+          !(resource.data.role == 'owner' && request.resource.data.role != 'owner');
+
+        // Eliminar: admins, no pueden eliminar al owner
+        allow delete: if isTripAdmin(tripId) &&
+          resource.data.role != 'owner';
+      }
+
+      // ============================================
+      // SUBCOLECCION: invitations
+      // ============================================
+
+      match /invitations/{inviteId} {
+        // Leer: cualquier usuario autenticado (necesario para buscar por codigo)
+        allow read: if isAuthenticated();
+
+        // Crear: admins del viaje
+        allow create: if isTripAdmin(tripId);
+
+        // Actualizar: admin O el invitado aceptando/rechazando
+        allow update: if isAuthenticated() &&
+          (isTripAdmin(tripId) ||
+           resource.data.email == request.auth.token.email.lower());
+
+        // Eliminar: admins
+        allow delete: if isTripAdmin(tripId);
+      }
+
+      // ============================================
+      // SUBCOLECCION: reservations
+      // ============================================
+
+      match /reservations/{docId} {
+        allow read: if isTripMember(tripId);
+        allow create: if canWrite(tripId);
+        allow update: if canWrite(tripId);
+        allow delete: if canWrite(tripId);
+      }
+
+      // ============================================
+      // SUBCOLECCION: places
+      // ============================================
+
+      match /places/{docId} {
+        allow read: if isTripMember(tripId);
+        allow create: if canWrite(tripId);
+        allow update: if canWrite(tripId);
+        allow delete: if canWrite(tripId);
+      }
+
+      // ============================================
+      // SUBCOLECCION: expenses
+      // ============================================
+
+      match /expenses/{docId} {
+        allow read: if isTripMember(tripId);
+        allow create: if canWrite(tripId);
+        allow update: if canWrite(tripId);
+        allow delete: if false; // Soft delete
+      }
+
+      // ============================================
+      // SUBCOLECCION: events
+      // ============================================
+
+      match /events/{docId} {
+        allow read: if isTripMember(tripId);
+        allow create: if canWrite(tripId);
+        allow update: if canWrite(tripId);
+        allow delete: if canWrite(tripId);
+      }
+
+      // ============================================
+      // SUBCOLECCION: documents
+      // ============================================
+
+      match /documents/{docId} {
+        allow read: if isTripMember(tripId);
+        allow create: if canWrite(tripId);
+        allow update: if canWrite(tripId);
+        allow delete: if canWrite(tripId);
+      }
+
+      // ============================================
+      // SUBCOLECCION: settlements
+      // ============================================
+
+      match /settlements/{docId} {
+        allow read: if isTripMember(tripId);
+        allow create: if canWrite(tripId);
+        allow update: if canWrite(tripId) &&
+          (resource.data.fromUid == currentUserId() ||
+           resource.data.toUid == currentUserId() ||
+           isTripAdmin(tripId));
+        allow delete: if canWrite(tripId) &&
+          resource.data.status == 'pending';
+      }
+    }
+
+    // ============================================
+    // COLECCION: pendingInvites
+    // ============================================
+
+    match /pendingInvites/{email} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAuthenticated() &&
+        request.auth.token.email.lower() == email;
+    }
+
+    // ============================================
+    // COLLECTION GROUP: invitations
+    // Permite buscar invitaciones por codigo en cualquier viaje
+    // ============================================
+
+    match /{path=**}/invitations/{inviteId} {
+      allow read: if isAuthenticated();
+    }
+  }
+}

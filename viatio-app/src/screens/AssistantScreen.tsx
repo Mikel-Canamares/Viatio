@@ -22,8 +22,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import type { CompositeScreenProps } from '@react-navigation/native';
 
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { PageHeader } from '@/components/PageHeader';
@@ -37,7 +35,7 @@ import { useChatStore } from '@/store/chatStore';
 import { getSugerenciasIniciales } from '@/services/ai/assistantPrompt';
 import { theme } from '@/config/theme';
 
-import type { HomeStackParamList, RootTabParamList } from '@/navigation/types';
+import type { HomeStackParamList } from '@/navigation/types';
 import type { MensajeChatConAcciones, ContextoViaje } from '@/types/asistente';
 import type { Reserva } from '@/types/reserva';
 import type { Lugar } from '@/types/lugar';
@@ -56,12 +54,8 @@ import type { AgentAction } from '@/types/asistente';
 // TIPOS
 // ============================================
 
-// Soporta tanto la navegación desde HomeStack como desde RootTab
-type HomeStackProps = NativeStackScreenProps<HomeStackParamList, 'Assistant'>;
-type TabProps = BottomTabScreenProps<RootTabParamList, 'Assistant'>;
-
-// Union type que permite ambas formas de navegación
-type Props = HomeStackProps | TabProps;
+// AssistantScreen ahora solo se accede desde HomeStack (ya no hay tab)
+type Props = NativeStackScreenProps<HomeStackParamList, 'Assistant'>;
 
 // ============================================
 // COMPONENT

@@ -76,5 +76,9 @@ export { ActionButton, ActionButtonsContainer } from './ActionButton';
 export { SwitchItem } from './SwitchItem';
 export { CopilotFAB } from './CopilotFAB';
 
+// Componentes de Viajes Compartidos
+export { MembersSection } from './MembersSection';
+export { ShareTripModal } from './ShareTripModal';
+
 // Los siguientes se crearán en fases posteriores:
 // export { EmptyState } from './EmptyState';

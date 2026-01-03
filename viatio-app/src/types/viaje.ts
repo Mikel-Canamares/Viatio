@@ -21,6 +21,10 @@ export interface Viaje {
   moneda: string;
   numViajeros: number;
   archived: number;
+  // Campos para viajes compartidos
+  isShared: number; // 0 = individual, 1 = compartido
+  firestoreId?: string; // ID del viaje en Firestore (si está migrado)
+  syncedAt?: string; // Última sincronización con Firestore
   createdAt: string;
   updatedAt: string;
 }

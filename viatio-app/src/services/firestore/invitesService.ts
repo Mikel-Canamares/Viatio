@@ -137,7 +137,7 @@ export async function inviteUserToTrip(
         invitedBy: user.uid,
         invitedByName: user.displayName || 'Usuario',
         role,
-        createdAt: serverTimestamp(),
+        createdAt: Timestamp.now(), // serverTimestamp() no soportado en arrays
       };
 
       if (pendingSnap.exists()) {
