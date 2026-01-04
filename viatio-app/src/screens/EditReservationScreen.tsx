@@ -13,9 +13,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  Alert,
   ActivityIndicator,
   Image,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -60,6 +60,7 @@ import {
 import type { Viaje } from '@/types/viaje';
 import type { Documento } from '@/types/documento';
 import type { HomeStackParamList } from '@/navigation/types';
+import { showToast } from '@/utils/toast';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'EditReservation'>;
 
@@ -106,7 +107,7 @@ export default function EditReservationScreen({ route, navigation }: Props) {
       const reservaData = await getReservaById(reservaId);
 
       if (!reservaData) {
-        Alert.alert('Error', 'No se encontró la reserva');
+        showToast.error('Error', 'No se encontró la reserva');
         navigation.goBack();
         return;
       }
@@ -140,7 +141,7 @@ export default function EditReservationScreen({ route, navigation }: Props) {
       });
     } catch (error) {
       console.error('[EditReservationScreen] Error al cargar datos:', error);
-      Alert.alert('Error', 'No se pudo cargar la reserva');
+      showToast.error('Error', 'No se pudo cargar la reserva');
     } finally {
       setLoading(false);
     }
@@ -181,7 +182,7 @@ export default function EditReservationScreen({ route, navigation }: Props) {
       }
     } catch (error) {
       console.error('Error picking document:', error);
-      Alert.alert('Error', 'No se pudo seleccionar el documento');
+      showToast.error('Error', 'No se pudo seleccionar el documento');
     }
   };
 
@@ -211,7 +212,7 @@ export default function EditReservationScreen({ route, navigation }: Props) {
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'No se pudo seleccionar la imagen');
+      showToast.error('Error', 'No se pudo seleccionar la imagen');
     }
   };
 
@@ -241,7 +242,7 @@ export default function EditReservationScreen({ route, navigation }: Props) {
 
   const handleSave = async () => {
     if (!formData.nombre || !formData.categoria) {
-      Alert.alert('Error', 'El nombre y la categoría son obligatorios');
+      showToast.error('Error', 'El nombre y la categoría son obligatorios');
       return;
     }
 
@@ -313,7 +314,7 @@ export default function EditReservationScreen({ route, navigation }: Props) {
       navigation.goBack();
     } catch (error) {
       console.error('[EditReservationScreen] Error al guardar:', error);
-      Alert.alert('Error', 'No se pudieron guardar los cambios');
+      showToast.error('Error', 'No se pudieron guardar los cambios');
     }
   };
 

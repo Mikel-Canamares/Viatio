@@ -14,7 +14,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,6 +22,7 @@ import { Input, PrimaryButton, GoogleSignInButton, LinkAccountModal, LoadingOver
 import { useAuth } from '@/context';
 import { theme } from '@/config';
 import type { AuthStackParamList } from '@/navigation/AuthStackNavigator';
+import { showToast } from '@/utils/toast';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
@@ -192,7 +192,7 @@ export default function LoginScreen({ navigation }: Props) {
                     });
                   } else {
                     console.error('Error Google Sign-In:', err);
-                    Alert.alert('Error', 'No se pudo iniciar sesión con Google. Intenta nuevamente.');
+                    showToast.error('Error', 'No se pudo iniciar sesión con Google. Intenta nuevamente.');
                   }
                 }}
                 disabled={loading}

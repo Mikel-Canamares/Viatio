@@ -1,20 +1,59 @@
 /**
  * TOAST UTILITIES
  *
- * Utilidades para mostrar notificaciones tipo toast al usuario.
- * Por ahora usa Alert nativo, se puede reemplazar por una librería de toasts.
+ * Utilidades para mostrar notificaciones modales al usuario.
+ * Usa CustomModal para una experiencia visual coherente con el diseño de la app.
  */
 
-import { Alert, Platform, ToastAndroid } from 'react-native';
+import { Platform, ToastAndroid } from 'react-native';
+import { ModalType } from '@/components/CustomModal';
 
-type ToastType = 'success' | 'error' | 'info' | 'warning';
+type ToastType = ModalType;
 
 interface ToastOptions {
   duration?: 'short' | 'long';
 }
 
+// Interfaz para el evento global de modal
+export interface ModalEvent {
+  type: ToastType;
+  title: string;
+  message?: string;
+  primaryButton?: {
+    text: string;
+    onPress: () => void;
+  };
+  secondaryButton?: {
+    text: string;
+    onPress: () => void;
+  };
+}
+
+// Lista de listeners para el modal
+const modalListeners: Array<(event: ModalEvent) => void> = [];
+
 /**
- * Muestra un toast/notificación al usuario
+ * Suscribe un listener para eventos de modal
+ */
+export function subscribeToModal(listener: (event: ModalEvent) => void) {
+  modalListeners.push(listener);
+  return () => {
+    const index = modalListeners.indexOf(listener);
+    if (index > -1) {
+      modalListeners.splice(index, 1);
+    }
+  };
+}
+
+/**
+ * Emite un evento de modal a todos los listeners
+ */
+function emitModal(event: ModalEvent) {
+  modalListeners.forEach((listener) => listener(event));
+}
+
+/**
+ * Muestra un modal/notificación al usuario
  */
 function show(
   type: ToastType,
@@ -22,8 +61,12 @@ function show(
   message?: string,
   options?: ToastOptions
 ) {
-  // En Android, para mensajes simples sin título, usamos ToastAndroid
-  if (Platform.OS === 'android' && !message && type !== 'error') {
+  // En Android, para mensajes simples sin título y tipo info/success, usamos ToastAndroid
+  if (
+    Platform.OS === 'android' &&
+    !message &&
+    (type === 'info' || type === 'success')
+  ) {
     ToastAndroid.show(
       title,
       options?.duration === 'long' ? ToastAndroid.LONG : ToastAndroid.SHORT
@@ -31,51 +74,48 @@ function show(
     return;
   }
 
-  // Para errores o iOS, usamos Alert
-  const alertTitle = type === 'error' ? `❌ ${title}` : title;
-  Alert.alert(alertTitle, message || undefined, [{ text: 'OK' }]);
+  // Para el resto de casos, usamos CustomModal
+  emitModal({ type, title, message });
 }
 
 /**
- * Toast de éxito
+ * Modal de éxito
  */
 function success(title: string, message?: string) {
-  if (Platform.OS === 'android') {
-    ToastAndroid.show(
-      message ? `${title}: ${message}` : title,
-      ToastAndroid.SHORT
-    );
-  } else {
-    Alert.alert(`✅ ${title}`, message);
+  // En Android, para mensajes simples, usamos ToastAndroid
+  if (Platform.OS === 'android' && !message) {
+    ToastAndroid.show(title, ToastAndroid.SHORT);
+    return;
   }
+
+  emitModal({ type: 'success', title, message });
 }
 
 /**
- * Toast de error
+ * Modal de error
  */
 function error(title: string, message?: string) {
-  Alert.alert(`❌ ${title}`, message || undefined, [{ text: 'OK' }]);
+  emitModal({ type: 'error', title, message });
 }
 
 /**
- * Toast informativo
+ * Modal informativo
  */
 function info(title: string, message?: string) {
-  if (Platform.OS === 'android') {
-    ToastAndroid.show(
-      message ? `${title}: ${message}` : title,
-      ToastAndroid.SHORT
-    );
-  } else {
-    Alert.alert(`ℹ️ ${title}`, message);
+  // En Android, para mensajes simples, usamos ToastAndroid
+  if (Platform.OS === 'android' && !message) {
+    ToastAndroid.show(title, ToastAndroid.SHORT);
+    return;
   }
+
+  emitModal({ type: 'info', title, message });
 }
 
 /**
- * Toast de advertencia
+ * Modal de advertencia
  */
 function warning(title: string, message?: string) {
-  Alert.alert(`⚠️ ${title}`, message || undefined, [{ text: 'OK' }]);
+  emitModal({ type: 'warning', title, message });
 }
 
 export const showToast = {

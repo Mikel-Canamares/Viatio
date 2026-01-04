@@ -16,9 +16,9 @@ import {
   FlatList,
   Pressable,
   StyleSheet,
-  Alert,
   TextInput,
   Modal,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format, isToday, isYesterday, isThisWeek, isThisMonth } from 'date-fns';

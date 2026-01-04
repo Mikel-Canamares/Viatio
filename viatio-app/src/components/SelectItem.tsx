@@ -6,7 +6,8 @@
  */
 
 import { useState } from 'react';
-import { Pressable, View, Text, StyleSheet, ActionSheetIOS, Platform, Alert } from 'react-native';
+import {Pressable, View, Text, StyleSheet, ActionSheetIOS, Platform,
+  Alert} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '@/config';
 

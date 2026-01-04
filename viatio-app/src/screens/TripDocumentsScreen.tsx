@@ -28,6 +28,7 @@ import { useDocumentosStore } from '@/store/documentosStore';
 import { openDocument } from '@/utils/documentViewer';
 import type { Documento, CategoriaDocumento } from '@/types/documento';
 import type { HomeStackParamList } from '@/navigation/types';
+import { showToast } from '@/utils/toast';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'TripDocuments'>;
 
@@ -51,7 +52,7 @@ export default function TripDocumentsScreen({ route, navigation }: Props) {
 
   useEffect(() => {
     if (error) {
-      Alert.alert('Error', error);
+      showToast.error('Error', error);
       clearError();
     }
   }, [error]);

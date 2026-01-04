@@ -42,6 +42,7 @@ import { BASE_CATEGORIES, CategoryBase } from '@/config/categories';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { HomeStackParamList } from '@/navigation/types';
+import { showToast } from '@/utils/toast';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'ReservationDetail'>;
 
@@ -130,7 +131,7 @@ export default function ReservationDetailScreen({ route, navigation }: Props) {
       setDocumentos(docs);
     } catch (error) {
       console.error('Error loading reservation:', error);
-      Alert.alert('Error', 'No se pudo cargar la reserva');
+      showToast.error('Error', 'No se pudo cargar la reserva');
     } finally {
       setLoading(false);
     }

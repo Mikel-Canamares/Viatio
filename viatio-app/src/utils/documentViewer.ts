@@ -9,10 +9,11 @@ import * as IntentLauncher from 'expo-intent-launcher';
 import { File } from 'expo-file-system/next';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { Platform, Linking, Alert } from 'react-native';
+import { Platform, Linking } from 'react-native';
 import type { Documento, TipoArchivo } from '@/types/documento';
 import { getDocumentoUri } from '@/services/documentosService';
 import { logError } from './errorHandler';
+import { showToast } from './toast';
 
 // ============================================
 // MIME TYPE DETECTION
@@ -97,9 +98,9 @@ export async function openDocument(documento: Documento): Promise<void> {
 
     // Mensaje de error específico para el usuario
     if (error instanceof Error && error.message === 'El archivo no existe') {
-      Alert.alert('Error', 'El archivo no se encuentra en el dispositivo');
+      showToast.error('Error', 'El archivo no se encuentra en el dispositivo');
     } else {
-      Alert.alert(
+      showToast.error(
         'No se puede abrir',
         'No hay ninguna aplicación instalada que pueda abrir este tipo de archivo'
       );
@@ -145,11 +146,11 @@ export async function shareDocument(documento: Documento): Promise<void> {
 
     // Mensaje de error específico para el usuario
     if (error instanceof Error && error.message === 'El archivo no existe') {
-      Alert.alert('Error', 'El archivo no se encuentra en el dispositivo');
+      showToast.error('Error', 'El archivo no se encuentra en el dispositivo');
     } else if (error instanceof Error && error.message.includes('no está disponible')) {
-      Alert.alert('Error', 'Compartir archivos no está disponible en este dispositivo');
+      showToast.error('Error', 'Compartir archivos no está disponible en este dispositivo');
     } else {
-      Alert.alert('Error', 'No se pudo compartir el documento');
+      showToast.error('Error', 'No se pudo compartir el documento');
     }
 
     throw error;

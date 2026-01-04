@@ -12,8 +12,8 @@ import {
   StyleSheet,
   Image,
   Pressable,
-  Alert,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,6 +26,7 @@ import { theme } from '@/config';
 import { getEstadisticasUsuario } from '@/services/perfilService';
 import type { EstadisticasUsuario } from '@/types/perfil';
 import type { ProfileStackParamList } from '@/navigation/types';
+import { showToast } from '@/utils/toast';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileMain'>;
 
@@ -93,7 +94,7 @@ export default function ProfileScreen({ navigation }: Props) {
               await logout();
             } catch (error) {
               console.error('Error al cerrar sesión:', error);
-              Alert.alert('Error', 'No se pudo cerrar sesión. Intenta de nuevo.');
+              showToast.error('Error', 'No se pudo cerrar sesión. Intenta de nuevo.');
             }
           },
         },
@@ -178,7 +179,7 @@ export default function ProfileScreen({ navigation }: Props) {
               label="Cambiar contraseña"
               onPress={() => {
                 // TODO: Implementar cambio de contraseña
-                Alert.alert('Próximamente', 'Esta función estará disponible pronto.');
+                showToast.info('Próximamente', 'Esta función estará disponible pronto.');
               }}
             />
           </Card>
@@ -214,14 +215,14 @@ export default function ProfileScreen({ navigation }: Props) {
               icon="chatbubbles-outline"
               label="Enviar feedback"
               onPress={() => {
-                Alert.alert('Feedback', 'Próximamente podrás enviarnos tus comentarios.');
+                showToast.info('Feedback', 'Próximamente podrás enviarnos tus comentarios.');
               }}
             />
             <ProfileMenuItem
               icon="shield-checkmark-outline"
               label="Términos y privacidad"
               onPress={() => {
-                Alert.alert('Legal', 'Próximamente: Términos y Política de Privacidad.');
+                showToast.info('Legal', 'Próximamente: Términos y Política de Privacidad.');
               }}
             />
           </Card>

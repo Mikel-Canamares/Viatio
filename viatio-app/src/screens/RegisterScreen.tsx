@@ -14,7 +14,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,6 +22,7 @@ import { Input, PrimaryButton, GoogleSignInButton, LinkAccountModal, LoadingOver
 import { useAuth } from '@/context';
 import { theme } from '@/config';
 import type { AuthStackParamList } from '@/navigation/AuthStackNavigator';
+import { showToast } from '@/utils/toast';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
@@ -90,10 +90,9 @@ export default function RegisterScreen({ navigation }: Props) {
     });
 
     if (success) {
-      Alert.alert(
+      showToast.success(
         'Cuenta creada',
-        '¡Bienvenido a Viatio! Hemos enviado un email de verificación a tu correo. Por favor verifica tu email para continuar.',
-        [{ text: 'OK' }]
+        '¡Bienvenido a Viatio! Hemos enviado un email de verificación a tu correo. Por favor verifica tu email para continuar.'
       );
     }
   };
@@ -237,7 +236,7 @@ export default function RegisterScreen({ navigation }: Props) {
                     });
                   } else {
                     console.error('Error Google Sign-In:', err);
-                    Alert.alert('Error', 'No se pudo registrar con Google. Intenta nuevamente.');
+                    showToast.error('Error', 'No se pudo registrar con Google. Intenta nuevamente.');
                   }
                 }}
                 disabled={loading}

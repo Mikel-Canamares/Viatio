@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Alert, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   PreferenciasNotificaciones,
@@ -28,6 +28,7 @@ import { Card } from '@/components/Card';
 import { SwitchItem } from '@/components/SwitchItem';
 import { SelectItem } from '@/components/SelectItem';
 import { theme } from '@/config';
+import { showToast } from '@/utils/toast';
 
 type RootStackParamList = {
   NotificationsSettings: undefined;
@@ -81,7 +82,7 @@ export default function NotificationsSettingsScreen({ navigation }: Props) {
       setPreferencias(prefs);
     } catch (error) {
       console.error('Error cargando preferencias:', error);
-      Alert.alert('Error', 'No se pudieron cargar las preferencias de notificaciones.');
+      showToast.error('Error', 'No se pudieron cargar las preferencias de notificaciones.');
     } finally {
       setLoading(false);
     }
@@ -102,7 +103,7 @@ export default function NotificationsSettingsScreen({ navigation }: Props) {
       await setPreferenciasNotificaciones(nuevasPreferencias);
     } catch (error) {
       console.error('Error guardando preferencia:', error);
-      Alert.alert('Error', 'No se pudo guardar la preferencia.');
+      showToast.error('Error', 'No se pudo guardar la preferencia.');
 
       // Revertir el cambio en caso de error
       setPreferencias(preferencias);

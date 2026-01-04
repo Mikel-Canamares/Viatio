@@ -13,6 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import { ScreenContainer, PageHeader, PrimaryButton, Card, DateInput } from '@/components';
 import { useSharedTripsStore } from '@/store/sharedTripsStore';
 import { theme } from '@/config';
+import { showToast } from '@/utils/toast';
 import { format, addDays } from 'date-fns';
 
 export default function CreateSharedTripScreen() {
@@ -76,10 +77,10 @@ export default function CreateSharedTripScreen() {
         Alert.alert('Viaje creado', name);
         navigation.replace('SharedTripDetail', { tripId: trip.id });
       } else {
-        Alert.alert('Error', 'No se pudo crear el viaje');
+        showToast.error('Error', 'No se pudo crear el viaje');
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      showToast.error('Error', error.message);
     } finally {
       setLoading(false);
     }

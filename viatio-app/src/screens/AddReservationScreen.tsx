@@ -14,8 +14,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  Alert,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -32,6 +32,7 @@ import {
   useHandlePlaceMatch,
 } from '@/components';
 import { theme } from '@/config';
+import { showToast } from '@/utils/toast';
 import { useReservasStore } from '@/store/reservasStore';
 import { useDocumentosStore } from '@/store/documentosStore';
 import { getViajeById, pickMultipleDocuments, pickImage } from '@/services';
@@ -158,7 +159,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
 
   const handleSave = async () => {
     if (!formData.nombre || !formData.categoria) {
-      Alert.alert('Error', 'El nombre y la categoría son obligatorios');
+      showToast.error('Error', 'El nombre y la categoría son obligatorios');
       return;
     }
 
@@ -230,9 +231,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
         console.log('[AddReservation] Total documentos creados exitosamente:', documentoIds.length);
 
         if (documentoIds.length === 0 && allFiles.length > 0) {
-          Alert.alert(
-            'Advertencia',
-            'No se pudieron guardar los documentos adjuntos. ¿Deseas continuar creando la reserva sin documentos?',
+          Alert.alert('Advertencia', 'No se pudieron guardar los documentos adjuntos. ¿Deseas continuar creando la reserva sin documentos?',
             [
               { text: 'Cancelar', style: 'cancel', onPress: () => {} },
               { text: 'Continuar', onPress: () => proceedWithReservation(documentoIds) }
@@ -245,9 +244,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
       await proceedWithReservation(documentoIds);
     } catch (error) {
       console.error('[AddReservation] Error al guardar:', error);
-      Alert.alert(
-        'Error',
-        `Ocurrió un error al guardar: ${error instanceof Error ? error.message : 'Error desconocido'}`
+      showToast.error('Error', `Ocurrió un error al guardar: ${error instanceof Error ? error.message : 'Error desconocido'}`
       );
     }
   };
@@ -284,7 +281,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
       const result = await addReserva(input);
 
       if (!result) {
-        Alert.alert('Error', 'No se pudo crear la reserva');
+        showToast.error('Error', 'No se pudo crear la reserva');
         return;
       }
 
@@ -305,9 +302,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
         } catch (linkError) {
           console.error('[AddReservation] Error al vincular documentos:', linkError);
           // No fallar la creación de la reserva por esto
-          Alert.alert(
-            'Advertencia',
-            'La reserva se creó pero hubo un problema al vincular algunos documentos adjuntos'
+          showToast.warning('Advertencia', 'La reserva se creó pero hubo un problema al vincular algunos documentos adjuntos'
           );
         }
       }
@@ -363,7 +358,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
       }
     } catch (error) {
       console.error('[AddReservation] Error al seleccionar documentos:', error);
-      Alert.alert('Error', 'No se pudieron seleccionar los documentos');
+      showToast.error('Error', 'No se pudieron seleccionar los documentos');
     } finally {
       setPickingFile(false);
     }
@@ -389,7 +384,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
       }
     } catch (error) {
       console.error('[AddReservation] Error al seleccionar imagen:', error);
-      Alert.alert('Error', 'No se pudo seleccionar la imagen');
+      showToast.error('Error', 'No se pudo seleccionar la imagen');
     } finally {
       setPickingFile(false);
     }

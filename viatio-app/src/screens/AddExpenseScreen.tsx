@@ -18,7 +18,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  Alert,
   Modal,
   ActivityIndicator,
 } from 'react-native';
@@ -37,6 +36,7 @@ import { getViajeById } from '@/services';
 import type { Viaje } from '@/types/viaje';
 import { theme } from '@/config';
 import type { HomeStackParamList } from '@/navigation/types';
+import { showToast } from '@/utils/toast';
 
 // ============================================
 // TIPOS
@@ -88,7 +88,7 @@ export function AddExpenseScreen() {
       setLoadingViaje(true);
       const viajeData = await getViajeById(viajeId);
       if (!viajeData) {
-        Alert.alert('Error', 'No se encontró el viaje');
+        showToast.error('Error', 'No se encontró el viaje');
         navigation.goBack();
         return;
       }
@@ -122,7 +122,7 @@ export function AddExpenseScreen() {
       }
     } catch (error) {
       console.error('Error loading viaje:', error);
-      Alert.alert('Error', 'No se pudo cargar el viaje');
+      showToast.error('Error', 'No se pudo cargar el viaje');
       navigation.goBack();
     } finally {
       setLoadingViaje(false);
@@ -149,19 +149,19 @@ export function AddExpenseScreen() {
     // Validar monto
     const montoNum = parseFloat(monto);
     if (!monto || isNaN(montoNum) || montoNum <= 0) {
-      Alert.alert('Error', 'El monto debe ser mayor a 0');
+      showToast.error('Error', 'El monto debe ser mayor a 0');
       return false;
     }
 
     // Validar descripción
     if (!descripcion.trim()) {
-      Alert.alert('Error', 'La descripción es requerida');
+      showToast.error('Error', 'La descripción es requerida');
       return false;
     }
 
     // Validar categoría
     if (!categoria) {
-      Alert.alert('Error', 'Debes seleccionar una categoría');
+      showToast.error('Error', 'Debes seleccionar una categoría');
       return false;
     }
 
@@ -172,7 +172,7 @@ export function AddExpenseScreen() {
     if (!validateForm()) return;
 
     if (!diaSeleccionado) {
-      Alert.alert('Error', 'Debes seleccionar un día del viaje');
+      showToast.error('Error', 'Debes seleccionar un día del viaje');
       return;
     }
 
@@ -191,7 +191,7 @@ export function AddExpenseScreen() {
     if (result) {
       navigation.goBack();
     } else {
-      Alert.alert('Error', 'No se pudo guardar el gasto');
+      showToast.error('Error', 'No se pudo guardar el gasto');
     }
   };
 

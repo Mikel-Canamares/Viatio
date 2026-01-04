@@ -14,7 +14,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +21,7 @@ import { useAuth } from '@/context';
 import { ScreenContainer, Card, Input, PrimaryButton } from '@/components';
 import { theme } from '@/config';
 import type { AuthStackParamList } from '@/navigation/AuthStackNavigator';
+import { showToast } from '@/utils/toast';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'ForgotPassword'>;
 
@@ -54,7 +54,7 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
     if (success) {
       setSent(true);
     } else if (error) {
-      Alert.alert('Error', error.message);
+      showToast.error('Error', error.message);
     }
   };
 

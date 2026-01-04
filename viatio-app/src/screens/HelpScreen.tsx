@@ -23,6 +23,7 @@ import { SectionTitle } from '@/components/SectionTitle';
 import { ProfileMenuItem } from '@/components/ProfileMenuItem';
 import { Accordion } from '@/components/Accordion';
 import { theme } from '@/config';
+import { showToast } from '@/utils/toast';
 import Constants from 'expo-constants';
 
 // Tipos para FAQs
@@ -106,15 +107,11 @@ export default function HelpScreen() {
       if (supported) {
         await Linking.openURL(url);
       } else {
-        Alert.alert(
-          'Error',
-          'No se pudo abrir el cliente de correo. Por favor, contacta a soporte@viatio.com manualmente.'
+        showToast.error('Error', 'No se pudo abrir el cliente de correo. Por favor, contacta a soporte@viatio.com manualmente.'
         );
       }
     } catch (error) {
-      Alert.alert(
-        'Error',
-        'No se pudo abrir el cliente de correo. Por favor, contacta a soporte@viatio.com manualmente.'
+      showToast.error('Error', 'No se pudo abrir el cliente de correo. Por favor, contacta a soporte@viatio.com manualmente.'
       );
     }
   };
@@ -148,10 +145,10 @@ export default function HelpScreen() {
       if (supported) {
         await Linking.openURL(url);
       } else {
-        Alert.alert('Error', 'No se pudo abrir el enlace');
+        showToast.error('Error', 'No se pudo abrir el enlace');
       }
     } catch (error) {
-      Alert.alert('Error', 'No se pudo abrir el enlace');
+      showToast.error('Error', 'No se pudo abrir el enlace');
     }
   };
 

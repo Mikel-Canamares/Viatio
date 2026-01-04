@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ScreenContainer,
@@ -14,6 +14,7 @@ import {
   PrimaryButton,
 } from '@/components';
 import { theme } from '@/config';
+import { showToast } from '@/utils/toast';
 import { useDocumentosStore } from '@/store/documentosStore';
 import type { HomeStackParamList } from '@/navigation/types';
 
@@ -29,7 +30,7 @@ export default function EditDocumentScreen({ route, navigation }: Props) {
   const handleSave = async () => {
     // Validar que el nombre no esté vacío
     if (!nombre.trim()) {
-      Alert.alert('Error', 'El nombre del documento no puede estar vacío');
+      showToast.error('Error', 'El nombre del documento no puede estar vacío');
       return;
     }
 
@@ -45,17 +46,13 @@ export default function EditDocumentScreen({ route, navigation }: Props) {
       const success = await updateDocumento(documentoId, nombre.trim());
 
       if (success) {
-        Alert.alert('Éxito', 'Documento actualizado correctamente', [
-          {
-            text: 'OK',
-            onPress: () => navigation.goBack(),
-          },
-        ]);
+        showToast.success('Éxito', 'Documento actualizado correctamente');
+        navigation.goBack();
       } else {
-        Alert.alert('Error', 'No se pudo actualizar el documento');
+        showToast.error('Error', 'No se pudo actualizar el documento');
       }
     } catch (error) {
-      Alert.alert('Error', 'Ocurrió un error al actualizar el documento');
+      showToast.error('Error', 'Ocurrió un error al actualizar el documento');
     } finally {
       setSaving(false);
     }

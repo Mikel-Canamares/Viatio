@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { View, FlatList, StyleSheet, ActivityIndicator, Text, Alert, Pressable } from 'react-native';
+import { View, FlatList, StyleSheet, ActivityIndicator, Text, Pressable, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -21,6 +21,7 @@ import { useAuth } from '@/context';
 import { theme } from '@/config';
 import type { HomeStackParamList } from '@/navigation/types';
 import { repairViajesSinDias, getViajeRelatedCounts } from '@/services';
+import { showToast } from '@/utils/toast';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'TripList'>;
 
@@ -75,7 +76,7 @@ export default function TripListScreen({ navigation }: Props) {
     try {
       await archiveViaje(viajeId);
     } catch (error) {
-      Alert.alert('Error', 'No se pudo archivar el viaje');
+      showToast.error('Error', 'No se pudo archivar el viaje');
     }
   };
 
@@ -106,14 +107,14 @@ export default function TripListScreen({ navigation }: Props) {
               try {
                 await deleteViajeCompletely(viajeId);
               } catch (error) {
-                Alert.alert('Error', 'No se pudo eliminar el viaje');
+                showToast.error('Error', 'No se pudo eliminar el viaje');
               }
             },
           },
         ]
       );
     } catch (error) {
-      Alert.alert('Error', 'No se pudo obtener información del viaje');
+      showToast.error('Error', 'No se pudo obtener información del viaje');
     }
   };
 

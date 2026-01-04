@@ -13,7 +13,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -29,6 +28,7 @@ import {
 import { useViajesStore } from '@/store';
 import { useAuth } from '@/context';
 import { theme } from '@/config';
+import { showToast } from '@/utils/toast';
 import type { HomeStackParamList } from '@/navigation/types';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'CreateTrip'>;
@@ -92,7 +92,7 @@ export default function CreateTripScreen({ navigation }: Props) {
     }
 
     if (!user?.uid) {
-      Alert.alert('Error', 'No se pudo identificar el usuario. Inicia sesión nuevamente.');
+      showToast.error('Error', 'No se pudo identificar el usuario. Inicia sesión nuevamente.');
       return;
     }
 
@@ -113,13 +113,12 @@ export default function CreateTripScreen({ navigation }: Props) {
     );
 
     if (viaje) {
-      Alert.alert('Éxito', 'Viaje creado correctamente', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      showToast.success('Éxito', 'Viaje creado correctamente');
+      navigation.goBack();
     } else {
       // Mostrar error específico del store (puede incluir info de solapamiento)
       const errorMsg = storeError || 'No se pudo crear el viaje. Inténtalo de nuevo.';
-      Alert.alert('Error', errorMsg);
+      showToast.error('Error', errorMsg);
     }
   };
 
