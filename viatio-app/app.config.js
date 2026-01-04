@@ -7,6 +7,7 @@ export default {
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
     newArchEnabled: true,
+    scheme: 'com.viatio.app',
     splash: {
       image: './assets/splash-icon.png',
       resizeMode: 'contain',
