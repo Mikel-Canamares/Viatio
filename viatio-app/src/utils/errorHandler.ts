@@ -74,7 +74,12 @@ const FIREBASE_AUTH_ERRORS: Record<string, string> = {
   // Google Sign-In
   'auth/popup-closed-by-user': 'Se canceló el inicio de sesión.',
   'auth/cancelled-popup-request': 'Se canceló la solicitud.',
-  'auth/account-exists-with-different-credential': 'Ya existe una cuenta con este email usando otro método de inicio de sesión.',
+  'auth/account-exists-with-different-credential': 'Este email ya está registrado con otro método. Puedes vincular tu cuenta de Google.',
+  'auth/popup-blocked': 'El navegador bloqueó la ventana de Google. Verifica la configuración.',
+
+  // Google Sign-In - Cancelaciones (no son errores)
+  '12501': '', // SIGN_IN_CANCELLED - no mostrar mensaje
+  'SIGN_IN_CANCELLED': '', // No mostrar mensaje
 
   // Apple Sign-In
   'auth/invalid-credential-apple': 'Las credenciales de Apple no son válidas.',

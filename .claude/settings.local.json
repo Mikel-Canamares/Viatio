@@ -15,7 +15,8 @@
       "Bash(mkdir:*)",
       "Bash(dir \"d:\\\\PROYECTOS\\\\VIATIO\\\\Viatio\\\\viatio-app\\\\src\")",
       "Bash(dir \"d:\\\\PROYECTOS\\\\VIATIO\\\\Viatio\\\\viatio-app\\\\src\\\\screens\" /b)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(cat:*)"
     ]
   }
 }

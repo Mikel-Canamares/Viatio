@@ -304,6 +304,18 @@ async function updateLocalReserva(
   let lugarId: string | null = null;
   if (resData.lugarId) {
     lugarId = placeIdMap.get(resData.lugarId) || null;
+
+    // Si no encontramos el lugar en el mapa, pero Firestore dice que existe,
+    // guardar temporalmente el firestoreId del lugar para actualizarlo después
+    if (!lugarId) {
+      console.warn(`[Sync⚠️ Reservations] Lugar ${resData.lugarId} no encontrado en mapa local, se buscará después de sincronizar lugares`);
+      // Buscar si ya existe el lugar con ese firestoreId
+      const lugarFromDb = await db.getFirstAsync<{ id: string }>(
+        'SELECT id FROM lugares WHERE firestoreId = ? AND viajeId = ?',
+        [resData.lugarId, viajeId]
+      );
+      lugarId = lugarFromDb?.id || null;
+    }
   }
 
   await db.runAsync(
@@ -355,4 +367,84 @@ async function updateLocalReserva(
       localId,
     ]
   );
+}
+
+/**
+ * Actualiza las referencias de lugares en reservas cuando se sincroniza un nuevo lugar
+ * Esta función se llama desde el listener de lugares para arreglar referencias pendientes
+ */
+export async function updateReservationPlaceReferences(
+  viajeId: string,
+  firestorePlaceId: string,
+  localPlaceId: string
+): Promise<void> {
+  try {
+    const db = await getDatabase();
+
+    // Buscar reservas que tengan este lugar en Firestore pero aún no tengan el lugarId local
+    // Esto puede pasar cuando las reservas llegan antes que los lugares
+    const reservationsNeedingUpdate = await db.getAllAsync<{
+      id: string;
+      firestoreId: string | null;
+    }>(
+      `SELECT r.id, r.firestoreId
+       FROM reservas r
+       WHERE r.viajeId = ?
+       AND r.lugarId IS NULL
+       AND r.firestoreId IS NOT NULL`,
+      [viajeId]
+    );
+
+    if (reservationsNeedingUpdate.length === 0) {
+      return;
+    }
+
+    console.log(`[Sync🔄 Reservations] Verificando ${reservationsNeedingUpdate.length} reservas para actualizar referencias de lugares`);
+
+    // Para cada reserva sin lugarId local, verificar si en Firestore tiene este lugar
+    const { db: firestoreDb } = require('@/config/firebase');
+    const { doc, getDoc } = require('firebase/firestore');
+
+    // Obtener el viaje para saber su firestoreId
+    const viaje = await db.getFirstAsync<{ firestoreId: string | null }>(
+      'SELECT firestoreId FROM viajes WHERE id = ?',
+      [viajeId]
+    );
+
+    if (!viaje?.firestoreId) {
+      return;
+    }
+
+    let updatedCount = 0;
+
+    for (const reservation of reservationsNeedingUpdate) {
+      if (!reservation.firestoreId) continue;
+
+      try {
+        // Verificar en Firestore si esta reserva tiene el lugar que acabamos de sincronizar
+        const reservationDoc = await getDoc(
+          doc(firestoreDb, 'trips', viaje.firestoreId, 'reservations', reservation.firestoreId)
+        );
+
+        const reservationData = reservationDoc.data();
+        if (reservationData?.lugarId === firestorePlaceId) {
+          // Actualizar la reserva local con el lugarId correcto
+          await db.runAsync(
+            'UPDATE reservas SET lugarId = ?, updatedAt = ? WHERE id = ?',
+            [localPlaceId, getCurrentTimestamp(), reservation.id]
+          );
+          updatedCount++;
+          console.log(`[Sync✅ Reservations] Actualizada referencia de lugar en reserva ${reservation.id}`);
+        }
+      } catch (error) {
+        console.error(`[Sync❌ Reservations] Error actualizando reserva ${reservation.id}:`, error);
+      }
+    }
+
+    if (updatedCount > 0) {
+      console.log(`[Sync✅ Reservations] ${updatedCount} reserva(s) actualizada(s) con referencias de lugar`);
+    }
+  } catch (error) {
+    logError(error, 'updateReservationPlaceReferences');
+  }
 }

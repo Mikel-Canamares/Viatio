@@ -8,7 +8,7 @@
  */
 
 import { Platform } from 'react-native';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
@@ -90,13 +90,17 @@ export async function signInWithGoogle(): Promise<boolean> {
       // Verificar si Google Play Services está disponible
       await GoogleSignin.hasPlayServices();
 
-      // Iniciar sesión
+      // Cerrar sesión anterior para forzar el selector de cuentas
+      await GoogleSignin.signOut();
+      console.log('[GoogleAuth] Sesión anterior cerrada, mostrando selector de cuentas');
+
+      // Iniciar sesión - ahora mostrará el selector de cuentas
       const userInfo = await GoogleSignin.signIn();
 
       console.log('[GoogleAuth] Usuario autenticado:', JSON.stringify(userInfo, null, 2));
 
       // Obtener el ID token (estructura: userInfo.data.idToken)
-      const idToken = userInfo.data?.idToken || userInfo.idToken;
+      const idToken = (userInfo.data as any)?.idToken || (userInfo as any).idToken;
 
       if (!idToken) {
         console.error('[GoogleAuth] No se encontró idToken en userInfo:', userInfo);
@@ -116,7 +120,13 @@ export async function signInWithGoogle(): Promise<boolean> {
         'signInWithGoogle() solo está disponible en Android. En iOS/Web, usa useGoogleAuth hook.'
       );
     }
-  } catch (error) {
+  } catch (error: any) {
+    // Detectar cancelación del usuario (no es un error)
+    if (error.code === statusCodes.SIGN_IN_CANCELLED || error.code === '12501') {
+      console.log('[GoogleAuth] Usuario canceló el sign-in');
+      return false; // Retornar false sin loggear error
+    }
+
     logError(error, 'signInWithGoogle');
     throw error;
   }

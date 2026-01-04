@@ -22,6 +22,7 @@ import { db as firestoreDb } from '@/config/firebase';
 import { getDatabase, getCurrentTimestamp } from '@/database';
 import { getDiasByViajeId } from '@/services/diasViajeService';
 import { logError } from '@/utils/errorHandler';
+import { updateReservationPlaceReferences } from './syncRealtimeReservations';
 
 // ============================================
 // TIPOS
@@ -93,15 +94,22 @@ export function subscribeToPlaces(
               [firestorePlaceId]
             );
 
+            let localPlaceId: string;
+
             if (!existing) {
               // Insertar nuevo lugar
               await createLocalPlace(placeData, viajeId, firestorePlaceId, diasMap);
+              localPlaceId = placeData.localId || firestorePlaceId;
               console.log('[Sync⬇️ Places] ✓ Lugar creado (inicial):', placeData.nombre);
             } else {
               // Actualizar lugar existente
               await updateLocalPlace(existing.id, placeData, viajeId, diasMap);
+              localPlaceId = existing.id;
               console.log('[Sync⬇️ Places] ✓ Lugar actualizado (inicial):', placeData.nombre);
             }
+
+            // Después de crear/actualizar el lugar, actualizar las reservas que lo referencian
+            await updateReservationPlaceReferences(viajeId, firestorePlaceId, localPlaceId);
           }
 
           isFirstSnapshot = false;
@@ -120,15 +128,22 @@ export function subscribeToPlaces(
                 [firestorePlaceId]
               );
 
+              let localPlaceId: string;
+
               if (!existing) {
                 // Insertar nuevo lugar
                 await createLocalPlace(placeData, viajeId, firestorePlaceId, diasMap);
+                localPlaceId = placeData.localId || firestorePlaceId;
                 console.log('[Sync⬇️ Places] ✓ Lugar creado:', placeData.nombre);
               } else {
                 // Actualizar lugar existente
                 await updateLocalPlace(existing.id, placeData, viajeId, diasMap);
+                localPlaceId = existing.id;
                 console.log('[Sync⬇️ Places] ✓ Lugar actualizado:', placeData.nombre);
               }
+
+              // Después de crear/actualizar el lugar, actualizar las reservas que lo referencian
+              await updateReservationPlaceReferences(viajeId, firestorePlaceId, localPlaceId);
             } else if (change.type === 'removed') {
               // Eliminar de SQLite
               await db.runAsync(

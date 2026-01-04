@@ -80,5 +80,9 @@ export { CopilotFAB } from './CopilotFAB';
 export { MembersSection } from './MembersSection';
 export { ShareTripModal } from './ShareTripModal';
 
+// Componentes de Autenticación
+export { GoogleSignInButton } from './GoogleSignInButton';
+export { LinkAccountModal } from './LinkAccountModal';
+
 // Los siguientes se crearán en fases posteriores:
 // export { EmptyState } from './EmptyState';
