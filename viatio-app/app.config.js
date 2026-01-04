@@ -48,6 +48,7 @@ export default {
       'expo-sqlite',
       'expo-web-browser',
       'expo-localization',
+      '@react-native-google-signin/google-signin',
       [
         'expo-location',
         {

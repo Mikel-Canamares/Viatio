@@ -14,7 +14,8 @@
       "Bash(git restore:*)",
       "Bash(mkdir:*)",
       "Bash(dir \"d:\\\\PROYECTOS\\\\VIATIO\\\\Viatio\\\\viatio-app\\\\src\")",
-      "Bash(dir \"d:\\\\PROYECTOS\\\\VIATIO\\\\Viatio\\\\viatio-app\\\\src\\\\screens\" /b)"
+      "Bash(dir \"d:\\\\PROYECTOS\\\\VIATIO\\\\Viatio\\\\viatio-app\\\\src\\\\screens\" /b)",
+      "Bash(npm uninstall:*)"
     ]
   }
 }

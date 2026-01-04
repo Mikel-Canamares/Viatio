@@ -23,13 +23,14 @@ import { Input, PrimaryButton, SecondaryButton, LoadingOverlay } from '@/compone
 import { useAuth } from '@/context';
 import { theme } from '@/config';
 import type { AuthStackParamList } from '@/navigation/AuthStackNavigator';
-import { useGoogleAuth } from '@/services/auth/googleAuthService';
+import { useGoogleAuth, signInWithGoogle } from '@/services/auth/googleAuthService';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 export default function LoginScreen({ navigation }: Props) {
   const { loginWithEmail, loginWithGoogle, error, clearError, loading } = useAuth();
-  const { request, response, promptAsync } = useGoogleAuth();
+  // Solo usar useGoogleAuth en iOS/Web
+  const googleAuth = Platform.OS !== 'android' ? useGoogleAuth() : null;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -70,7 +71,15 @@ export default function LoginScreen({ navigation }: Props) {
 
   const handleGoogleLogin = async () => {
     try {
-      await promptAsync();
+      if (Platform.OS === 'android') {
+        // Android: Usar SDK nativo
+        await signInWithGoogle();
+      } else {
+        // iOS/Web: Usar expo-auth-session
+        if (googleAuth?.promptAsync) {
+          await googleAuth.promptAsync();
+        }
+      }
     } catch (error) {
       console.error('Error al iniciar Google Sign-In:', error);
       Alert.alert('Error', 'No se pudo iniciar sesión con Google. Intenta nuevamente.');
@@ -84,15 +93,15 @@ export default function LoginScreen({ navigation }: Props) {
     );
   };
 
-  // Manejar la respuesta del flujo OAuth de Google
+  // Manejar la respuesta del flujo OAuth de Google (solo iOS/Web)
   useEffect(() => {
-    if (response?.type === 'success') {
-      const { authentication } = response;
+    if (Platform.OS !== 'android' && googleAuth?.response?.type === 'success') {
+      const { authentication } = googleAuth.response;
       if (authentication?.idToken) {
         loginWithGoogle(authentication.idToken);
       }
     }
-  }, [response]);
+  }, [googleAuth?.response]);
 
   return (
     <KeyboardAvoidingView
@@ -206,7 +215,7 @@ export default function LoginScreen({ navigation }: Props) {
               <View style={styles.socialButtons}>
                 <SecondaryButton
                   onPress={handleGoogleLogin}
-                  disabled={!request || loading}
+                  disabled={Platform.OS !== 'android' && !googleAuth?.request || loading}
                   style={styles.socialButton}
                 >
                   <Ionicons name="logo-google" size={20} color={theme.colors.text} />
