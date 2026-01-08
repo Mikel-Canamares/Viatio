@@ -9,6 +9,8 @@ import { Directory, File, Paths } from 'expo-file-system/next';
 import { getDatabase, generateId, getCurrentTimestamp } from '@/database';
 import type { Documento, CreateDocumentoInput, CategoriaDocumento, TipoArchivo } from '@/types/documento';
 import { logError } from '@/utils/errorHandler';
+import { syncDocumentoIfShared, syncDocumentLinkIfShared, syncDeleteIfShared } from '@/services/sync/syncUpload';
+import { getViajeById } from '@/services/viajesService';
 
 // ============================================
 // HELPERS - DIRECTORIO
@@ -143,6 +145,20 @@ export async function createDocumento(
       updatedAt: timestamp,
     };
 
+    // Sincronizar con Firestore si el viaje es compartido
+    // NOTA: El UPDATE del firestoreId se hace DENTRO de uploadDocument para prevenir race conditions
+    try {
+      const firestoreDocId = await syncDocumentoIfShared(documento);
+      if (firestoreDocId) {
+        // Actualizar el objeto en memoria (la BD ya fue actualizada en uploadDocument)
+        documento.firestoreId = firestoreDocId;
+        console.log('[createDocumento] ✓ Documento sincronizado con Firestore:', firestoreDocId);
+      }
+    } catch (syncError) {
+      console.warn('[createDocumento] Error sincronizando documento:', syncError);
+      // No fallar la creación del documento local
+    }
+
     return documento;
   } catch (error) {
     logError(error, 'createDocumento');
@@ -160,11 +176,22 @@ export async function createDocumento(
  */
 export async function getDocumentosByViajeId(viajeId: string): Promise<Documento[]> {
   try {
+    console.log('[getDocumentosByViajeId] 🔍 Consultando documentos para viajeId:', viajeId);
     const db = await getDatabase();
     const result = await db.getAllAsync<Documento>(
       'SELECT * FROM documentos WHERE viajeId = ? ORDER BY createdAt DESC',
       [viajeId]
     );
+
+    console.log('[getDocumentosByViajeId] 📊 Documentos encontrados:', result?.length || 0);
+    if (result && result.length > 0) {
+      console.log('[getDocumentosByViajeId] 📄 Detalle:', result.map(d => ({
+        id: d.id,
+        nombre: d.nombre,
+        viajeId: d.viajeId,
+        firestoreId: d.firestoreId,
+      })));
+    }
 
     return result || [];
   } catch (error) {
@@ -336,6 +363,33 @@ export async function linkDocumentoToReserva(
     }
 
     console.log('[linkDocumentoToReserva] Verificación exitosa, relación existe en BD');
+
+    // Sincronizar vinculación con Firestore si el viaje es compartido
+    try {
+      // Obtener firestoreId de la reserva y documento
+      const reserva = await db.getFirstAsync<{ firestoreId: string | null; viajeId: string }>(
+        'SELECT firestoreId, viajeId FROM reservas WHERE id = ?',
+        [reservaId]
+      );
+
+      const documento = await db.getFirstAsync<{ firestoreId: string | null }>(
+        'SELECT firestoreId FROM documentos WHERE id = ?',
+        [documentoId]
+      );
+
+      if (reserva && documento && reserva.firestoreId && documento.firestoreId) {
+        await syncDocumentLinkIfShared(
+          reserva.viajeId,
+          reserva.firestoreId,
+          documento.firestoreId
+        );
+        console.log('[linkDocumentoToReserva] Vinculación sincronizada con Firestore');
+      }
+    } catch (syncError) {
+      console.warn('[linkDocumentoToReserva] Error sincronizando vinculación:', syncError);
+      // No fallar la vinculación local
+    }
+
     return true;
   } catch (error) {
     // Si ya existe la relación (UNIQUE constraint), no es un error
@@ -460,6 +514,17 @@ export async function deleteDocumento(id: string): Promise<boolean> {
 
     if (file.exists) {
       file.delete();
+    }
+
+    // Sincronizar eliminación con Firestore si el viaje es compartido
+    if (documento.firestoreId) {
+      try {
+        await syncDeleteIfShared(documento.viajeId, 'documents', documento.firestoreId);
+        console.log('[deleteDocumento] Eliminación sincronizada con Firestore');
+      } catch (syncError) {
+        console.warn('[deleteDocumento] Error sincronizando eliminación:', syncError);
+        // Continuar con eliminación local
+      }
     }
 
     // Eliminar registro de BD

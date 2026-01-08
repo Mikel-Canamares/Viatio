@@ -13,6 +13,7 @@ import {
   ScrollView,
   Pressable,
   Alert,
+  Image,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,8 +31,11 @@ import { useReservasStore } from '@/store/reservasStore';
 import { getReservaById } from '@/services/reservasService';
 import { getDocumentosByReservaId } from '@/services/documentosService';
 import { openDocument } from '@/utils/documentViewer';
+import { getViajeById } from '@/services';
+import { useTripMembers } from '@/hooks';
 import type { Reserva } from '@/types/reserva';
 import type { Documento } from '@/types/documento';
+import type { Viaje } from '@/types/viaje';
 import {
   RESERVA_CATEGORIAS,
   SUBTIPOS_TRANSPORTE,
@@ -108,6 +112,10 @@ export default function ReservationDetailScreen({ route, navigation }: Props) {
   const [reserva, setReserva] = useState<Reserva | null>(null);
   const [documentos, setDocumentos] = useState<Documento[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viaje, setViaje] = useState<Viaje | null>(null);
+
+  // Hook para obtener miembros del viaje compartido
+  const { members, loading: loadingMembers } = useTripMembers(viaje?.firestoreId || null);
 
   useEffect(() => {
     loadReserva();
@@ -124,7 +132,18 @@ export default function ReservationDetailScreen({ route, navigation }: Props) {
     try {
       setLoading(true);
       const data = await getReservaById(reservaId);
+
+      if (!data) {
+        showToast.error('Error', 'No se encontró la reserva');
+        navigation.goBack();
+        return;
+      }
+
       setReserva(data);
+
+      // Cargar datos del viaje
+      const viajeData = await getViajeById(data.viajeId);
+      setViaje(viajeData);
 
       // Cargar documentos asociados desde tabla intermedia
       const docs = await getDocumentosByReservaId(reservaId);
@@ -170,6 +189,19 @@ export default function ReservationDetailScreen({ route, navigation }: Props) {
   const colors = CATEGORIA_COLORS[reserva.categoria];
   const estadoPagoInfo = ESTADO_PAGO_CONFIG[reserva.estadoPago];
   const iconName = getIconForReserva(reserva);
+
+  // Buscar el miembro que pagó
+  const paidByMember = reserva.paidByUserId && members.length > 0
+    ? members.find(m => m.uid === reserva.paidByUserId)
+    : null;
+
+  // Calcular la información de reparto si existe
+  const splitInfo = reserva.shares && reserva.shares.length > 0 && reserva.precio
+    ? reserva.shares.map(share => ({
+        ...share,
+        member: members.find(m => m.uid === share.uid),
+      }))
+    : null;
 
   return (
     <View style={styles.container}>
@@ -318,6 +350,73 @@ export default function ReservationDetailScreen({ route, navigation }: Props) {
                     </Text>
                   </View>
                 </View>
+
+                {/* Mostrar quién pagó si existe */}
+                {paidByMember && (
+                  <>
+                    <View style={styles.divider} />
+                    <View style={styles.paidByRow}>
+                      <Text style={styles.infoLabel}>Pagado por</Text>
+                      <View style={styles.memberInfo}>
+                        {paidByMember.photoURL ? (
+                          <Image
+                            source={{ uri: paidByMember.photoURL }}
+                            style={styles.memberAvatar}
+                          />
+                        ) : (
+                          <View style={[styles.memberAvatar, styles.memberAvatarPlaceholder]}>
+                            <Text style={styles.memberAvatarText}>
+                              {paidByMember.displayName.charAt(0).toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
+                        <Text style={styles.memberName}>{paidByMember.displayName}</Text>
+                      </View>
+                    </View>
+                  </>
+                )}
+
+                {/* Mostrar información de reparto si existe */}
+                {splitInfo && splitInfo.length > 0 && (
+                  <>
+                    <View style={styles.divider} />
+                    <View style={styles.splitInfoSection}>
+                      <Text style={styles.splitInfoTitle}>Reparto del gasto</Text>
+                      <View style={styles.splitMethodBadge}>
+                        <Text style={styles.splitMethodText}>
+                          {reserva.splitMethod === 'equal' && 'Dividido equitativamente'}
+                          {reserva.splitMethod === 'exact' && 'Montos exactos'}
+                          {reserva.splitMethod === 'percentage' && 'Por porcentajes'}
+                          {reserva.splitMethod === 'shares' && 'Por partes'}
+                        </Text>
+                      </View>
+                      <View style={styles.sharesList}>
+                        {splitInfo.map((share) => (
+                          <View key={share.uid} style={styles.shareRow}>
+                            <View style={styles.shareMemberInfo}>
+                              {share.member?.photoURL ? (
+                                <Image
+                                  source={{ uri: share.member.photoURL }}
+                                  style={styles.shareAvatar}
+                                />
+                              ) : (
+                                <View style={[styles.shareAvatar, styles.shareAvatarPlaceholder]}>
+                                  <Text style={styles.shareAvatarText}>
+                                    {share.displayName.charAt(0).toUpperCase()}
+                                  </Text>
+                                </View>
+                              )}
+                              <Text style={styles.shareMemberName}>{share.displayName}</Text>
+                            </View>
+                            <Text style={styles.shareAmount}>
+                              {((share.calculatedAmount || 0) / 100).toFixed(2)} {reserva.moneda}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  </>
+                )}
               </Card>
             </View>
           )}
@@ -534,5 +633,95 @@ const styles = StyleSheet.create({
   documentMeta: {
     fontSize: 13,
     color: theme.colors.textMuted,
+  },
+  paidByRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  memberInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  memberAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+  },
+  memberAvatarPlaceholder: {
+    backgroundColor: theme.colors.primaryLight + '30',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memberAvatarText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.primaryLight,
+  },
+  memberName: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: theme.colors.text,
+  },
+  splitInfoSection: {
+    gap: theme.spacing.sm,
+  },
+  splitInfoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.text,
+  },
+  splitMethodBadge: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  splitMethodText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: theme.colors.primaryLight,
+  },
+  sharesList: {
+    gap: theme.spacing.xs,
+    marginTop: theme.spacing.xs,
+  },
+  shareRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: theme.spacing.xs,
+  },
+  shareMemberInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    flex: 1,
+  },
+  shareAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+  },
+  shareAvatarPlaceholder: {
+    backgroundColor: theme.colors.primaryLight + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  shareAvatarText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: theme.colors.primaryLight,
+  },
+  shareMemberName: {
+    fontSize: 14,
+    color: theme.colors.text,
+  },
+  shareAmount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.text,
   },
 });

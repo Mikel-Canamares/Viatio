@@ -16,6 +16,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { subscribeToReservations } from '@/services/sync/syncRealtimeReservations';
 import { subscribeToPlaces } from '@/services/sync/syncRealtimePlaces';
+import { subscribeToDocuments } from '@/services/sync/syncRealtimeDocuments';
 import { subscribeToExpenses } from '@/services/firestore/expensesService';
 import type { SharedExpense } from '@/types/shared';
 
@@ -30,6 +31,8 @@ export interface RealtimeSyncOptions {
   onReservationsChange?: () => void;
   /** Callback cuando se detectan cambios en lugares */
   onPlacesChange?: () => void;
+  /** Callback cuando se detectan cambios en documentos */
+  onDocumentsChange?: () => void;
   /** Callback cuando se detectan cambios en gastos */
   onExpensesChange?: (expenses: SharedExpense[]) => void;
 }
@@ -67,6 +70,7 @@ export function useRealtimeSync(
     enabled = true,
     onReservationsChange,
     onPlacesChange,
+    onDocumentsChange,
     onExpensesChange,
   } = options;
 
@@ -74,6 +78,7 @@ export function useRealtimeSync(
   const callbacksRef = useRef({
     onReservationsChange,
     onPlacesChange,
+    onDocumentsChange,
     onExpensesChange,
   });
 
@@ -82,9 +87,10 @@ export function useRealtimeSync(
     callbacksRef.current = {
       onReservationsChange,
       onPlacesChange,
+      onDocumentsChange,
       onExpensesChange,
     };
-  }, [onReservationsChange, onPlacesChange, onExpensesChange]);
+  }, [onReservationsChange, onPlacesChange, onDocumentsChange, onExpensesChange]);
 
   useEffect(() => {
     // Solo activar si el viaje es compartido, hay firestoreId y está enabled
@@ -97,6 +103,8 @@ export function useRealtimeSync(
     console.log('[useRealtimeSync] Iniciando sincronización:', firestoreId);
     setSyncing(true);
 
+    // Flag para prevenir race conditions durante cleanup
+    let isCleanedUp = false;
     const unsubscribers: Array<() => void> = [];
 
     // Listener de reservas
@@ -131,6 +139,22 @@ export function useRealtimeSync(
       console.error('[useRealtimeSync] Error en listener de lugares:', error);
     }
 
+    // Listener de documentos
+    try {
+      const unsubDocuments = subscribeToDocuments(
+        firestoreId,
+        viajeId,
+        () => {
+          // Usar el callback del ref (siempre la versión más reciente)
+          callbacksRef.current.onDocumentsChange?.();
+        }
+      );
+      unsubscribers.push(unsubDocuments);
+      console.log('[useRealtimeSync] ✓ Listener de documentos activado');
+    } catch (error) {
+      console.error('[useRealtimeSync] Error en listener de documentos:', error);
+    }
+
     // Listener de gastos (ya existe en expensesService)
     if (callbacksRef.current.onExpensesChange) {
       try {
@@ -155,6 +179,12 @@ export function useRealtimeSync(
 
     // Cleanup: desuscribir todos los listeners
     return () => {
+      if (isCleanedUp) {
+        console.log('[useRealtimeSync] ⚠️ Cleanup ya ejecutado, ignorando...');
+        return;
+      }
+      isCleanedUp = true;
+
       console.log('[useRealtimeSync] Limpiando suscripciones...');
       unsubscribers.forEach(unsub => {
         try {

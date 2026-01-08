@@ -126,6 +126,22 @@ export async function runMigrations(
     await migrateToV14(db);
   }
 
+  if (currentVersion < 15) {
+    await migrateToV15(db);
+  }
+
+  if (currentVersion < 16) {
+    await migrateToV16(db);
+  }
+
+  if (currentVersion < 17) {
+    await migrateToV17(db);
+  }
+
+  if (currentVersion < 18) {
+    await migrateToV18(db);
+  }
+
   console.log('[Migrations] Migraciones completadas exitosamente');
 }
 
@@ -732,6 +748,198 @@ async function migrateToV14(db: SQLite.SQLiteDatabase): Promise<void> {
     console.log('[Migrations] Migración a v14 completada');
   } catch (error) {
     console.error('[Migrations] Error en migración a v14:', error);
+    throw error;
+  }
+}
+
+/**
+ * Migración a versión 15: Añadir campo paidByUserId a tabla reservas
+ * Permite registrar quién pagó una reserva en viajes compartidos
+ */
+async function migrateToV15(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migrations] Ejecutando migración a v15...');
+
+  try {
+    // Verificar si la columna paidByUserId ya existe en reservas
+    const reservasInfo = await db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(reservas);'
+    );
+
+    const paidByUserIdExists = reservasInfo.some(col => col.name === 'paidByUserId');
+
+    if (!paidByUserIdExists) {
+      console.log('[Migrations] Añadiendo columna paidByUserId a reservas...');
+      await db.execAsync('ALTER TABLE reservas ADD COLUMN paidByUserId TEXT;');
+    } else {
+      console.log('[Migrations] Columna paidByUserId ya existe, omitiendo...');
+    }
+
+    // Registrar migración
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'INSERT INTO _migrations (version, appliedAt) VALUES (?, ?)',
+      [15, now]
+    );
+
+    console.log('[Migrations] Migración a v15 completada');
+  } catch (error) {
+    console.error('[Migrations] Error en migración a v15:', error);
+    throw error;
+  }
+}
+
+/**
+ * Migración a versión 16: Añadir campos de reparto a tabla reservas
+ * Permite configurar splitMethod, participantUids y shares para viajes compartidos
+ */
+async function migrateToV16(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migrations] Ejecutando migración a v16...');
+
+  try {
+    // Verificar columnas existentes en reservas
+    const reservasInfo = await db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(reservas);'
+    );
+
+    // Añadir splitMethod si no existe
+    const splitMethodExists = reservasInfo.some(col => col.name === 'splitMethod');
+    if (!splitMethodExists) {
+      console.log('[Migrations] Añadiendo columna splitMethod a reservas...');
+      await db.execAsync("ALTER TABLE reservas ADD COLUMN splitMethod TEXT DEFAULT 'equal';");
+    } else {
+      console.log('[Migrations] Columna splitMethod ya existe, omitiendo...');
+    }
+
+    // Añadir participantUids si no existe
+    const participantUidsExists = reservasInfo.some(col => col.name === 'participantUids');
+    if (!participantUidsExists) {
+      console.log('[Migrations] Añadiendo columna participantUids a reservas...');
+      await db.execAsync('ALTER TABLE reservas ADD COLUMN participantUids TEXT;');
+    } else {
+      console.log('[Migrations] Columna participantUids ya existe, omitiendo...');
+    }
+
+    // Añadir shares si no existe
+    const sharesExists = reservasInfo.some(col => col.name === 'shares');
+    if (!sharesExists) {
+      console.log('[Migrations] Añadiendo columna shares a reservas...');
+      await db.execAsync('ALTER TABLE reservas ADD COLUMN shares TEXT;');
+    } else {
+      console.log('[Migrations] Columna shares ya existe, omitiendo...');
+    }
+
+    // Registrar migración
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'INSERT INTO _migrations (version, appliedAt) VALUES (?, ?)',
+      [16, now]
+    );
+
+    console.log('[Migrations] Migración a v16 completada');
+  } catch (error) {
+    console.error('[Migrations] Error en migración a v16:', error);
+    throw error;
+  }
+}
+
+/**
+ * Migración a versión 17: Añadir campo firestoreId a la tabla documentos
+ * para soportar sincronización de documentos en viajes compartidos
+ */
+async function migrateToV17(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migrations] Ejecutando migración a v17...');
+
+  try {
+    // Verificar columnas existentes en documentos
+    const documentosInfo = await db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(documentos);'
+    );
+
+    // Añadir firestoreId si no existe
+    const firestoreIdExists = documentosInfo.some(col => col.name === 'firestoreId');
+    if (!firestoreIdExists) {
+      console.log('[Migrations] Añadiendo columna firestoreId a documentos...');
+      await db.execAsync('ALTER TABLE documentos ADD COLUMN firestoreId TEXT;');
+    } else {
+      console.log('[Migrations] Columna firestoreId ya existe, omitiendo...');
+    }
+
+    // Registrar migración
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'INSERT INTO _migrations (version, appliedAt) VALUES (?, ?)',
+      [17, now]
+    );
+
+    console.log('[Migrations] Migración a v17 completada');
+  } catch (error) {
+    console.error('[Migrations] Error en migración a v17:', error);
+    throw error;
+  }
+}
+
+/**
+ * Migración a versión 18: Limpiar documentos duplicados
+ *
+ * Problema: Los documentos se guardaban con el mismo firestoreId pero IDs locales diferentes,
+ * causando duplicados en viajes compartidos. Esta migración elimina los duplicados manteniendo
+ * solo el más reciente por cada combinación única de (firestoreId, viajeId).
+ */
+async function migrateToV18(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migrations] Ejecutando migración a v18: Limpieza de documentos duplicados...');
+
+  try {
+    // Eliminar documentos duplicados (mantener solo el más reciente por firestoreId + viajeId)
+    const duplicates = await db.getAllAsync<{ id: string; firestoreId: string; viajeId: string; createdAt: string }>(
+      `SELECT id, firestoreId, viajeId, createdAt
+       FROM documentos
+       WHERE firestoreId IS NOT NULL
+       ORDER BY firestoreId, viajeId, createdAt DESC`
+    );
+
+    if (duplicates && duplicates.length > 0) {
+      const seen = new Map<string, string>(); // key: "firestoreId-viajeId", value: id a mantener
+      const idsToDelete: string[] = [];
+
+      for (const doc of duplicates) {
+        if (!doc.firestoreId || !doc.viajeId) continue;
+
+        const key = `${doc.firestoreId}-${doc.viajeId}`;
+
+        if (!seen.has(key)) {
+          // Primer documento encontrado para esta combinación (el más reciente), mantenerlo
+          seen.set(key, doc.id);
+        } else {
+          // Documento duplicado, marcarlo para eliminar
+          idsToDelete.push(doc.id);
+        }
+      }
+
+      if (idsToDelete.length > 0) {
+        console.log(`[Migrations] Eliminando ${idsToDelete.length} documentos duplicados...`);
+
+        for (const id of idsToDelete) {
+          await db.runAsync('DELETE FROM documentos WHERE id = ?', [id]);
+        }
+
+        console.log('[Migrations] ✓ Documentos duplicados eliminados');
+      } else {
+        console.log('[Migrations] No se encontraron documentos duplicados');
+      }
+    } else {
+      console.log('[Migrations] No hay documentos para procesar');
+    }
+
+    // Registrar migración
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'INSERT INTO _migrations (version, appliedAt) VALUES (?, ?)',
+      [18, now]
+    );
+
+    console.log('[Migrations] Migración a v18 completada');
+  } catch (error) {
+    console.error('[Migrations] Error en migración a v18:', error);
     throw error;
   }
 }

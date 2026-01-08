@@ -5,7 +5,7 @@
  * Muestra documentos agrupados por categoría con opción de añadir nuevos.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -24,9 +24,12 @@ import {
   DocumentCategoryGroup,
 } from '@/components';
 import { theme } from '@/config';
-import { useDocumentosStore } from '@/store/documentosStore';
+import { useDocumentosStore, documentosSelectors } from '@/store/documentosStore';
 import { openDocument } from '@/utils/documentViewer';
+import { getViajeById } from '@/services/viajesService';
+import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import type { Documento, CategoriaDocumento } from '@/types/documento';
+import type { Viaje } from '@/types/viaje';
 import type { HomeStackParamList } from '@/navigation/types';
 import { showToast } from '@/utils/toast';
 
@@ -38,32 +41,88 @@ type Props = NativeStackScreenProps<HomeStackParamList, 'TripDocuments'>;
 
 export default function TripDocumentsScreen({ route, navigation }: Props) {
   const { viajeId } = route.params;
-  const { documentos, loading, error, fetchDocumentos, removeDocumento, clearError } = useDocumentosStore();
 
+  // Usar selectors para prevenir re-renders innecesarios
+  const documentos = useDocumentosStore(documentosSelectors.documentos);
+  const loading = useDocumentosStore(documentosSelectors.loading);
+  const error = useDocumentosStore(documentosSelectors.error);
+
+  // Seleccionar acciones individualmente para evitar crear nuevos objetos
+  const fetchDocumentos = useDocumentosStore((state) => state.fetchDocumentos);
+  const removeDocumento = useDocumentosStore((state) => state.removeDocumento);
+  const clearError = useDocumentosStore((state) => state.clearError);
+
+  const [viaje, setViaje] = useState<Viaje | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   // ============================================
   // EFFECTS
   // ============================================
 
+  // Cargar datos del viaje
+  useEffect(() => {
+    const loadViaje = async () => {
+      const viajeData = await getViajeById(viajeId);
+      setViaje(viajeData);
+    };
+    loadViaje();
+  }, [viajeId]);
+
+  // Memoizar loadDocumentos para que sea estable entre renders
+  // fetchDocumentos es ahora una referencia estable gracias a los selectors
+  const loadDocumentos = useCallback(async () => {
+    console.log('[TripDocuments] 📂 Cargando documentos para viajeId:', viajeId);
+    await fetchDocumentos(viajeId);
+    console.log('[TripDocuments] 📊 Carga completada');
+  }, [viajeId, fetchDocumentos]);
+
   useEffect(() => {
     loadDocumentos();
-  }, [viajeId]);
+  }, [loadDocumentos]);
 
   useEffect(() => {
     if (error) {
       showToast.error('Error', error);
       clearError();
     }
-  }, [error]);
+  }, [error, clearError]);
+
+  // Callback memoizado para sincronización en tiempo real con debounce
+  // Previene múltiples recargas cuando hay 2 listeners activos
+  const debounceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const handleDocumentsChange = useCallback(() => {
+    // Cancelar recarga anterior si existe
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Programar nueva recarga con pequeño delay
+    debounceTimerRef.current = setTimeout(() => {
+      console.log('[TripDocuments] Documentos actualizados, recargando...');
+      loadDocumentos();
+      debounceTimerRef.current = null;
+    }, 100); // 100ms de delay para consolidar múltiples eventos
+  }, [loadDocumentos]);
+
+  // Sincronización en tiempo real para viajes compartidos
+  // Usar useMemo para evitar que cambios en viaje disparen re-montaje de useRealtimeSync
+  const syncConfig = useMemo(() => {
+    if (!viaje) {
+      return { isShared: false, firestoreId: null };
+    }
+    return {
+      isShared: viaje.isShared === 1,
+      firestoreId: viaje.firestoreId || null,
+    };
+  }, [viaje?.isShared, viaje?.firestoreId]);
+
+  useRealtimeSync(syncConfig.firestoreId, viajeId, syncConfig.isShared, {
+    onDocumentsChange: handleDocumentsChange,
+  });
 
   // ============================================
   // HANDLERS
   // ============================================
-
-  const loadDocumentos = async () => {
-    await fetchDocumentos(viajeId);
-  };
 
   const handleRefresh = async () => {
     setRefreshing(true);

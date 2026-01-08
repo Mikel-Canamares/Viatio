@@ -9,7 +9,7 @@
 // VERSIÓN DEL ESQUEMA
 // ============================================
 
-export const CURRENT_SCHEMA_VERSION = 14;
+export const CURRENT_SCHEMA_VERSION = 18;
 
 // ============================================
 // CREACIÓN DE TABLAS
@@ -69,6 +69,10 @@ const CREATE_RESERVAS_TABLE = `
     precio REAL,
     moneda TEXT DEFAULT 'EUR',
     estadoPago TEXT DEFAULT 'pending',
+    paidByUserId TEXT,
+    splitMethod TEXT DEFAULT 'equal',
+    participantUids TEXT,
+    shares TEXT,
     notas TEXT,
     metadatos TEXT,
     documentoId TEXT,
@@ -112,6 +116,7 @@ const CREATE_DOCUMENTOS_TABLE = `
     tipoArchivo TEXT NOT NULL,
     rutaArchivo TEXT NOT NULL,
     tamano INTEGER,
+    firestoreId TEXT,
     createdAt TEXT NOT NULL,
     updatedAt TEXT NOT NULL,
     FOREIGN KEY (viajeId) REFERENCES viajes(id) ON DELETE CASCADE

@@ -18,6 +18,9 @@ import {
 import { deleteLugar } from './lugaresService';
 import { deleteDocumento, getDocumentosByReservaId } from './documentosService';
 import { syncReservaIfShared, syncDeleteIfShared } from './sync/syncUpload';
+import { createExpense, calculateShares } from './firestore/expensesService';
+import { getTripMembers } from './firestore/tripsService';
+import type { CreateExpenseInput } from '@/types/shared';
 
 /**
  * Crea una nueva reserva y opcionalmente busca/crea lugar asociado
@@ -47,6 +50,10 @@ export async function createReserva(
     precio: input.precio,
     moneda: input.moneda || 'EUR',
     estadoPago: input.estadoPago || 'pending',
+    paidByUserId: input.paidByUserId,
+    splitMethod: input.splitMethod,
+    participantUids: input.participantUids,
+    shares: input.shares as any, // Se convertirá a JSON al insertar
     notas: input.notas,
     metadatos: input.metadatos,
     lugarId: input.lugarId,
@@ -58,9 +65,10 @@ export async function createReserva(
     `INSERT INTO reservas (
       id, viajeId, diaId, categoria, nombre, proveedor, numeroConfirmacion,
       fechaInicio, horaInicio, fechaFin, horaFin, ubicacion, direccion,
-      latitud, longitud, precio, moneda, estadoPago, notas, metadatos,
+      latitud, longitud, precio, moneda, estadoPago, paidByUserId,
+      splitMethod, participantUids, shares, notas, metadatos,
       documentoId, lugarId, createdAt, updatedAt
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       reserva.id,
       reserva.viajeId,
@@ -80,6 +88,10 @@ export async function createReserva(
       reserva.precio || null,
       reserva.moneda,
       reserva.estadoPago,
+      reserva.paidByUserId || null,
+      reserva.splitMethod || null,
+      reserva.participantUids ? JSON.stringify(reserva.participantUids) : null,
+      reserva.shares ? JSON.stringify(reserva.shares) : null,
       reserva.notas || null,
       reserva.metadatos ? JSON.stringify(reserva.metadatos) : null,
       input.documentoId || null,
@@ -98,21 +110,50 @@ export async function createReserva(
     (reserva.estadoPago === 'paid' || reserva.estadoPago === 'partial')
   ) {
     try {
+      const viaje = await getViajeById(reserva.viajeId);
       const categoriaGasto = mapReservaToCategoriaGasto(reserva.categoria);
       const montoGasto = reserva.estadoPago === 'partial' ? reserva.precio / 2 : reserva.precio;
 
-      await createGasto({
-        viajeId: reserva.viajeId,
-        diaId: reserva.diaId,
-        reservaId: reserva.id,
-        categoria: categoriaGasto,
-        descripcion: reserva.nombre,
-        monto: montoGasto,
-        moneda: reserva.moneda,
-        fecha: reserva.fechaInicio || new Date().toISOString(),
-      });
+      // Si el viaje es compartido Y tiene datos de reparto, crear gasto compartido en Firestore
+      if (viaje?.isShared && viaje.firestoreId && reserva.paidByUserId && reserva.shares && reserva.shares.length > 0) {
+        const members = await getTripMembers(viaje.firestoreId);
 
-      console.log('[ReservasService] Gasto auto-creado para reserva:', reserva.id);
+        // Calcular shares con los montos calculados
+        const sharesWithCalculated = calculateShares(
+          Math.round(montoGasto * 100), // Convertir a céntimos
+          reserva.splitMethod || 'equal',
+          reserva.shares
+        );
+
+        const expenseInput: CreateExpenseInput = {
+          description: reserva.nombre,
+          amount: Math.round(montoGasto * 100), // Convertir a céntimos
+          currency: reserva.moneda,
+          category: categoriaGasto,
+          date: reserva.fechaInicio || new Date().toISOString(),
+          paidByUid: reserva.paidByUserId,
+          splitMethod: reserva.splitMethod || 'equal',
+          participantUids: reserva.participantUids || [],
+          shares: reserva.shares,
+          notes: reserva.notas,
+        };
+
+        await createExpense(viaje.firestoreId, expenseInput, members);
+        console.log('[ReservasService] Gasto compartido auto-creado para reserva:', reserva.id);
+      } else {
+        // Viaje no compartido o sin datos de reparto: crear gasto local normal
+        await createGasto({
+          viajeId: reserva.viajeId,
+          diaId: reserva.diaId,
+          reservaId: reserva.id,
+          categoria: categoriaGasto,
+          descripcion: reserva.nombre,
+          monto: montoGasto,
+          moneda: reserva.moneda,
+          fecha: reserva.fechaInicio || new Date().toISOString(),
+        });
+        console.log('[ReservasService] Gasto local auto-creado para reserva:', reserva.id);
+      }
     } catch (error) {
       console.error('[ReservasService] Error al auto-crear gasto:', error);
     }
@@ -202,6 +243,26 @@ function parseMetadatos(metadatos: any): any {
 }
 
 /**
+ * Parsea campos JSON de forma segura (participantUids, shares)
+ */
+function parseJSONField(field: any): any {
+  if (!field) return undefined;
+  if (typeof field === 'object') return field;
+  if (typeof field === 'string') {
+    if (field === 'null' || field === 'undefined' || field.trim() === '') {
+      return undefined;
+    }
+    try {
+      return JSON.parse(field);
+    } catch (error) {
+      console.warn('[ReservasService] Error parseando campo JSON:', field, error);
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+/**
  * Obtiene todas las reservas de un viaje
  */
 export async function getReservasByViajeId(viajeId: string): Promise<Reserva[]> {
@@ -217,6 +278,8 @@ export async function getReservasByViajeId(viajeId: string): Promise<Reserva[]> 
   return rows.map((row) => ({
     ...row,
     metadatos: parseMetadatos(row.metadatos),
+    participantUids: parseJSONField(row.participantUids),
+    shares: parseJSONField(row.shares),
   }));
 }
 
@@ -239,6 +302,8 @@ export async function getReservasByCategoria(
   return rows.map((row) => ({
     ...row,
     metadatos: parseMetadatos(row.metadatos),
+    participantUids: parseJSONField(row.participantUids),
+    shares: parseJSONField(row.shares),
   }));
 }
 
@@ -258,6 +323,8 @@ export async function getReservaById(id: string): Promise<Reserva | null> {
   return {
     ...row,
     metadatos: parseMetadatos(row.metadatos),
+    participantUids: parseJSONField(row.participantUids),
+    shares: parseJSONField(row.shares),
   };
 }
 
@@ -333,6 +400,22 @@ export async function updateReserva(
   if (input.estadoPago !== undefined) {
     fields.push('estadoPago = ?');
     values.push(input.estadoPago);
+  }
+  if (input.paidByUserId !== undefined) {
+    fields.push('paidByUserId = ?');
+    values.push(input.paidByUserId);
+  }
+  if (input.splitMethod !== undefined) {
+    fields.push('splitMethod = ?');
+    values.push(input.splitMethod);
+  }
+  if (input.participantUids !== undefined) {
+    fields.push('participantUids = ?');
+    values.push(JSON.stringify(input.participantUids));
+  }
+  if (input.shares !== undefined) {
+    fields.push('shares = ?');
+    values.push(JSON.stringify(input.shares));
   }
   if (input.notas !== undefined) {
     fields.push('notas = ?');

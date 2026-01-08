@@ -12,13 +12,17 @@ import {
   updateDoc,
   deleteDoc,
   serverTimestamp,
+  arrayUnion,
 } from 'firebase/firestore';
 import { getDatabase } from '@/database';
 import { getViajeById } from '@/services/viajesService';
 import { logError } from '@/utils/errorHandler';
+import { uploadDocument as uploadDocumentToStorage } from '@/services/firestore/documentsService';
+import { getDocumentoUri } from '@/services/documentosService';
 import type { Reserva } from '@/types/reserva';
 import type { Lugar } from '@/types/lugar';
 import type { Gasto } from '@/types/gasto';
+import type { Documento } from '@/types/documento';
 
 // ============================================
 // TIPOS
@@ -271,6 +275,84 @@ export async function uploadGasto(
 }
 
 // ============================================
+// UPLOAD DE DOCUMENTOS
+// ============================================
+
+/**
+ * Sube un documento a Firestore Storage y crea el registro en Firestore
+ */
+export async function uploadDocumento(
+  documento: Documento,
+  tripFirestoreId: string
+): Promise<UploadResult> {
+  const result: UploadResult = { success: false, firestoreId: null };
+
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      result.error = 'Usuario no autenticado';
+      return result;
+    }
+
+    console.log('[SyncUpload] Subiendo documento:', documento.nombre);
+
+    // Obtener URI completa del archivo local
+    const fileUri = getDocumentoUri(documento);
+
+    // Subir a Storage y crear registro en Firestore
+    // NOTA: uploadDocumentToStorage ya actualiza el firestoreId en SQLite internamente
+    const firestoreId = await uploadDocumentToStorage(
+      tripFirestoreId,
+      documento.id,
+      fileUri,
+      documento.nombre,
+      documento.categoria,
+      documento.tipoArchivo,
+      documento.tamano || 0
+    );
+
+    result.success = true;
+    result.firestoreId = firestoreId;
+    console.log('[SyncUpload] Documento subido:', documento.nombre, '->', firestoreId);
+
+    return result;
+  } catch (error: any) {
+    logError(error, 'uploadDocumento');
+    result.error = error.message;
+    return result;
+  }
+}
+
+/**
+ * Vincula un documento a una reserva en Firestore
+ * Actualiza el campo documentIds en la reserva
+ */
+export async function linkDocumentToReservationInFirestore(
+  tripFirestoreId: string,
+  reservationFirestoreId: string,
+  documentFirestoreId: string
+): Promise<boolean> {
+  try {
+    const reservaRef = doc(firestoreDb, 'trips', tripFirestoreId, 'reservations', reservationFirestoreId);
+
+    await updateDoc(reservaRef, {
+      documentIds: arrayUnion(documentFirestoreId),
+      updatedAt: serverTimestamp(),
+    });
+
+    console.log('[SyncUpload] Documento vinculado a reserva:', {
+      reservationFirestoreId,
+      documentFirestoreId,
+    });
+
+    return true;
+  } catch (error) {
+    logError(error, 'linkDocumentToReservationInFirestore');
+    return false;
+  }
+}
+
+// ============================================
 // ELIMINACIÓN (SOFT DELETE)
 // ============================================
 
@@ -279,7 +361,7 @@ export async function uploadGasto(
  */
 export async function markDeletedInFirestore(
   tripFirestoreId: string,
-  collectionName: 'reservations' | 'places' | 'expenses',
+  collectionName: 'reservations' | 'places' | 'expenses' | 'documents',
   entityFirestoreId: string
 ): Promise<boolean> {
   try {
@@ -370,11 +452,52 @@ export async function syncGastoIfShared(gasto: Gasto): Promise<void> {
 }
 
 /**
+ * Sincroniza un documento si el viaje es compartido
+ */
+export async function syncDocumentoIfShared(documento: Documento): Promise<string | null> {
+  try {
+    const tripFirestoreId = await getSharedTripFirestoreId(documento.viajeId);
+    if (tripFirestoreId) {
+      const result = await uploadDocumento(documento, tripFirestoreId);
+      return result.firestoreId;
+    }
+    return null;
+  } catch (error) {
+    console.warn('[SyncUpload] Error sincronizando documento:', error);
+    return null;
+  }
+}
+
+/**
+ * Vincula un documento a una reserva en Firestore si el viaje es compartido
+ */
+export async function syncDocumentLinkIfShared(
+  viajeId: string,
+  reservaFirestoreId: string | null | undefined,
+  documentoFirestoreId: string | null | undefined
+): Promise<void> {
+  if (!reservaFirestoreId || !documentoFirestoreId) return;
+
+  try {
+    const tripFirestoreId = await getSharedTripFirestoreId(viajeId);
+    if (tripFirestoreId) {
+      await linkDocumentToReservationInFirestore(
+        tripFirestoreId,
+        reservaFirestoreId,
+        documentoFirestoreId
+      );
+    }
+  } catch (error) {
+    console.warn('[SyncUpload] Error sincronizando vinculación de documento:', error);
+  }
+}
+
+/**
  * Marca como eliminado en Firestore si el viaje es compartido
  */
 export async function syncDeleteIfShared(
   viajeId: string,
-  collectionName: 'reservations' | 'places' | 'expenses',
+  collectionName: 'reservations' | 'places' | 'expenses' | 'documents',
   entityFirestoreId: string | null
 ): Promise<void> {
   if (!entityFirestoreId) return;

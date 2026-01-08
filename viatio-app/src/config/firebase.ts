@@ -9,6 +9,7 @@ import {
   persistentLocalCache,
   CACHE_SIZE_UNLIMITED,
 } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
@@ -34,6 +35,9 @@ export const db = initializeFirestore(app, {
     cacheSizeBytes: CACHE_SIZE_UNLIMITED,
   }),
 });
+
+// Storage para archivos
+export const storage = getStorage(app);
 
 // Función para verificar conexión
 export async function checkFirestoreConnection(): Promise<boolean> {

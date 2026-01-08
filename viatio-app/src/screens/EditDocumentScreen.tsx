@@ -15,14 +15,16 @@ import {
 } from '@/components';
 import { theme } from '@/config';
 import { showToast } from '@/utils/toast';
-import { useDocumentosStore } from '@/store/documentosStore';
+import { useDocumentosStore, documentosSelectors } from '@/store/documentosStore';
 import type { HomeStackParamList } from '@/navigation/types';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'EditDocument'>;
 
 export default function EditDocumentScreen({ route, navigation }: Props) {
   const { documentoId, nombreActual } = route.params;
-  const { updateDocumento } = useDocumentosStore();
+
+  // Usar selectors para prevenir re-renders innecesarios
+  const updateDocumento = useDocumentosStore((state) => state.updateDocumento);
 
   const [nombre, setNombre] = useState(nombreActual);
   const [saving, setSaving] = useState(false);

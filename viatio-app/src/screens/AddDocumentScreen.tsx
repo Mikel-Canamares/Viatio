@@ -26,7 +26,7 @@ import {
   SecondaryButton,
 } from '@/components';
 import { theme } from '@/config';
-import { useDocumentosStore } from '@/store/documentosStore';
+import { useDocumentosStore, documentosSelectors } from '@/store/documentosStore';
 import { pickDocument, formatFileSize, isImageFile } from '@/services';
 import type { CategoriaDocumento } from '@/types/documento';
 import { DOCUMENTO_CATEGORIAS, MAX_FILE_SIZE } from '@/types/documento';
@@ -53,7 +53,10 @@ interface SelectedFile {
 
 export default function AddDocumentScreen({ route, navigation }: Props) {
   const { viajeId } = route.params;
-  const { addDocumento, loading } = useDocumentosStore();
+
+  // Usar selectors para prevenir re-renders innecesarios
+  const loading = useDocumentosStore(documentosSelectors.loading);
+  const addDocumento = useDocumentosStore((state) => state.addDocumento);
 
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
   const [nombre, setNombre] = useState('');

@@ -15,13 +15,16 @@ import {
   where,
   Timestamp,
 } from 'firebase/firestore';
+import { Directory, File, Paths } from 'expo-file-system/next';
 import { getDatabase, generateId, getCurrentTimestamp } from '@/database';
 import { createDiasParaViaje, getDiasByViajeId } from '@/services/diasViajeService';
 import { logError } from '@/utils/errorHandler';
+import { downloadDocument } from '@/services/firestore/documentsService';
 import type { Viaje } from '@/types/viaje';
 import type { Reserva } from '@/types/reserva';
 import type { Lugar } from '@/types/lugar';
 import type { Gasto } from '@/types/gasto';
+import type { CategoriaDocumento, TipoArchivo } from '@/types/documento';
 
 // ============================================
 // TIPOS
@@ -99,6 +102,21 @@ interface FirestoreExpense {
   deletedAt: Timestamp | null;
 }
 
+interface FirestoreDocument {
+  nombre: string;
+  categoria: CategoriaDocumento;
+  tipoArchivo: TipoArchivo;
+  tamano: number;
+  storageUrl: string;
+  storagePath: string;
+  localId: string;
+  createdBy: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  updatedBy: string;
+  deletedAt: Timestamp | null;
+}
+
 export interface DownloadResult {
   success: boolean;
   viaje: Viaje | null;
@@ -106,6 +124,7 @@ export interface DownloadResult {
     reservations: number;
     places: number;
     expenses: number;
+    documents: number;
   };
   error?: string;
 }
@@ -129,7 +148,7 @@ export async function downloadSharedTrip(
   const result: DownloadResult = {
     success: false,
     viaje: null,
-    stats: { reservations: 0, places: 0, expenses: 0 },
+    stats: { reservations: 0, places: 0, expenses: 0, documents: 0 },
   };
 
   try {
@@ -296,6 +315,18 @@ async function downloadSubcollectionsWithRetry(
       result.stats.expenses++;
     }
     console.log('[SyncDownload] Gastos descargados:', result.stats.expenses);
+
+    // Descargar documentos
+    const documentsRef = collection(firestoreDb, 'trips', firestoreId, 'documents');
+    const documentsQuery = query(documentsRef, where('deletedAt', '==', null));
+    const documentsSnap = await getDocs(documentsQuery);
+
+    for (const docDoc of documentsSnap.docs) {
+      const docData = docDoc.data() as FirestoreDocument;
+      await createLocalDocumento(docData, viajeId, docDoc.id);
+      result.stats.documents++;
+    }
+    console.log('[SyncDownload] Documentos descargados:', result.stats.documents);
 
   } catch (error: any) {
     const isPermissionError = error.message?.includes('permission') ||
@@ -542,6 +573,84 @@ async function createLocalGasto(
       monto,
       expData.currency || 'EUR',
       expData.date,
+      firestoreId,
+      now,
+      now,
+    ]
+  );
+
+  return id;
+}
+
+/**
+ * Obtiene el directorio de documentos usando la nueva API de SDK 52
+ */
+function getDocumentsDirectory(): Directory {
+  return new Directory(Paths.document, 'viatio_docs');
+}
+
+/**
+ * Asegurar que el directorio de documentos existe
+ */
+async function ensureDocumentsDir(): Promise<void> {
+  try {
+    const docsDir = getDocumentsDirectory();
+    if (!docsDir.exists) {
+      docsDir.create();
+    }
+  } catch (error) {
+    logError(error, 'ensureDocumentsDir');
+    throw new Error('Error al crear directorio de documentos');
+  }
+}
+
+/**
+ * Crea un documento en SQLite y descarga el archivo de Storage
+ */
+async function createLocalDocumento(
+  docData: FirestoreDocument,
+  viajeId: string,
+  firestoreId: string
+): Promise<string> {
+  const db = await getDatabase();
+  const id = generateId();
+  const now = getCurrentTimestamp();
+
+  await ensureDocumentsDir();
+
+  // Generar nombre de archivo local
+  const extension = docData.nombre.split('.').pop() || 'bin';
+  const fileName = `${id}.${extension}`;
+
+  // Descargar archivo de Storage
+  const docsDir = getDocumentsDirectory();
+  const destinationFile = new File(docsDir, fileName);
+
+  console.log('[SyncDownload] Descargando documento:', docData.nombre);
+
+  try {
+    await downloadDocument(docData.storageUrl, destinationFile.uri);
+    console.log('[SyncDownload] ✓ Documento descargado:', fileName);
+  } catch (downloadError) {
+    console.error('[SyncDownload] ⚠ Error al descargar archivo:', downloadError);
+    // Continuar de todas formas para crear el registro en BD
+    // El archivo se puede reintentar descargar después
+  }
+
+  // Insertar en BD
+  await db.runAsync(
+    `INSERT INTO documentos (
+      id, viajeId, nombre, categoria, tipoArchivo,
+      rutaArchivo, tamano, firestoreId, createdAt, updatedAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      viajeId,
+      docData.nombre,
+      docData.categoria,
+      docData.tipoArchivo,
+      fileName,
+      docData.tamano,
       firestoreId,
       now,
       now,
