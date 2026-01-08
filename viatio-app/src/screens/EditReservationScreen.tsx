@@ -13,9 +13,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  Alert,
   ActivityIndicator,
   Image,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -32,6 +32,9 @@ import {
   PrimaryButton,
   SubtypeSelector,
 } from '@/components';
+import { MemberChipsSelector } from '@/components/shared/MemberChipsSelector';
+import { SplitMethodSelector } from '@/components/shared/SplitMethodSelector';
+import { SharesEditor } from '@/components/shared/SharesEditor';
 import { theme } from '@/config';
 import { useReservasStore } from '@/store/reservasStore';
 import { useDocumentosStore } from '@/store/documentosStore';
@@ -44,6 +47,7 @@ import {
   linkDocumentoToReserva,
 } from '@/services/documentosService';
 import { parseLocalDate } from '@/utils';
+import { useTripMembers } from '@/hooks';
 import type {
   CreateReservaInput,
   CategoriaReserva,
@@ -51,6 +55,7 @@ import type {
   SubtipoAlojamiento,
   SubtipoActividad,
 } from '@/types/reserva';
+import type { SplitMethod, ExpenseShare } from '@/types/shared';
 import {
   mapReservaToCategoriaDocumento,
   SUBTIPOS_TRANSPORTE,
@@ -60,6 +65,7 @@ import {
 import type { Viaje } from '@/types/viaje';
 import type { Documento } from '@/types/documento';
 import type { HomeStackParamList } from '@/navigation/types';
+import { showToast } from '@/utils/toast';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'EditReservation'>;
 
@@ -96,9 +102,44 @@ export default function EditReservationScreen({ route, navigation }: Props) {
     size: number;
   } | null>(null);
 
+  // Hook para obtener miembros del viaje compartido
+  const { members, loading: loadingMembers } = useTripMembers(viaje?.firestoreId || null);
+
+  // Estados para el sistema de reparto
+  const [splitMethod, setSplitMethod] = useState<SplitMethod>('equal');
+  const [participantUids, setParticipantUids] = useState<string[]>([]);
+  const [shares, setShares] = useState<Omit<ExpenseShare, 'calculatedAmount'>[]>([]);
+
   useEffect(() => {
     loadData();
   }, [reservaId]);
+
+  // Inicializar participantes cuando hay miembros y alguien pagó
+  useEffect(() => {
+    if (members.length > 0 && formData.paidByUserId && participantUids.length === 0 && !loading) {
+      // Por defecto, todos los miembros participan (solo si no hay datos previos)
+      const allUids = members.map((m) => m.uid);
+      setParticipantUids(allUids);
+    }
+  }, [members, formData.paidByUserId, loading]);
+
+  // Actualizar shares cuando cambian los participantes o el método
+  useEffect(() => {
+    if (participantUids.length > 0 && !loading) {
+      const newShares = participantUids.map((uid) => {
+        const member = members.find((m) => m.uid === uid);
+        const existingShare = shares.find((s) => s.uid === uid);
+        return {
+          uid,
+          displayName: member?.displayName || 'Desconocido',
+          value: existingShare?.value || (splitMethod === 'shares' ? 1 : 0),
+        };
+      });
+      setShares(newShares);
+    } else if (participantUids.length === 0 && !loading) {
+      setShares([]);
+    }
+  }, [participantUids, splitMethod, members, loading]);
 
   const loadData = async () => {
     try {
@@ -106,7 +147,7 @@ export default function EditReservationScreen({ route, navigation }: Props) {
       const reservaData = await getReservaById(reservaId);
 
       if (!reservaData) {
-        Alert.alert('Error', 'No se encontró la reserva');
+        showToast.error('Error', 'No se encontró la reserva');
         navigation.goBack();
         return;
       }
@@ -135,12 +176,31 @@ export default function EditReservationScreen({ route, navigation }: Props) {
         precio: reservaData.precio,
         moneda: reservaData.moneda,
         estadoPago: reservaData.estadoPago,
+        paidByUserId: reservaData.paidByUserId,
         notas: reservaData.notas,
         metadatos: reservaData.metadatos, // CRITICAL: Incluir metadatos para que se cargue el subtipo
       });
+
+      // Cargar datos de reparto si existen
+      if (reservaData.splitMethod) {
+        setSplitMethod(reservaData.splitMethod);
+      }
+      if (reservaData.participantUids && reservaData.participantUids.length > 0) {
+        setParticipantUids(reservaData.participantUids);
+      }
+      if (reservaData.shares && reservaData.shares.length > 0) {
+        // Convertir de ExpenseShare a Omit<ExpenseShare, 'calculatedAmount'>
+        setShares(
+          reservaData.shares.map((s) => ({
+            uid: s.uid,
+            displayName: s.displayName,
+            value: s.value,
+          }))
+        );
+      }
     } catch (error) {
       console.error('[EditReservationScreen] Error al cargar datos:', error);
-      Alert.alert('Error', 'No se pudo cargar la reserva');
+      showToast.error('Error', 'No se pudo cargar la reserva');
     } finally {
       setLoading(false);
     }
@@ -181,7 +241,7 @@ export default function EditReservationScreen({ route, navigation }: Props) {
       }
     } catch (error) {
       console.error('Error picking document:', error);
-      Alert.alert('Error', 'No se pudo seleccionar el documento');
+      showToast.error('Error', 'No se pudo seleccionar el documento');
     }
   };
 
@@ -211,7 +271,7 @@ export default function EditReservationScreen({ route, navigation }: Props) {
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'No se pudo seleccionar la imagen');
+      showToast.error('Error', 'No se pudo seleccionar la imagen');
     }
   };
 
@@ -241,7 +301,7 @@ export default function EditReservationScreen({ route, navigation }: Props) {
 
   const handleSave = async () => {
     if (!formData.nombre || !formData.categoria) {
-      Alert.alert('Error', 'El nombre y la categoría son obligatorios');
+      showToast.error('Error', 'El nombre y la categoría son obligatorios');
       return;
     }
 
@@ -305,6 +365,10 @@ export default function EditReservationScreen({ route, navigation }: Props) {
         precio: formData.precio ? parseFloat(formData.precio as any) : undefined,
         moneda: formData.moneda || 'EUR',
         estadoPago: formData.estadoPago || 'pending',
+        paidByUserId: formData.paidByUserId,
+        splitMethod: participantUids.length > 0 ? splitMethod : undefined,
+        participantUids: participantUids.length > 0 ? participantUids : undefined,
+        shares: shares.length > 0 ? shares : undefined,
         notas: formData.notas,
         metadatos: formData.metadatos,
       };
@@ -313,7 +377,7 @@ export default function EditReservationScreen({ route, navigation }: Props) {
       navigation.goBack();
     } catch (error) {
       console.error('[EditReservationScreen] Error al guardar:', error);
-      Alert.alert('Error', 'No se pudieron guardar los cambios');
+      showToast.error('Error', 'No se pudieron guardar los cambios');
     }
   };
 
@@ -626,6 +690,60 @@ export default function EditReservationScreen({ route, navigation }: Props) {
                   ))}
                 </View>
               </View>
+
+              {/* Selector de quién pagó - Solo en viajes compartidos y si el estado es pagado o parcial */}
+              {viaje?.isShared && members.length > 0 && (formData.estadoPago === 'paid' || formData.estadoPago === 'partial') && (
+                <>
+                  <MemberChipsSelector
+                    members={members}
+                    selectedUids={formData.paidByUserId ? [formData.paidByUserId] : []}
+                    onToggle={(uid) => updateField('paidByUserId', uid)}
+                    singleSelect={true}
+                    label="Pagado por"
+                  />
+
+                  {/* Sistema de reparto - Solo si hay precio y alguien pagó */}
+                  {formData.precio && formData.paidByUserId && (
+                    <>
+                      <View style={styles.divider} />
+                      <Text style={styles.sectionTitle}>Reparto del gasto</Text>
+
+                      <MemberChipsSelector
+                        members={members}
+                        selectedUids={participantUids}
+                        onToggle={(uid) => {
+                          setParticipantUids((prev) =>
+                            prev.includes(uid)
+                              ? prev.filter((id) => id !== uid)
+                              : [...prev, uid]
+                          );
+                        }}
+                        singleSelect={false}
+                        label="Participantes"
+                      />
+
+                      {participantUids.length > 0 && (
+                        <>
+                          <SplitMethodSelector
+                            selected={splitMethod}
+                            onSelect={setSplitMethod}
+                          />
+
+                          <SharesEditor
+                            members={members}
+                            participantUids={participantUids}
+                            splitMethod={splitMethod}
+                            shares={shares}
+                            onChange={setShares}
+                            totalAmount={Math.round(parseFloat(formData.precio.toString()) * 100)}
+                            currency={formData.moneda || 'EUR'}
+                          />
+                        </>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
             </Card>
           )}
 
@@ -883,5 +1001,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: theme.colors.primaryLight,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: theme.spacing.md,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
   },
 });

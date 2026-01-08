@@ -1,0 +1,76 @@
+rules_version = '2';
+
+// ============================================
+// FIREBASE STORAGE RULES
+// Reglas de seguridad para archivos de documentos
+// ============================================
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ============================================
+    // FUNCIONES HELPER
+    // ============================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function currentUserId() {
+      return request.auth.uid;
+    }
+
+    // Verificar si el usuario es miembro del viaje
+    function isTripMember(tripId) {
+      return isAuthenticated() &&
+        firestore.get(/databases/(default)/documents/trips/$(tripId)/members/$(currentUserId())).data.role != null;
+    }
+
+    // Verificar si puede escribir en el viaje
+    function canWriteToTrip(tripId) {
+      let role = firestore.get(/databases/(default)/documents/trips/$(tripId)/members/$(currentUserId())).data.role;
+      return isAuthenticated() && role in ['owner', 'admin', 'member'];
+    }
+
+    // Validar tamaño de archivo (10MB máximo)
+    function isValidSize() {
+      return request.resource.size <= 10 * 1024 * 1024;
+    }
+
+    // Validar tipo de archivo permitido
+    function isValidFileType() {
+      return request.resource.contentType.matches('application/pdf') ||
+             request.resource.contentType.matches('image/.*');
+    }
+
+    // ============================================
+    // DOCUMENTOS DE VIAJES
+    // Estructura: trips/{tripId}/documents/{docId}.{extension}
+    // ============================================
+
+    match /trips/{tripId}/documents/{docId} {
+      // Leer: cualquier miembro del viaje
+      allow read: if isTripMember(tripId);
+
+      // Crear: miembros con permisos de escritura, tamaño y tipo válidos
+      allow create: if canWriteToTrip(tripId) &&
+                       isValidSize() &&
+                       isValidFileType();
+
+      // Actualizar: no permitido (los archivos son inmutables)
+      allow update: if false;
+
+      // Eliminar: miembros con permisos de escritura
+      // Nota: En producción, considera soft-delete en Firestore en lugar de eliminar archivos
+      allow delete: if canWriteToTrip(tripId);
+    }
+
+    // ============================================
+    // BLOQUEAR TODO LO DEMÁS
+    // ============================================
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

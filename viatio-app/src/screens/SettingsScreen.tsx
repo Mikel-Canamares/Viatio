@@ -6,7 +6,8 @@
  */
 
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Alert, ScrollView } from 'react-native';
+import {View, Text, StyleSheet, ScrollView,
+  Alert} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { ProfileStackParamList } from '@/navigation/types';
@@ -19,6 +20,7 @@ import { ProfileMenuItem } from '@/components/ProfileMenuItem';
 import { useConfiguracionStore } from '@/store/useConfiguracionStore';
 import { IDIOMAS_DISPONIBLES, MONEDAS_DISPONIBLES } from '@/types/perfil';
 import { theme } from '@/config';
+import { showToast } from '@/utils/toast';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Opciones de configuración
@@ -83,7 +85,7 @@ export default function SettingsScreen() {
     try {
       await updateConfig({ tema: tema as 'light' | 'dark' | 'system' });
     } catch (error) {
-      Alert.alert('Error', 'No se pudo cambiar el tema');
+      showToast.error('Error', 'No se pudo cambiar el tema');
     }
   };
 
@@ -91,7 +93,7 @@ export default function SettingsScreen() {
     try {
       await updateConfig({ idioma });
     } catch (error) {
-      Alert.alert('Error', 'No se pudo cambiar el idioma');
+      showToast.error('Error', 'No se pudo cambiar el idioma');
     }
   };
 
@@ -99,7 +101,7 @@ export default function SettingsScreen() {
     try {
       await updateConfig({ monedaDefault });
     } catch (error) {
-      Alert.alert('Error', 'No se pudo cambiar la moneda');
+      showToast.error('Error', 'No se pudo cambiar la moneda');
     }
   };
 
@@ -107,7 +109,7 @@ export default function SettingsScreen() {
     try {
       await updateConfig({ unidadDistancia: unidad as 'km' | 'mi' });
     } catch (error) {
-      Alert.alert('Error', 'No se pudo cambiar la unidad de distancia');
+      showToast.error('Error', 'No se pudo cambiar la unidad de distancia');
     }
   };
 
@@ -115,7 +117,7 @@ export default function SettingsScreen() {
     try {
       await updateConfig({ formatoFecha: formato as 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD' });
     } catch (error) {
-      Alert.alert('Error', 'No se pudo cambiar el formato de fecha');
+      showToast.error('Error', 'No se pudo cambiar el formato de fecha');
     }
   };
 
@@ -146,9 +148,9 @@ export default function SettingsScreen() {
               // Aquí podrías limpiar cachés específicas
               // Por ahora solo recalculamos el tamaño
               await calculateCacheSize();
-              Alert.alert('Éxito', 'Caché limpiada correctamente');
+              showToast.success('Éxito', 'Caché limpiada correctamente');
             } catch (error) {
-              Alert.alert('Error', 'No se pudo limpiar la caché');
+              showToast.error('Error', 'No se pudo limpiar la caché');
             }
           },
         },

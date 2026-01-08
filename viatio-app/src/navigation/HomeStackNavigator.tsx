@@ -3,6 +3,9 @@
  *
  * Stack Navigator para el flujo de viajes.
  * Incluye lista de viajes, creación, detalle y subsecciones.
+ *
+ * NOTA: Las pantallas de viajes compartidos (TripMembers, InviteToTrip, etc.)
+ * ahora están integradas aquí en lugar de en un SharedStackNavigator separado.
  */
 
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -27,6 +30,16 @@ import { AddExpenseScreen } from '@/screens/AddExpenseScreen';
 import { AddEventoScreen } from '@/screens/AddEventoScreen';
 import { EventoDetailScreen } from '@/screens/EventoDetailScreen';
 import AssistantScreen from '@/screens/AssistantScreen';
+// Pantallas de viajes compartidos (integradas desde SharedStack)
+import {
+  TripMembersScreen,
+  InviteToTripScreen,
+  TripSettlementsScreen,
+  RecordSettlementScreen,
+  JoinTripByCodeScreen,
+  AddSharedExpenseScreen,
+  ExpenseDetailScreen,
+} from '@/screens/shared';
 import type { HomeStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<HomeStackParamList>();
@@ -61,6 +74,14 @@ export function HomeStackNavigator() {
       <Stack.Screen name="AddEvento" component={AddEventoScreen} />
       <Stack.Screen name="EventoDetail" component={EventoDetailScreen} />
       <Stack.Screen name="Assistant" component={AssistantScreen} />
+      {/* Pantallas de viajes compartidos */}
+      <Stack.Screen name="TripMembers" component={TripMembersScreen} />
+      <Stack.Screen name="InviteToTrip" component={InviteToTripScreen} />
+      <Stack.Screen name="TripSettlements" component={TripSettlementsScreen} />
+      <Stack.Screen name="RecordSettlement" component={RecordSettlementScreen} />
+      <Stack.Screen name="AddSharedExpense" component={AddSharedExpenseScreen} />
+      <Stack.Screen name="ExpenseDetail" component={ExpenseDetailScreen} />
+      <Stack.Screen name="JoinTripByCode" component={JoinTripByCodeScreen} />
     </Stack.Navigator>
   );
 }

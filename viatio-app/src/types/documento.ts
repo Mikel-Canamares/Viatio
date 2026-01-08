@@ -31,6 +31,7 @@ export interface Documento {
   tipoArchivo: TipoArchivo;
   rutaArchivo: string;
   tamano: number;
+  firestoreId?: string; // ID en Firestore (para viajes compartidos)
   createdAt: string;
   updatedAt: string;
 }

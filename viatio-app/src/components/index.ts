@@ -14,6 +14,7 @@ export { SecondaryButton } from './SecondaryButton';
 export { Card } from './Card';
 export { Input } from './Input';
 export { DateInput } from './DateInput';
+export { DatePickerInput } from './DatePickerInput';
 export { TimeInput } from './TimeInput';
 export { DateRangePicker } from './DateRangePicker';
 export { CategoryBadge, CATEGORY_COLORS, getCategoryConfig } from './CategoryBadge';
@@ -74,6 +75,14 @@ export { ConversationHistoryList } from './ConversationHistoryList';
 export { ActionButton, ActionButtonsContainer } from './ActionButton';
 export { SwitchItem } from './SwitchItem';
 export { CopilotFAB } from './CopilotFAB';
+
+// Componentes de Viajes Compartidos
+export { MembersSection } from './MembersSection';
+export { ShareTripModal } from './ShareTripModal';
+
+// Componentes de Autenticación
+export { GoogleSignInButton } from './GoogleSignInButton';
+export { LinkAccountModal } from './LinkAccountModal';
 
 // Los siguientes se crearán en fases posteriores:
 // export { EmptyState } from './EmptyState';

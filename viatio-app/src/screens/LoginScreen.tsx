@@ -14,27 +14,30 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Input, PrimaryButton, SecondaryButton, LoadingOverlay } from '@/components';
+import { Input, PrimaryButton, GoogleSignInButton, LinkAccountModal, LoadingOverlay } from '@/components';
 import { useAuth } from '@/context';
 import { theme } from '@/config';
 import type { AuthStackParamList } from '@/navigation/AuthStackNavigator';
-import { useGoogleAuth } from '@/services/auth/googleAuthService';
+import { showToast } from '@/utils/toast';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 export default function LoginScreen({ navigation }: Props) {
   const { loginWithEmail, loginWithGoogle, error, clearError, loading } = useAuth();
-  const { request, response, promptAsync } = useGoogleAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [linkingModal, setLinkingModal] = useState({
+    visible: false,
+    email: '',
+    idToken: '',
+  });
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -67,32 +70,6 @@ export default function LoginScreen({ navigation }: Props) {
   const handleForgotPassword = () => {
     navigation.navigate('ForgotPassword');
   };
-
-  const handleGoogleLogin = async () => {
-    try {
-      await promptAsync();
-    } catch (error) {
-      console.error('Error al iniciar Google Sign-In:', error);
-      Alert.alert('Error', 'No se pudo iniciar sesión con Google. Intenta nuevamente.');
-    }
-  };
-
-  const handleSocialLogin = (provider: string) => {
-    Alert.alert(
-      `Login con ${provider}`,
-      'Esta funcionalidad estará disponible próximamente.'
-    );
-  };
-
-  // Manejar la respuesta del flujo OAuth de Google
-  useEffect(() => {
-    if (response?.type === 'success') {
-      const { authentication } = response;
-      if (authentication?.idToken) {
-        loginWithGoogle(authentication.idToken);
-      }
-    }
-  }, [response]);
 
   return (
     <KeyboardAvoidingView
@@ -202,26 +179,24 @@ export default function LoginScreen({ navigation }: Props) {
                 <View style={styles.separatorLine} />
               </View>
 
-              {/* Botones sociales */}
-              <View style={styles.socialButtons}>
-                <SecondaryButton
-                  onPress={handleGoogleLogin}
-                  disabled={!request || loading}
-                  style={styles.socialButton}
-                >
-                  <Ionicons name="logo-google" size={20} color={theme.colors.text} />
-                  <Text style={styles.socialButtonText}>Google</Text>
-                </SecondaryButton>
-                {Platform.OS === 'ios' && (
-                  <SecondaryButton
-                    onPress={() => handleSocialLogin('Apple')}
-                    style={styles.socialButton}
-                  >
-                    <Ionicons name="logo-apple" size={20} color={theme.colors.text} />
-                    <Text style={styles.socialButtonText}>Apple</Text>
-                  </SecondaryButton>
-                )}
-              </View>
+              {/* Botón de Google */}
+              <GoogleSignInButton
+                text="Continuar con Google"
+                onSuccess={loginWithGoogle}
+                onError={(err: any) => {
+                  if (err?.needsLinking) {
+                    setLinkingModal({
+                      visible: true,
+                      email: err.email || '',
+                      idToken: err.pendingCredential || '',
+                    });
+                  } else {
+                    console.error('Error Google Sign-In:', err);
+                    showToast.error('Error', 'No se pudo iniciar sesión con Google. Intenta nuevamente.');
+                  }
+                }}
+                disabled={loading}
+              />
 
               {/* Footer - Registro */}
               <View style={styles.footer}>
@@ -236,6 +211,18 @@ export default function LoginScreen({ navigation }: Props) {
       </ScrollView>
 
       <LoadingOverlay visible={loading} message="Iniciando sesión..." />
+
+      <LinkAccountModal
+        visible={linkingModal.visible}
+        email={linkingModal.email}
+        idToken={linkingModal.idToken}
+        onSuccess={() => {
+          setLinkingModal({ visible: false, email: '', idToken: '' });
+        }}
+        onCancel={() => {
+          setLinkingModal({ visible: false, email: '', idToken: '' });
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -336,22 +323,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.md,
     fontSize: 14,
     color: theme.colors.textMuted,
-  },
-  socialButtons: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-  },
-  socialButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  socialButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: theme.colors.text,
   },
   footer: {
     flexDirection: 'row',

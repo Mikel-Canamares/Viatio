@@ -5,7 +5,7 @@
  * Incluye imagen hero, stats y menú de navegación.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -20,12 +20,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ScreenContainer, Card, CopilotFAB } from '@/components';
+import { ScreenContainer, Card, CopilotFAB, MembersSection, ShareTripModal } from '@/components';
 import { getViajeById, getViajeStats } from '@/services';
 import type { Viaje, ViajeStats } from '@/types/viaje';
 import { theme } from '@/config';
 import type { HomeStackParamList } from '@/navigation/types';
 import { parseLocalDate } from '@/utils';
+import { showToast } from '@/utils/toast';
+import { useRealtimeSync } from '@/hooks';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'TripDetail'>;
 
@@ -34,21 +36,10 @@ export default function TripDetailScreen({ navigation, route }: Props) {
   const [viaje, setViaje] = useState<Viaje | null>(null);
   const [stats, setStats] = useState<ViajeStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showShareModal, setShowShareModal] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, [viajeId]);
-
-  // Refrescar stats al volver de otras pantallas
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      loadData();
-    });
-
-    return unsubscribe;
-  }, [navigation, viajeId]);
-
-  const loadData = async () => {
+  // Memoizar loadData para evitar recrearlo en cada render
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const [viajeData, statsData] = await Promise.all([
@@ -62,7 +53,51 @@ export default function TripDetailScreen({ navigation, route }: Props) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [viajeId]);
+
+  // Usar ref para el firestoreId y isShared para evitar que cambien en cada render
+  const isSharedRef = useRef(viaje?.isShared === 1);
+  const firestoreIdRef = useRef(viaje?.firestoreId || null);
+
+  // Actualizar refs cuando cambia el viaje
+  useEffect(() => {
+    isSharedRef.current = viaje?.isShared === 1;
+    firestoreIdRef.current = viaje?.firestoreId || null;
+  }, [viaje]);
+
+  // Callbacks memoizados para evitar recrearlos
+  const handleReservationsChange = useCallback(() => {
+    console.log('[TripDetail] Reservas actualizadas, recargando stats...');
+    getViajeStats(viajeId).then(setStats).catch(console.error);
+  }, [viajeId]);
+
+  const handlePlacesChange = useCallback(() => {
+    console.log('[TripDetail] Lugares actualizados, recargando stats...');
+    getViajeStats(viajeId).then(setStats).catch(console.error);
+  }, [viajeId]);
+
+  // Sincronización en tiempo real para viajes compartidos
+  // Solo usar valores derivados del viaje una vez cargado
+  const isShared = viaje?.isShared === 1;
+  const firestoreId = viaje?.firestoreId || null;
+
+  useRealtimeSync(firestoreId, viajeId, isShared, {
+    onReservationsChange: handleReservationsChange,
+    onPlacesChange: handlePlacesChange,
+  });
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Refrescar stats al volver de otras pantallas
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadData();
+    });
+
+    return unsubscribe;
+  }, [navigation, loadData]);
 
   const handleNavigate = (screen: string) => {
     switch (screen) {
@@ -83,6 +118,32 @@ export default function TripDetailScreen({ navigation, route }: Props) {
         break;
       default:
         console.log('Unknown screen:', screen);
+    }
+  };
+
+  // Handlers para compartir viaje
+  const handleShareTrip = () => {
+    setShowShareModal(true);
+  };
+
+  const handleShareSuccess = (firestoreId: string) => {
+    setShowShareModal(false);
+    showToast.success('Viaje compartido correctamente');
+    // Recargar datos para mostrar el estado actualizado
+    loadData();
+    // Navegar a invitar miembros
+    navigation.navigate('InviteToTrip', { viajeId, firestoreId });
+  };
+
+  const handleViewMembers = () => {
+    if (viaje?.firestoreId) {
+      navigation.navigate('TripMembers', { viajeId, firestoreId: viaje.firestoreId });
+    }
+  };
+
+  const handleInvite = () => {
+    if (viaje?.firestoreId) {
+      navigation.navigate('InviteToTrip', { viajeId, firestoreId: viaje.firestoreId });
     }
   };
 
@@ -161,6 +222,14 @@ export default function TripDetailScreen({ navigation, route }: Props) {
               </Card>
             </View>
           )}
+
+          {/* Sección de miembros / compartir viaje */}
+          <MembersSection
+            viaje={viaje}
+            onShareTrip={handleShareTrip}
+            onViewMembers={handleViewMembers}
+            onInvite={handleInvite}
+          />
 
           {/* Menú de navegación */}
           <View style={styles.menuContainer}>
@@ -242,6 +311,15 @@ export default function TripDetailScreen({ navigation, route }: Props) {
         onPress={() => navigation.navigate('Assistant', { viajeId })}
       />
       */}
+
+      {/* Modal de compartir viaje */}
+      <ShareTripModal
+        visible={showShareModal}
+        viajeId={viajeId}
+        viajeDestino={viaje.destino}
+        onClose={() => setShowShareModal(false)}
+        onSuccess={handleShareSuccess}
+      />
     </ScreenContainer>
   );
 }

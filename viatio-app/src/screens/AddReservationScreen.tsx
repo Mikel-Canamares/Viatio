@@ -14,8 +14,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  Alert,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -31,13 +31,18 @@ import {
   SubtypeSelector,
   useHandlePlaceMatch,
 } from '@/components';
+import { MemberChipsSelector } from '@/components/shared/MemberChipsSelector';
+import { SplitMethodSelector } from '@/components/shared/SplitMethodSelector';
+import { SharesEditor } from '@/components/shared/SharesEditor';
 import { theme } from '@/config';
+import { showToast } from '@/utils/toast';
 import { useReservasStore } from '@/store/reservasStore';
 import { useDocumentosStore } from '@/store/documentosStore';
 import { getViajeById, pickMultipleDocuments, pickImage } from '@/services';
 import { detectTipoArchivo, linkMultipleDocumentosToReserva } from '@/services/documentosService';
 import { confirmPlaceSuggestion, mapReservaCategoriaToLugarCategoria } from '@/services/placeMatchingService';
 import { parseLocalDate } from '@/utils';
+import { useTripMembers } from '@/hooks';
 import type {
   CreateReservaInput,
   CategoriaReserva,
@@ -45,6 +50,7 @@ import type {
   SubtipoAlojamiento,
   SubtipoActividad,
 } from '@/types/reserva';
+import type { SplitMethod, ExpenseShare } from '@/types/shared';
 import {
   mapReservaToCategoriaDocumento,
   SUBTIPOS_TRANSPORTE,
@@ -110,6 +116,14 @@ export default function AddReservationScreen({ route, navigation }: Props) {
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [pickingFile, setPickingFile] = useState(false);
 
+  // Hook para obtener miembros del viaje compartido
+  const { members, loading: loadingMembers } = useTripMembers(viaje?.firestoreId || null);
+
+  // Estados para el sistema de reparto
+  const [splitMethod, setSplitMethod] = useState<SplitMethod>('equal');
+  const [participantUids, setParticipantUids] = useState<string[]>([]);
+  const [shares, setShares] = useState<Omit<ExpenseShare, 'calculatedAmount'>[]>([]);
+
   // Cargar datos del viaje para limitar fechas
   useEffect(() => {
     loadViaje();
@@ -129,6 +143,33 @@ export default function AddReservationScreen({ route, navigation }: Props) {
       setFormData(prefillData);
     }
   }, [prefillData]);
+
+  // Inicializar participantes cuando hay miembros y alguien pagó
+  useEffect(() => {
+    if (members.length > 0 && formData.paidByUserId && participantUids.length === 0) {
+      // Por defecto, todos los miembros participan
+      const allUids = members.map((m) => m.uid);
+      setParticipantUids(allUids);
+    }
+  }, [members, formData.paidByUserId]);
+
+  // Actualizar shares cuando cambian los participantes o el método
+  useEffect(() => {
+    if (participantUids.length > 0) {
+      const newShares = participantUids.map((uid) => {
+        const member = members.find((m) => m.uid === uid);
+        const existingShare = shares.find((s) => s.uid === uid);
+        return {
+          uid,
+          displayName: member?.displayName || 'Desconocido',
+          value: existingShare?.value || (splitMethod === 'shares' ? 1 : 0),
+        };
+      });
+      setShares(newShares);
+    } else {
+      setShares([]);
+    }
+  }, [participantUids, splitMethod, members]);
 
   const loadViaje = async () => {
     try {
@@ -158,7 +199,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
 
   const handleSave = async () => {
     if (!formData.nombre || !formData.categoria) {
-      Alert.alert('Error', 'El nombre y la categoría son obligatorios');
+      showToast.error('Error', 'El nombre y la categoría son obligatorios');
       return;
     }
 
@@ -230,9 +271,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
         console.log('[AddReservation] Total documentos creados exitosamente:', documentoIds.length);
 
         if (documentoIds.length === 0 && allFiles.length > 0) {
-          Alert.alert(
-            'Advertencia',
-            'No se pudieron guardar los documentos adjuntos. ¿Deseas continuar creando la reserva sin documentos?',
+          Alert.alert('Advertencia', 'No se pudieron guardar los documentos adjuntos. ¿Deseas continuar creando la reserva sin documentos?',
             [
               { text: 'Cancelar', style: 'cancel', onPress: () => {} },
               { text: 'Continuar', onPress: () => proceedWithReservation(documentoIds) }
@@ -245,9 +284,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
       await proceedWithReservation(documentoIds);
     } catch (error) {
       console.error('[AddReservation] Error al guardar:', error);
-      Alert.alert(
-        'Error',
-        `Ocurrió un error al guardar: ${error instanceof Error ? error.message : 'Error desconocido'}`
+      showToast.error('Error', `Ocurrió un error al guardar: ${error instanceof Error ? error.message : 'Error desconocido'}`
       );
     }
   };
@@ -277,6 +314,10 @@ export default function AddReservationScreen({ route, navigation }: Props) {
         precio: formData.precio ? parseFloat(formData.precio as any) : undefined,
         moneda: formData.moneda || 'EUR',
         estadoPago: formData.estadoPago || 'pending',
+        paidByUserId: formData.paidByUserId,
+        splitMethod: participantUids.length > 0 ? splitMethod : undefined,
+        participantUids: participantUids.length > 0 ? participantUids : undefined,
+        shares: shares.length > 0 ? shares : undefined,
         notas: formData.notas,
         metadatos: formData.metadatos,
       };
@@ -284,7 +325,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
       const result = await addReserva(input);
 
       if (!result) {
-        Alert.alert('Error', 'No se pudo crear la reserva');
+        showToast.error('Error', 'No se pudo crear la reserva');
         return;
       }
 
@@ -305,9 +346,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
         } catch (linkError) {
           console.error('[AddReservation] Error al vincular documentos:', linkError);
           // No fallar la creación de la reserva por esto
-          Alert.alert(
-            'Advertencia',
-            'La reserva se creó pero hubo un problema al vincular algunos documentos adjuntos'
+          showToast.warning('Advertencia', 'La reserva se creó pero hubo un problema al vincular algunos documentos adjuntos'
           );
         }
       }
@@ -363,7 +402,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
       }
     } catch (error) {
       console.error('[AddReservation] Error al seleccionar documentos:', error);
-      Alert.alert('Error', 'No se pudieron seleccionar los documentos');
+      showToast.error('Error', 'No se pudieron seleccionar los documentos');
     } finally {
       setPickingFile(false);
     }
@@ -389,7 +428,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
       }
     } catch (error) {
       console.error('[AddReservation] Error al seleccionar imagen:', error);
-      Alert.alert('Error', 'No se pudo seleccionar la imagen');
+      showToast.error('Error', 'No se pudo seleccionar la imagen');
     } finally {
       setPickingFile(false);
     }
@@ -788,6 +827,60 @@ export default function AddReservationScreen({ route, navigation }: Props) {
                   ))}
                 </View>
               </View>
+
+              {/* Selector de quién pagó - Solo en viajes compartidos y si el estado es pagado o parcial */}
+              {viaje?.isShared && members.length > 0 && (formData.estadoPago === 'paid' || formData.estadoPago === 'partial') && (
+                <>
+                  <MemberChipsSelector
+                    members={members}
+                    selectedUids={formData.paidByUserId ? [formData.paidByUserId] : []}
+                    onToggle={(uid) => updateField('paidByUserId', uid)}
+                    singleSelect={true}
+                    label="Pagado por"
+                  />
+
+                  {/* Sistema de reparto - Solo si hay precio y alguien pagó */}
+                  {formData.precio && formData.paidByUserId && (
+                    <>
+                      <View style={styles.divider} />
+                      <Text style={styles.sectionTitle}>Reparto del gasto</Text>
+
+                      <MemberChipsSelector
+                        members={members}
+                        selectedUids={participantUids}
+                        onToggle={(uid) => {
+                          setParticipantUids((prev) =>
+                            prev.includes(uid)
+                              ? prev.filter((id) => id !== uid)
+                              : [...prev, uid]
+                          );
+                        }}
+                        singleSelect={false}
+                        label="Participantes"
+                      />
+
+                      {participantUids.length > 0 && (
+                        <>
+                          <SplitMethodSelector
+                            selected={splitMethod}
+                            onSelect={setSplitMethod}
+                          />
+
+                          <SharesEditor
+                            members={members}
+                            participantUids={participantUids}
+                            splitMethod={splitMethod}
+                            shares={shares}
+                            onChange={setShares}
+                            totalAmount={Math.round(parseFloat(formData.precio.toString()) * 100)}
+                            currency={formData.moneda || 'EUR'}
+                          />
+                        </>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
             </Card>
           )}
 
@@ -1167,5 +1260,16 @@ const styles = StyleSheet.create({
   },
   removeButton: {
     padding: 4,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: theme.spacing.md,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
   },
 });

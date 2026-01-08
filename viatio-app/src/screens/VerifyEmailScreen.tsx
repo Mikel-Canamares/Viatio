@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context';
 import { ScreenContainer, Card, PrimaryButton, SecondaryButton } from '@/components';
 import { theme } from '@/config';
+import { showToast } from '@/utils/toast';
 
 export default function VerifyEmailScreen() {
   const { user, resendVerificationEmail, logout, refreshUser } = useAuth();
@@ -41,10 +42,10 @@ export default function VerifyEmailScreen() {
     setResending(false);
 
     if (success) {
-      Alert.alert('Email enviado', 'Revisa tu bandeja de entrada y carpeta de spam');
+      showToast.success('Email enviado', 'Revisa tu bandeja de entrada y carpeta de spam');
       setCountdown(60); // 60 segundos antes de poder reenviar
     } else {
-      Alert.alert('Error', 'No se pudo enviar el email. Inténtalo más tarde.');
+      showToast.error('Error', 'No se pudo enviar el email. Inténtalo más tarde.');
     }
   };
 

@@ -22,6 +22,7 @@ export interface Gasto {
   monto: number;
   moneda: string;
   fecha: string;
+  firestoreId?: string; // ID en Firestore (para viajes compartidos)
   createdAt: string;
   updatedAt: string;
 }

@@ -11,9 +11,9 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   ActivityIndicator,
   Pressable,
+  Alert,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -30,6 +30,7 @@ import {
 } from '@/types/evento';
 import * as eventosService from '@/services/eventosService';
 import { theme } from '@/config/theme';
+import { showToast } from '@/utils/toast';
 
 // ============================================
 // TIPOS
@@ -68,14 +69,14 @@ export function EventoDetailScreen() {
       setLoading(true);
       const eventoData = await eventosService.getEventoById(eventoId);
       if (!eventoData) {
-        Alert.alert('Error', 'No se encontró el evento');
+        showToast.error('Error', 'No se encontró el evento');
         navigation.goBack();
         return;
       }
       setEvento(eventoData);
     } catch (error) {
       console.error('Error loading evento:', error);
-      Alert.alert('Error', 'No se pudo cargar el evento');
+      showToast.error('Error', 'No se pudo cargar el evento');
       navigation.goBack();
     } finally {
       setLoading(false);
@@ -108,7 +109,7 @@ export function EventoDetailScreen() {
             if (success) {
               navigation.goBack();
             } else {
-              Alert.alert('Error', 'No se pudo eliminar el evento');
+              showToast.error('Error', 'No se pudo eliminar el evento');
             }
           },
         },

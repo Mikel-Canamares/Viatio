@@ -145,6 +145,7 @@ export async function createViaje(
       moneda: input.moneda || 'EUR',
       numViajeros: input.numViajeros || 1,
       archived: 0,
+      isShared: 0, // Por defecto no compartido
       createdAt: now,
       updatedAt: now,
     };
@@ -152,8 +153,8 @@ export async function createViaje(
     await db.runAsync(
       `INSERT INTO viajes (
         id, usuarioId, destino, destinoPlaceId, fechaInicio, fechaFin, descripcion,
-        imagenUrl, presupuesto, moneda, numViajeros, archived, createdAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        imagenUrl, presupuesto, moneda, numViajeros, archived, isShared, createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         viaje.id,
         viaje.usuarioId,
@@ -167,6 +168,7 @@ export async function createViaje(
         viaje.moneda,
         viaje.numViajeros,
         viaje.archived,
+        viaje.isShared,
         viaje.createdAt,
         viaje.updatedAt,
       ]
@@ -470,5 +472,97 @@ export async function getViajeStats(viajeId: string): Promise<ViajeStats> {
   } catch (error) {
     logError(error, 'getViajeStats');
     throw new Error('Error al obtener estadísticas del viaje');
+  }
+}
+
+// ============================================
+// VIAJES COMPARTIDOS
+// ============================================
+
+/**
+ * Marca un viaje como compartido y guarda su ID de Firestore
+ * Se llama después de migrar el viaje a Firestore
+ */
+export async function markViajeAsShared(
+  viajeId: string,
+  firestoreId: string
+): Promise<Viaje | null> {
+  try {
+    const db = await getDatabase();
+
+    const now = getCurrentTimestamp();
+
+    await db.runAsync(
+      `UPDATE viajes SET isShared = 1, firestoreId = ?, syncedAt = ?, updatedAt = ? WHERE id = ?`,
+      [firestoreId, now, now, viajeId]
+    );
+
+    console.log('[ViajesService] Viaje marcado como compartido:', viajeId, '-> Firestore:', firestoreId);
+
+    return await getViajeById(viajeId);
+  } catch (error) {
+    logError(error, 'markViajeAsShared');
+    throw new Error('Error al marcar viaje como compartido');
+  }
+}
+
+/**
+ * Obtiene un viaje por su ID de Firestore
+ * Útil para encontrar el viaje local correspondiente a uno de Firestore
+ */
+export async function getViajeByFirestoreId(firestoreId: string): Promise<Viaje | null> {
+  try {
+    const db = await getDatabase();
+
+    const viaje = await db.getFirstAsync<Viaje>(
+      'SELECT * FROM viajes WHERE firestoreId = ?',
+      [firestoreId]
+    );
+
+    return viaje || null;
+  } catch (error) {
+    logError(error, 'getViajeByFirestoreId');
+    throw new Error('Error al obtener viaje por firestoreId');
+  }
+}
+
+/**
+ * Actualiza la fecha de última sincronización de un viaje compartido
+ */
+export async function updateViajeSyncedAt(viajeId: string): Promise<void> {
+  try {
+    const db = await getDatabase();
+
+    const now = getCurrentTimestamp();
+
+    await db.runAsync(
+      `UPDATE viajes SET syncedAt = ?, updatedAt = ? WHERE id = ?`,
+      [now, now, viajeId]
+    );
+
+    console.log('[ViajesService] syncedAt actualizado para viaje:', viajeId);
+  } catch (error) {
+    logError(error, 'updateViajeSyncedAt');
+    throw new Error('Error al actualizar syncedAt del viaje');
+  }
+}
+
+/**
+ * Obtiene todos los viajes compartidos de un usuario
+ * Útil para sincronización
+ */
+export async function getSharedViajes(usuarioId: string): Promise<Viaje[]> {
+  try {
+    const db = await getDatabase();
+
+    const viajes = await db.getAllAsync<Viaje>(
+      'SELECT * FROM viajes WHERE usuarioId = ? AND isShared = 1 ORDER BY fechaInicio DESC',
+      [usuarioId]
+    );
+
+    return viajes;
+  } catch (error) {
+    logError(error, 'getSharedViajes');
+    throw new Error('Error al obtener viajes compartidos');
   }
 }

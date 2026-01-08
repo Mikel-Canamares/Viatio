@@ -18,8 +18,8 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  Alert,
   Switch,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -35,6 +35,7 @@ import {
   ScheduledNotificationInfo,
 } from '@/services/notificationsService';
 import { theme } from '@/config/theme';
+import { showToast } from '@/utils/toast';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'NotificationsManagement'>;
 
@@ -88,9 +89,7 @@ export default function NotificationsManagementScreen({ navigation }: Props) {
         'Recibirás una notificación de prueba en 3 segundos'
       );
     } else {
-      Alert.alert(
-        'Error',
-        'No se pudo enviar la notificación. Verifica que tienes permisos activados.'
+      showToast.error('Error', 'No se pudo enviar la notificación. Verifica que tienes permisos activados.'
       );
     }
   };

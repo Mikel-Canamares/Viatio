@@ -15,7 +15,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -27,6 +26,7 @@ import {
   setPreferenciasNotificaciones,
 } from '@/services/perfilService';
 import { PreferenciasNotificaciones, TIEMPOS_ANTELACION, TiempoAntelacion } from '@/types/perfil';
+import { showToast } from '@/utils/toast';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'NotificationsSettings'>;
 
@@ -59,7 +59,7 @@ export default function NotificationSettingsScreen({ navigation }: Props) {
       await setPreferenciasNotificaciones(updated);
     } catch (error) {
       console.error('Error updating preferences:', error);
-      Alert.alert('Error', 'No se pudieron guardar las preferencias');
+      showToast.error('Error', 'No se pudieron guardar las preferencias');
     }
   };
 

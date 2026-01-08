@@ -13,9 +13,9 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   Pressable,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -35,6 +35,7 @@ import type { DiaViaje } from '@/components';
 import { useEventosStore } from '@/store/eventosStore';
 import { CategoriaEvento, PrioridadEvento } from '@/types/evento';
 import { getViajeById } from '@/services';
+import { showToast } from '@/utils/toast';
 import { getDiasByViajeId } from '@/services/diasViajeService';
 import { getEventoById, linkEventoToLugar } from '@/services/eventosService';
 import {
@@ -95,7 +96,7 @@ export function AddEventoScreen() {
       setLoadingViaje(true);
       const viajeData = await getViajeById(viajeId);
       if (!viajeData) {
-        Alert.alert('Error', 'No se encontró el viaje');
+        showToast.error('Error', 'No se encontró el viaje');
         navigation.goBack();
         return;
       }
@@ -118,7 +119,7 @@ export function AddEventoScreen() {
       if (isEditMode && eventoId) {
         const eventoData = await getEventoById(eventoId);
         if (!eventoData) {
-          Alert.alert('Error', 'No se encontró el evento');
+          showToast.error('Error', 'No se encontró el evento');
           navigation.goBack();
           return;
         }
@@ -158,7 +159,7 @@ export function AddEventoScreen() {
       }
     } catch (error) {
       console.error('Error loading viaje:', error);
-      Alert.alert('Error', 'No se pudo cargar el viaje');
+      showToast.error('Error', 'No se pudo cargar el viaje');
       navigation.goBack();
     } finally {
       setLoadingViaje(false);
@@ -185,19 +186,19 @@ export function AddEventoScreen() {
   const validateForm = (): boolean => {
     // Validar categoría
     if (!categoria) {
-      Alert.alert('Error', 'Por favor selecciona una categoría');
+      showToast.error('Error', 'Por favor selecciona una categoría');
       return false;
     }
 
     // Validar nombre
     if (!nombre.trim()) {
-      Alert.alert('Error', 'El nombre del evento es obligatorio');
+      showToast.error('Error', 'El nombre del evento es obligatorio');
       return false;
     }
 
     // Validar día seleccionado
     if (!diaSeleccionado) {
-      Alert.alert('Error', 'Debes seleccionar un día del viaje');
+      showToast.error('Error', 'Debes seleccionar un día del viaje');
       return false;
     }
 
@@ -209,7 +210,7 @@ export function AddEventoScreen() {
       const minutosFin = hFin * 60 + mFin;
 
       if (minutosFin <= minutosInicio) {
-        Alert.alert('Error', 'La hora de fin debe ser posterior a la hora de inicio');
+        showToast.error('Error', 'La hora de fin debe ser posterior a la hora de inicio');
         return false;
       }
     }
@@ -230,9 +231,7 @@ export function AddEventoScreen() {
     // Validar que tengamos diaId
     if (!diaSeleccionado?.diaId) {
       console.error('[AddEvento] ERROR: diaId es undefined');
-      Alert.alert(
-        'Error',
-        'No se pudo identificar el día seleccionado. Por favor, intenta de nuevo.'
+      showToast.error('Error', 'No se pudo identificar el día seleccionado. Por favor, intenta de nuevo.'
       );
       return;
     }
@@ -256,7 +255,7 @@ export function AddEventoScreen() {
       // MODO EDICIÓN: actualizar evento existente
       const success = await updateEvento(eventoId, eventoData);
       if (!success) {
-        Alert.alert('Error', 'No se pudo actualizar el evento');
+        showToast.error('Error', 'No se pudo actualizar el evento');
         return;
       }
       console.log('[AddEvento] Evento actualizado');
@@ -301,11 +300,11 @@ export function AddEventoScreen() {
             await linkEventoToLugar(eventoCreado.id, matchResult.lugar.id);
             console.log('[AddEvento] Lugar vinculado automáticamente:', matchResult.lugar.nombre);
 
-            Alert.alert(
+            showToast.success(
               'Evento creado',
-              `Se ha creado el evento y se ha añadido "${matchResult.lugar.nombre}" al mapa.`,
-              [{ text: 'OK', onPress: () => navigation.goBack() }]
+              `Se ha creado el evento y se ha añadido "${matchResult.lugar.nombre}" al mapa.`
             );
+            navigation.goBack();
           } else if (matchResult.type === 'suggested' && matchResult.suggestions) {
             // Sugerencia única - preguntar al usuario
             Alert.alert(
@@ -377,22 +376,19 @@ export function AddEventoScreen() {
             );
           } else {
             // No se encontró lugar
-            Alert.alert('Evento creado', 'El evento se ha creado correctamente.', [
-              { text: 'OK', onPress: () => navigation.goBack() },
-            ]);
+            showToast.success('Evento creado', 'El evento se ha creado correctamente.');
+            navigation.goBack();
           }
         } catch (error) {
           console.error('[AddEvento] Error en place matching:', error);
           // Si falla el place matching, igual mostrar que el evento se creó
-          Alert.alert('Evento creado', 'El evento se ha creado correctamente.', [
-            { text: 'OK', onPress: () => navigation.goBack() },
-          ]);
+          showToast.success('Evento creado', 'El evento se ha creado correctamente.');
+          navigation.goBack();
         }
       } else {
         // Sin ubicación, solo confirmar creación
-        Alert.alert('Evento creado', 'El evento se ha creado correctamente.', [
-          { text: 'OK', onPress: () => navigation.goBack() },
-        ]);
+        showToast.success('Evento creado', 'El evento se ha creado correctamente.');
+        navigation.goBack();
       }
     }
   };

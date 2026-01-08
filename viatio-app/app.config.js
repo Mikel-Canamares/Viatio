@@ -7,6 +7,7 @@ export default {
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
     newArchEnabled: true,
+    scheme: 'com.viatio.app',
     splash: {
       image: './assets/splash-icon.png',
       resizeMode: 'contain',
@@ -47,6 +48,7 @@ export default {
       'expo-sqlite',
       'expo-web-browser',
       'expo-localization',
+      '@react-native-google-signin/google-signin',
       [
         'expo-location',
         {

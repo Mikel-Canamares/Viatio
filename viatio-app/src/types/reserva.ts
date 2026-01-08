@@ -14,6 +14,7 @@ import {
   ACCOMMODATION_SUBTYPES,
   ACTIVITY_SUBTYPES,
 } from '@/config/categories';
+import type { SplitMethod, ExpenseShare } from './shared';
 
 export type CategoriaReserva = CategoryBase;
 
@@ -79,10 +80,15 @@ export interface Reserva {
   precio?: number;
   moneda: string;
   estadoPago: EstadoPago;
+  paidByUserId?: string; // ID del usuario que pagó (para viajes compartidos)
+  splitMethod?: SplitMethod; // Método de reparto del pago (para viajes compartidos)
+  participantUids?: string[]; // UIDs de participantes que comparten el gasto
+  shares?: ExpenseShare[]; // Detalle del reparto por participante
   notas?: string;
   metadatos?: ReservaMetadatos;
   documentoId?: string; // ID del documento asociado (opcional)
   lugarId?: string; // ID del lugar asociado (opcional, creado automáticamente)
+  firestoreId?: string; // ID en Firestore (para viajes compartidos)
   createdAt: string;
   updatedAt: string;
 }
@@ -105,6 +111,10 @@ export interface CreateReservaInput {
   precio?: number;
   moneda?: string;
   estadoPago?: EstadoPago;
+  paidByUserId?: string; // ID del usuario que pagó (para viajes compartidos)
+  splitMethod?: SplitMethod; // Método de reparto del pago (para viajes compartidos)
+  participantUids?: string[]; // UIDs de participantes que comparten el gasto
+  shares?: Omit<ExpenseShare, 'calculatedAmount'>[]; // Detalle del reparto (calculatedAmount se calcula automáticamente)
   notas?: string;
   metadatos?: ReservaMetadatos;
   documentoId?: string; // ID del documento asociado (opcional)

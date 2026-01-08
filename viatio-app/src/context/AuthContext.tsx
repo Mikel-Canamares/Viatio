@@ -16,6 +16,9 @@ import {
   sendPasswordResetEmail,
   GoogleAuthProvider,
   signInWithCredential,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  linkWithCredential,
 } from 'firebase/auth';
 import { auth } from '@/config/firebase';
 import { AuthUser, LoginCredentials, RegisterCredentials, mapFirebaseUser } from '@/types/auth';
@@ -33,6 +36,9 @@ export interface AuthError {
   message: string;
   suggestRegister?: boolean;
   suggestLogin?: boolean;
+  needsLinking?: boolean;
+  pendingCredential?: string;
+  email?: string;
   originalError?: unknown;
 }
 
@@ -48,6 +54,7 @@ interface AuthContextType {
   resendVerificationEmail: () => Promise<boolean>;
   resetPassword: (email: string) => Promise<boolean>;
   refreshUser: () => Promise<void>;
+  linkGoogleAccount: (idToken: string, password: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -99,7 +106,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await signInWithCredential(auth, credential);
 
       return true;
-    } catch (err) {
+    } catch (err: any) {
+      // Detectar cuenta existente con otro proveedor
+      if (err.code === 'auth/account-exists-with-different-credential') {
+        setError({
+          message: 'Este email ya está registrado con otro método. Puedes vincular tu cuenta de Google.',
+          needsLinking: true,
+          pendingCredential: idToken,
+          email: err.customData?.email || '',
+          originalError: err,
+        });
+        return false;
+      }
+
       const message = getUserFriendlyMessage(err);
       setError({ message, originalError: err });
       logError(err, 'loginWithGoogle');
@@ -202,6 +221,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const linkGoogleAccount = async (idToken: string, password: string): Promise<boolean> => {
+    try {
+      if (!auth.currentUser?.email) {
+        setError({
+          message: 'No se pudo obtener el email de la cuenta actual',
+        });
+        return false;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      // 1. Re-autenticar con contraseña actual
+      const emailCred = EmailAuthProvider.credential(auth.currentUser.email, password);
+      await reauthenticateWithCredential(auth.currentUser, emailCred);
+
+      // 2. Vincular con Google
+      const googleCred = GoogleAuthProvider.credential(idToken);
+      await linkWithCredential(auth.currentUser, googleCred);
+
+      return true;
+    } catch (err: any) {
+      const message = getUserFriendlyMessage(err);
+      setError({ message, originalError: err });
+      logError(err, 'linkGoogleAccount');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const clearError = () => setError(null);
 
   return (
@@ -218,6 +268,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         resendVerificationEmail,
         resetPassword,
         refreshUser,
+        linkGoogleAccount,
       }}
     >
       {children}

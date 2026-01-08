@@ -34,6 +34,7 @@ import {
 import { getReservasByViajeId } from '@/services/reservasService';
 import { getViajeById } from '@/services/viajesService';
 import { theme } from '@/config/theme';
+import { showToast } from '@/utils/toast';
 
 type RouteParams = {
   TripMap: {
@@ -285,7 +286,7 @@ export default function TripMapScreen() {
       }
     } catch (error) {
       console.error('Error obteniendo lugar:', error);
-      Alert.alert('Error', 'No se pudo obtener información del lugar');
+      showToast.error('Error', 'No se pudo obtener información del lugar');
     } finally {
       setLoading(false);
     }
@@ -355,7 +356,7 @@ export default function TripMapScreen() {
       await loadLugaresAndReservas();
     } catch (error) {
       console.error('Error añadiendo lugar:', error);
-      Alert.alert('Error', 'No se pudo añadir el lugar');
+      showToast.error('Error', 'No se pudo añadir el lugar');
     } finally {
       setLoadingAdd(false);
     }
@@ -473,7 +474,7 @@ export default function TripMapScreen() {
               Alert.alert('Eliminado', 'Lugar eliminado del viaje');
               await loadLugaresAndReservas();
             } catch (error) {
-              Alert.alert('Error', 'No se pudo eliminar');
+              showToast.error('Error', 'No se pudo eliminar');
             }
           },
         },
@@ -514,7 +515,7 @@ export default function TripMapScreen() {
       }, 500);
     } catch (error) {
       console.error('Error obteniendo ubicación:', error);
-      Alert.alert('Error', 'No se pudo obtener tu ubicación');
+      showToast.error('Error', 'No se pudo obtener tu ubicación');
     }
   };
 

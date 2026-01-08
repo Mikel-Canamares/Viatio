@@ -138,3 +138,32 @@ export const useDocumentosStore = create<DocumentosStore>((set) => ({
    */
   clearError: () => set({ error: null }),
 }));
+
+// ============================================
+// SELECTORS
+// ============================================
+
+/**
+ * Selectors para subscripciones granulares
+ * Previene re-renders innecesarios al subscribirse solo a los datos necesarios
+ */
+export const documentosSelectors = {
+  /** Selector para array de documentos */
+  documentos: (state: DocumentosStore) => state.documentos,
+
+  /** Selector para estado de carga */
+  loading: (state: DocumentosStore) => state.loading,
+
+  /** Selector para estado de error */
+  error: (state: DocumentosStore) => state.error,
+
+  /** Selector para acciones (referencias estables) */
+  actions: (state: DocumentosStore) => ({
+    fetchDocumentos: state.fetchDocumentos,
+    addDocumento: state.addDocumento,
+    updateDocumento: state.updateDocumento,
+    removeDocumento: state.removeDocumento,
+    clearDocumentos: state.clearDocumentos,
+    clearError: state.clearError,
+  }),
+};

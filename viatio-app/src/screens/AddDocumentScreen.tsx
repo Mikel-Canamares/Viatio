@@ -13,7 +13,6 @@ import {
   ScrollView,
   Pressable,
   Image,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -27,12 +26,13 @@ import {
   SecondaryButton,
 } from '@/components';
 import { theme } from '@/config';
-import { useDocumentosStore } from '@/store/documentosStore';
+import { useDocumentosStore, documentosSelectors } from '@/store/documentosStore';
 import { pickDocument, formatFileSize, isImageFile } from '@/services';
 import type { CategoriaDocumento } from '@/types/documento';
 import { DOCUMENTO_CATEGORIAS, MAX_FILE_SIZE } from '@/types/documento';
 import { detectTipoArchivo } from '@/services/documentosService';
 import type { HomeStackParamList } from '@/navigation/types';
+import { showToast } from '@/utils/toast';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'AddDocument'>;
 
@@ -53,7 +53,10 @@ interface SelectedFile {
 
 export default function AddDocumentScreen({ route, navigation }: Props) {
   const { viajeId } = route.params;
-  const { addDocumento, loading } = useDocumentosStore();
+
+  // Usar selectors para prevenir re-renders innecesarios
+  const loading = useDocumentosStore(documentosSelectors.loading);
+  const addDocumento = useDocumentosStore((state) => state.addDocumento);
 
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
   const [nombre, setNombre] = useState('');
@@ -73,7 +76,7 @@ export default function AddDocumentScreen({ route, navigation }: Props) {
 
       // Validar tamaño
       if (result.size > MAX_FILE_SIZE) {
-        Alert.alert(
+        showToast.error(
           'Archivo muy grande',
           `El archivo debe ser menor a ${formatFileSize(MAX_FILE_SIZE)}`
         );
@@ -95,24 +98,24 @@ export default function AddDocumentScreen({ route, navigation }: Props) {
       }
     } catch (error) {
       console.error('[AddDocument] Error picking file:', error);
-      Alert.alert('Error', 'No se pudo seleccionar el archivo');
+      showToast.error('Error', 'No se pudo seleccionar el archivo');
     }
   };
 
   const handleSave = async () => {
     // Validaciones
     if (!selectedFile) {
-      Alert.alert('Error', 'Debes seleccionar un archivo');
+      showToast.error('Error', 'Debes seleccionar un archivo');
       return;
     }
 
     if (!nombre.trim()) {
-      Alert.alert('Error', 'Debes ingresar un nombre para el documento');
+      showToast.error('Error', 'Debes ingresar un nombre para el documento');
       return;
     }
 
     if (!categoria) {
-      Alert.alert('Error', 'Debes seleccionar una categoría');
+      showToast.error('Error', 'Debes seleccionar una categoría');
       return;
     }
 
@@ -132,18 +135,14 @@ export default function AddDocumentScreen({ route, navigation }: Props) {
       );
 
       if (documento) {
-        Alert.alert('Éxito', 'Documento guardado correctamente', [
-          {
-            text: 'OK',
-            onPress: () => navigation.goBack(),
-          },
-        ]);
+        showToast.success('Éxito', 'Documento guardado correctamente');
+        navigation.goBack();
       } else {
-        Alert.alert('Error', 'No se pudo guardar el documento');
+        showToast.error('Error', 'No se pudo guardar el documento');
       }
     } catch (error) {
       console.error('[AddDocument] Error saving document:', error);
-      Alert.alert('Error', 'No se pudo guardar el documento');
+      showToast.error('Error', 'No se pudo guardar el documento');
     }
   };
 

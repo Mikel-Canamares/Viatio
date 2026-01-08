@@ -39,8 +39,10 @@ const colors = {
 
   // Text
   text: '#1A1A1A',
+  textPrimary: '#1A1A1A', // Alias para text
   textSecondary: '#6B6B6B',
-  textMuted: '#9CA3AF', // Gris claro
+  textTertiary: '#9CA3AF', // Gris claro (para texto menos importante)
+  textMuted: '#9CA3AF', // Alias para textTertiary
 
   // Status
   success: '#16A34A',

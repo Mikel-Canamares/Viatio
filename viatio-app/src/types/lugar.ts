@@ -32,6 +32,7 @@ export interface Lugar {
   googlePlaceId?: string; // ID de Google Places para obtener detalles completos
   orden: number;
   visitado: boolean;
+  firestoreId?: string; // ID en Firestore (para viajes compartidos)
   createdAt: string;
   updatedAt: string;
 }

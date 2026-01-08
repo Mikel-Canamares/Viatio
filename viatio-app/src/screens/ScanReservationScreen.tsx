@@ -11,10 +11,10 @@ import {
   Text,
   StyleSheet,
   Image,
-  Alert,
   ActivityIndicator,
   ScrollView,
   Pressable,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -29,6 +29,7 @@ import { theme } from '@/config';
 import { pickImage, pickDocument, readFileAsBase64, isImageFile, extractReservaFromImage } from '@/services';
 import type { CreateReservaInput } from '@/types/reserva';
 import type { HomeStackParamList } from '@/navigation/types';
+import { showToast } from '@/utils/toast';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'ScanReservation'>;
 
@@ -76,7 +77,7 @@ export default function ScanReservationScreen({ route, navigation }: Props) {
       }
 
       if (!imageResult.base64) {
-        Alert.alert('Error', 'No se pudo obtener los datos de la imagen');
+        showToast.error('Error', 'No se pudo obtener los datos de la imagen');
         return;
       }
 
@@ -94,9 +95,7 @@ export default function ScanReservationScreen({ route, navigation }: Props) {
       setError(null);
     } catch (error) {
       console.error('[ScanReservation] Error picking image:', error);
-      Alert.alert(
-        'Error',
-        error instanceof Error ? error.message : 'No se pudo seleccionar la imagen'
+      showToast.error('Error', error instanceof Error ? error.message : 'No se pudo seleccionar la imagen'
       );
     }
   };
@@ -124,9 +123,7 @@ export default function ScanReservationScreen({ route, navigation }: Props) {
       setError(null);
     } catch (error) {
       console.error('[ScanReservation] Error picking document:', error);
-      Alert.alert(
-        'Error',
-        error instanceof Error ? error.message : 'No se pudo seleccionar el documento'
+      showToast.error('Error', error instanceof Error ? error.message : 'No se pudo seleccionar el documento'
       );
     }
   };
@@ -140,7 +137,7 @@ export default function ScanReservationScreen({ route, navigation }: Props) {
 
   const handleProcess = async () => {
     if (files.length === 0) {
-      Alert.alert('Error', 'No hay archivos para procesar');
+      showToast.error('Error', 'No hay archivos para procesar');
       return;
     }
 
@@ -198,7 +195,7 @@ export default function ScanReservationScreen({ route, navigation }: Props) {
 
   const handleUseData = () => {
     if (!result?.success || !result.data) {
-      Alert.alert('Error', 'No hay datos para usar');
+      showToast.error('Error', 'No hay datos para usar');
       return;
     }
 

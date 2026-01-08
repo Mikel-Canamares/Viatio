@@ -12,7 +12,16 @@
       "Bash(then echo \"ios exists\")",
       "Bash(adb devices:*)",
       "Bash(git restore:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(dir \"d:\\\\PROYECTOS\\\\VIATIO\\\\Viatio\\\\viatio-app\\\\src\")",
+      "Bash(dir \"d:\\\\PROYECTOS\\\\VIATIO\\\\Viatio\\\\viatio-app\\\\src\\\\screens\" /b)",
+      "Bash(npm uninstall:*)",
+      "Bash(cat:*)",
+      "Bash(find:*)",
+      "Bash(python3:*)",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Bash(node:*)"
     ]
   }
 }

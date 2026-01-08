@@ -9,8 +9,11 @@ import { Pressable, Text, StyleSheet, ActivityIndicator, ViewStyle } from 'react
 import { theme } from '@/config';
 
 interface PrimaryButtonProps {
-  /** Texto del botón */
-  children: string;
+  /** Texto del botón (preferido) */
+  children?: string;
+
+  /** Texto del botón (alias para retrocompatibilidad) */
+  title?: string;
 
   /** Función a ejecutar al presionar */
   onPress: () => void;
@@ -30,12 +33,15 @@ interface PrimaryButtonProps {
 
 export function PrimaryButton({
   children,
+  title,
   onPress,
   disabled = false,
   loading = false,
   variant = 'primary',
   style,
 }: PrimaryButtonProps) {
+  // Soportar tanto children como title para retrocompatibilidad
+  const buttonText = children || title || '';
   const isDisabled = disabled || loading;
 
   return (
@@ -53,7 +59,7 @@ export function PrimaryButton({
       {loading ? (
         <ActivityIndicator color="#FFFFFF" size="small" />
       ) : (
-        <Text style={styles.text}>{children}</Text>
+        <Text style={styles.text}>{buttonText}</Text>
       )}
     </Pressable>
   );

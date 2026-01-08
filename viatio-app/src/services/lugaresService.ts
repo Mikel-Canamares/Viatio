@@ -7,6 +7,7 @@
 
 import { getDatabase, generateId, getCurrentTimestamp } from '@/database';
 import type { Lugar, CreateLugarInput } from '@/types/lugar';
+import { syncLugarIfShared, syncDeleteIfShared } from './sync/syncUpload';
 
 // ============================================
 // HELPERS
@@ -57,6 +58,7 @@ function rowToLugar(row: any): Lugar {
     googlePlaceId: row.googlePlaceId || undefined,
     orden: row.orden,
     visitado: row.visitado === 1,
+    firestoreId: row.firestoreId || undefined,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -118,6 +120,11 @@ export async function createLugar(input: CreateLugarInput): Promise<Lugar> {
     if (!lugar) {
       throw new Error('No se pudo recuperar el lugar creado');
     }
+
+    // Sincronizar con Firestore si es viaje compartido (no bloqueante)
+    syncLugarIfShared(lugar).catch((error) => {
+      console.warn('[createLugar] Error al sincronizar lugar:', error);
+    });
 
     return lugar;
   } catch (error) {
@@ -252,7 +259,15 @@ export async function updateLugar(
 
     console.log('[updateLugar] Lugar actualizado:', id);
 
-    return getLugarById(id);
+    // Sincronizar con Firestore si es viaje compartido (no bloqueante)
+    const lugarActualizado = await getLugarById(id);
+    if (lugarActualizado) {
+      syncLugarIfShared(lugarActualizado).catch((error) => {
+        console.warn('[updateLugar] Error al sincronizar lugar:', error);
+      });
+    }
+
+    return lugarActualizado;
   } catch (error) {
     logError(error, 'updateLugar');
     return null;
@@ -359,6 +374,16 @@ export async function reorderLugares(lugarIds: string[]): Promise<void> {
 export async function deleteLugar(id: string): Promise<boolean> {
   try {
     const db = await getDatabase();
+
+    // Obtener el lugar antes de eliminar para sincronización
+    const lugar = await getLugarById(id);
+
+    // Sincronizar eliminación con Firestore si es viaje compartido
+    if (lugar?.firestoreId) {
+      syncDeleteIfShared(lugar.viajeId, 'places', lugar.firestoreId).catch((error) => {
+        console.warn('[deleteLugar] Error al sincronizar eliminación:', error);
+      });
+    }
 
     await db.runAsync('DELETE FROM lugares WHERE id = ?', [id]);
 

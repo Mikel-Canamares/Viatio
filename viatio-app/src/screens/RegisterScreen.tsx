@@ -14,20 +14,20 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Input, PrimaryButton, LoadingOverlay } from '@/components';
+import { Input, PrimaryButton, GoogleSignInButton, LinkAccountModal, LoadingOverlay } from '@/components';
 import { useAuth } from '@/context';
 import { theme } from '@/config';
 import type { AuthStackParamList } from '@/navigation/AuthStackNavigator';
+import { showToast } from '@/utils/toast';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
 export default function RegisterScreen({ navigation }: Props) {
-  const { registerWithEmail, error, clearError, loading } = useAuth();
+  const { registerWithEmail, loginWithGoogle, error, clearError, loading } = useAuth();
 
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
@@ -36,6 +36,11 @@ export default function RegisterScreen({ navigation }: Props) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [linkingModal, setLinkingModal] = useState({
+    visible: false,
+    email: '',
+    idToken: '',
+  });
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -85,10 +90,9 @@ export default function RegisterScreen({ navigation }: Props) {
     });
 
     if (success) {
-      Alert.alert(
+      showToast.success(
         'Cuenta creada',
-        '¡Bienvenido a Viatio! Hemos enviado un email de verificación a tu correo. Por favor verifica tu email para continuar.',
-        [{ text: 'OK' }]
+        '¡Bienvenido a Viatio! Hemos enviado un email de verificación a tu correo. Por favor verifica tu email para continuar.'
       );
     }
   };
@@ -212,6 +216,37 @@ export default function RegisterScreen({ navigation }: Props) {
                 Crear cuenta
               </PrimaryButton>
 
+              {/* Separador */}
+              <View style={styles.separator}>
+                <View style={styles.separatorLine} />
+                <Text style={styles.separatorText}>o regístrate con</Text>
+                <View style={styles.separatorLine} />
+              </View>
+
+              {/* Botón de Google */}
+              <GoogleSignInButton
+                text="Registrarse con Google"
+                onSuccess={loginWithGoogle}
+                onError={(err: any) => {
+                  if (err?.needsLinking) {
+                    setLinkingModal({
+                      visible: true,
+                      email: err.email || '',
+                      idToken: err.pendingCredential || '',
+                    });
+                  } else {
+                    console.error('Error Google Sign-In:', err);
+                    showToast.error('Error', 'No se pudo registrar con Google. Intenta nuevamente.');
+                  }
+                }}
+                disabled={loading}
+              />
+
+              {/* Texto informativo */}
+              <Text style={styles.helperText}>
+                Al usar Google, tu cuenta se creará automáticamente
+              </Text>
+
               {/* Footer - Login */}
               <View style={styles.footer}>
                 <Text style={styles.footerText}>¿Ya tienes cuenta? </Text>
@@ -225,6 +260,18 @@ export default function RegisterScreen({ navigation }: Props) {
       </ScrollView>
 
       <LoadingOverlay visible={loading} message="Creando cuenta..." />
+
+      <LinkAccountModal
+        visible={linkingModal.visible}
+        email={linkingModal.email}
+        idToken={linkingModal.idToken}
+        onSuccess={() => {
+          setLinkingModal({ visible: false, email: '', idToken: '' });
+        }}
+        onCancel={() => {
+          setLinkingModal({ visible: false, email: '', idToken: '' });
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -291,6 +338,27 @@ const styles = StyleSheet.create({
   },
   form: {
     gap: theme.spacing.md,
+  },
+  separator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: theme.spacing.lg,
+  },
+  separatorLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E5E5EA',
+  },
+  separatorText: {
+    paddingHorizontal: theme.spacing.md,
+    fontSize: 14,
+    color: theme.colors.textMuted,
+  },
+  helperText: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 8,
   },
   footer: {
     flexDirection: 'row',

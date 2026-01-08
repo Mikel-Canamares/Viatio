@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { RootNavigator } from '@/navigation';
 import { ErrorBoundary, PrimaryButton } from '@/components';
+import { GlobalModalProvider } from '@/components/GlobalModalProvider';
 import { AuthProvider } from '@/context';
 import { initializeDatabase, clearDatabase } from '@/database';
 import { logError } from '@/utils';
@@ -82,10 +83,12 @@ export default function App() {
       <SafeAreaProvider>
         <ErrorBoundary>
           <AuthProvider>
-            <NavigationContainer>
-              <RootNavigator />
-              <StatusBar style="auto" />
-            </NavigationContainer>
+            <GlobalModalProvider>
+              <NavigationContainer>
+                <RootNavigator />
+                <StatusBar style="auto" />
+              </NavigationContainer>
+            </GlobalModalProvider>
           </AuthProvider>
         </ErrorBoundary>
       </SafeAreaProvider>

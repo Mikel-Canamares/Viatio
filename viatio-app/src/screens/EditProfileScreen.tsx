@@ -14,9 +14,9 @@ import {
   KeyboardAvoidingView,
   Image,
   Pressable,
-  Alert,
   ActionSheetIOS,
   Platform,
+  Alert,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,6 +30,7 @@ import { Card } from '@/components/Card';
 import { Input } from '@/components/Input';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { theme } from '@/config';
+import { showToast } from '@/utils/toast';
 
 type RootStackParamList = {
   EditProfile: undefined;
@@ -135,7 +136,7 @@ export default function EditProfileScreen({ navigation }: Props) {
       }
     } catch (error) {
       console.error('Error al tomar foto:', error);
-      Alert.alert('Error', 'No se pudo tomar la foto.');
+      showToast.error('Error', 'No se pudo tomar la foto.');
     }
   };
 
@@ -166,7 +167,7 @@ export default function EditProfileScreen({ navigation }: Props) {
       }
     } catch (error) {
       console.error('Error al elegir foto:', error);
-      Alert.alert('Error', 'No se pudo elegir la foto.');
+      showToast.error('Error', 'No se pudo elegir la foto.');
     }
   };
 
@@ -178,7 +179,7 @@ export default function EditProfileScreen({ navigation }: Props) {
       setLoading(true);
 
       if (!auth.currentUser) {
-        Alert.alert('Error', 'No hay usuario autenticado.');
+        showToast.error('Error', 'No hay usuario autenticado.');
         return;
       }
 
@@ -193,12 +194,11 @@ export default function EditProfileScreen({ navigation }: Props) {
       // Refrescar el usuario en el contexto
       await refreshUser();
 
-      Alert.alert('Éxito', 'Perfil actualizado correctamente.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      showToast.success('Éxito', 'Perfil actualizado correctamente.');
+      navigation.goBack();
     } catch (error) {
       console.error('Error al guardar cambios:', error);
-      Alert.alert('Error', 'No se pudo actualizar el perfil.');
+      showToast.error('Error', 'No se pudo actualizar el perfil.');
     } finally {
       setLoading(false);
     }
