@@ -541,6 +541,24 @@ export async function linkReservaToLugar(
     );
 
     console.log('[PlaceMatching] Reserva vinculada a lugar:', { reservaId, lugarId });
+
+    // Sincronizar a Firestore si el viaje es compartido
+    try {
+      const reserva = await db.getFirstAsync<any>(
+        'SELECT r.*, v.firestoreId as viajeFirestoreId, v.isShared FROM reservas r JOIN viajes v ON r.viajeId = v.id WHERE r.id = ?',
+        [reservaId]
+      );
+
+      if (reserva && reserva.isShared === 1 && reserva.viajeFirestoreId) {
+        const { syncReservaIfShared } = require('./sync/syncUpload');
+        await syncReservaIfShared({ ...reserva, lugarId });
+        console.log('[PlaceMatching] Vinculación sincronizada a Firestore');
+      }
+    } catch (syncError) {
+      console.warn('[PlaceMatching] No se pudo sincronizar vinculación a Firestore:', syncError);
+      // No fallar si la sincronización falla, la actualización local ya está hecha
+    }
+
     return true;
   } catch (error) {
     console.error('[PlaceMatching] Error vinculando reserva a lugar:', error);

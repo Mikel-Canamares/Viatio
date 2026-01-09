@@ -80,6 +80,14 @@ export default function TripAgendaScreen({ route, navigation }: Props) {
   );
 
   const handleEventPress = (item: EventoAgenda) => {
+    console.log('[TripAgendaScreen] handleEventPress:', {
+      tipo: item.tipo,
+      origen: item.origen,
+      reservaId: item.reservaId,
+      lugarId: item.lugarId,
+      titulo: item.titulo
+    });
+
     // Eventos personalizados
     if (item.origen === 'evento_personalizado') {
       // Siempre mostrar modal de elección para eventos personalizados
@@ -92,9 +100,11 @@ export default function TripAgendaScreen({ route, navigation }: Props) {
     if (item.tipo === 'reserva' && item.reservaId) {
       // Si la reserva tiene un lugar asociado, mostrar modal de elección
       if (item.lugarId) {
+        console.log('[TripAgendaScreen] Reserva con lugar, mostrando modal');
         setSelectedEvent(item);
         setShowChoiceModal(true);
       } else {
+        console.log('[TripAgendaScreen] Reserva sin lugar, navegando directo a detalle');
         // Si no tiene lugar, navegar directo a la reserva
         navigation.navigate('ReservationDetail', {
           viajeId,

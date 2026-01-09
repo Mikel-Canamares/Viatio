@@ -195,14 +195,6 @@ export default function ReservationDetailScreen({ route, navigation }: Props) {
     ? members.find(m => m.uid === reserva.paidByUserId)
     : null;
 
-  // Calcular la información de reparto si existe
-  const splitInfo = reserva.shares && reserva.shares.length > 0 && reserva.precio
-    ? reserva.shares.map(share => ({
-        ...share,
-        member: members.find(m => m.uid === share.uid),
-      }))
-    : null;
-
   return (
     <View style={styles.container}>
       <PageHeader title="Detalle de reserva" onBack={() => navigation.goBack()} />
@@ -371,48 +363,6 @@ export default function ReservationDetailScreen({ route, navigation }: Props) {
                           </View>
                         )}
                         <Text style={styles.memberName}>{paidByMember.displayName}</Text>
-                      </View>
-                    </View>
-                  </>
-                )}
-
-                {/* Mostrar información de reparto si existe */}
-                {splitInfo && splitInfo.length > 0 && (
-                  <>
-                    <View style={styles.divider} />
-                    <View style={styles.splitInfoSection}>
-                      <Text style={styles.splitInfoTitle}>Reparto del gasto</Text>
-                      <View style={styles.splitMethodBadge}>
-                        <Text style={styles.splitMethodText}>
-                          {reserva.splitMethod === 'equal' && 'Dividido equitativamente'}
-                          {reserva.splitMethod === 'exact' && 'Montos exactos'}
-                          {reserva.splitMethod === 'percentage' && 'Por porcentajes'}
-                          {reserva.splitMethod === 'shares' && 'Por partes'}
-                        </Text>
-                      </View>
-                      <View style={styles.sharesList}>
-                        {splitInfo.map((share) => (
-                          <View key={share.uid} style={styles.shareRow}>
-                            <View style={styles.shareMemberInfo}>
-                              {share.member?.photoURL ? (
-                                <Image
-                                  source={{ uri: share.member.photoURL }}
-                                  style={styles.shareAvatar}
-                                />
-                              ) : (
-                                <View style={[styles.shareAvatar, styles.shareAvatarPlaceholder]}>
-                                  <Text style={styles.shareAvatarText}>
-                                    {share.displayName.charAt(0).toUpperCase()}
-                                  </Text>
-                                </View>
-                              )}
-                              <Text style={styles.shareMemberName}>{share.displayName}</Text>
-                            </View>
-                            <Text style={styles.shareAmount}>
-                              {((share.calculatedAmount || 0) / 100).toFixed(2)} {reserva.moneda}
-                            </Text>
-                          </View>
-                        ))}
                       </View>
                     </View>
                   </>
@@ -662,66 +612,6 @@ const styles = StyleSheet.create({
   memberName: {
     fontSize: 15,
     fontWeight: '500',
-    color: theme.colors.text,
-  },
-  splitInfoSection: {
-    gap: theme.spacing.sm,
-  },
-  splitInfoTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: theme.colors.text,
-  },
-  splitMethodBadge: {
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 6,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-  },
-  splitMethodText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: theme.colors.primaryLight,
-  },
-  sharesList: {
-    gap: theme.spacing.xs,
-    marginTop: theme.spacing.xs,
-  },
-  shareRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.xs,
-  },
-  shareMemberInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-    flex: 1,
-  },
-  shareAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-  },
-  shareAvatarPlaceholder: {
-    backgroundColor: theme.colors.primaryLight + '20',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  shareAvatarText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: theme.colors.primaryLight,
-  },
-  shareMemberName: {
-    fontSize: 14,
-    color: theme.colors.text,
-  },
-  shareAmount: {
-    fontSize: 14,
-    fontWeight: '600',
     color: theme.colors.text,
   },
 });

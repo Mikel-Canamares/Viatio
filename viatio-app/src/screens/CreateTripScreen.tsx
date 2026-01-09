@@ -42,9 +42,6 @@ export default function CreateTripScreen({ navigation }: Props) {
   const [destinoPlaceId, setDestinoPlaceId] = useState<string | undefined>(undefined);
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin, setFechaFin] = useState('');
-  const [descripcion, setDescripcion] = useState('');
-  const [presupuesto, setPresupuesto] = useState('');
-  const [numViajeros, setNumViajeros] = useState('1');
 
   // Validation
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -105,9 +102,6 @@ export default function CreateTripScreen({ navigation }: Props) {
         destinoPlaceId: destinoPlaceId,
         fechaInicio,
         fechaFin,
-        descripcion: descripcion.trim() || undefined,
-        presupuesto: presupuesto ? parseFloat(presupuesto) : undefined,
-        numViajeros: parseInt(numViajeros) || 1,
       },
       user.uid
     );
@@ -136,13 +130,13 @@ export default function CreateTripScreen({ navigation }: Props) {
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="always"
           >
-          {/* Card 1: Información básica */}
+          {/* Información del viaje */}
           <Card style={styles.card}>
             <View style={styles.sectionHeader}>
               <View style={styles.iconContainer}>
                 <Ionicons name="location-outline" size={20} color={theme.colors.primaryLight} />
               </View>
-              <Text style={styles.sectionTitle}>Información básica</Text>
+              <Text style={styles.sectionTitle}>Información del viaje</Text>
             </View>
 
             <PlaceAutocompleteInput
@@ -164,48 +158,6 @@ export default function CreateTripScreen({ navigation }: Props) {
               }}
               placeholder="Seleccionar fechas"
               error={errors.fechaInicio || errors.fechaFin}
-            />
-
-            <Input
-              label="Descripción (opcional)"
-              value={descripcion}
-              onChangeText={setDescripcion}
-              placeholder="Añade notas sobre tu viaje..."
-              multiline
-              numberOfLines={4}
-            />
-          </Card>
-
-          {/* Card 2: Detalles adicionales */}
-          <Card style={styles.card}>
-            <View style={styles.sectionHeader}>
-              <View style={[styles.iconContainer, styles.iconContainerAmber]}>
-                <Ionicons name="wallet-outline" size={20} color="#D97706" />
-              </View>
-              <Text style={styles.sectionTitle}>Detalles adicionales</Text>
-            </View>
-
-            <Input
-              label="Presupuesto estimado (opcional)"
-              value={presupuesto}
-              onChangeText={(text) => {
-                // Permitir solo números y un punto decimal
-                const filteredText = text.replace(/[^0-9.]/g, '');
-                const parts = filteredText.split('.');
-                // Evitar múltiples puntos decimales
-                if (parts.length > 2) return;
-                setPresupuesto(filteredText);
-              }}
-              placeholder="€"
-              keyboardType="decimal-pad"
-            />
-
-            <Input
-              label="Número de viajeros"
-              value={numViajeros}
-              onChangeText={setNumViajeros}
-              placeholder="1"
-              keyboardType="numeric"
             />
           </Card>
 
@@ -252,9 +204,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: theme.spacing.sm,
-  },
-  iconContainerAmber: {
-    backgroundColor: '#FEF3C7',
   },
   sectionTitle: {
     fontSize: 16,
