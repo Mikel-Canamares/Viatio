@@ -34,7 +34,7 @@ export function PlaceSearchBar({
   const [showResults, setShowResults] = useState(false);
   const inputRef = useRef<TextInput>(null);
 
-  // Búsqueda con debounce
+  // Búsqueda con debounce (incrementado de 500ms a 800ms para reducir costes)
   const searchPlaces = useCallback(
     debounce(async (text: string) => {
       if (text.trim().length < 2) {
@@ -49,7 +49,7 @@ export function PlaceSearchBar({
           latitude,
           longitude,
           radiusMeters: 50000, // 50km
-          maxResults: 8,
+          maxResults: 5, // Reducido de 8 a 5 para reducir costes
         });
         setResults(places);
       } catch (error) {
@@ -58,7 +58,7 @@ export function PlaceSearchBar({
       } finally {
         setLoading(false);
       }
-    }, 500),
+    }, 800), // Incrementado de 500ms a 800ms
     [latitude, longitude]
   );
 

@@ -482,14 +482,58 @@ export async function getPointsOfInterest(
     await setCache(cacheKey, allPlaces);
   }
 
-  // Convertir y ordenar por rating y popularidad
-  const suggestions = allPlaces
+  // OPTIMIZACIÓN DE COSTES: 2-step approach
+  // Paso 1: Pre-filtro sin rating (ya tenemos places con PRO tier)
+  // Los lugares ya vienen ordenados por relevancia de Google
+
+  // Tomar top candidatos (2x maxResults) para refinar después
+  const topCandidates = allPlaces.slice(0, maxResults * 2);
+
+  // Paso 2: Obtener rating solo para top candidatos si es necesario
+  // En este punto, los lugares ya tienen datos básicos (PRO tier)
+  // Solo pedimos rating si el usuario tiene preferencias de presupuesto o necesitamos scoring detallado
+  const needsRating = preferences?.budgetLevel !== undefined;
+
+  let finalPlaces = topCandidates;
+
+  if (needsRating && topCandidates.length > 0) {
+    console.log('[CopilotPlaces] Obteniendo rating para top', topCandidates.length, 'candidatos');
+
+    // Obtener detalles con rating solo para candidatos (ENTERPRISE_BASIC tier)
+    const { getPlaceDetails } = await import('@/services/googlePlacesService');
+    const { PlaceDetailLevel } = await import('@/types/googlePlaces');
+
+    const detailsPromises = topCandidates.map(async (place) => {
+      try {
+        const details = await getPlaceDetails(place.placeId, PlaceDetailLevel.ENTERPRISE_BASIC);
+        if (details) {
+          // Merge detalles con lugar original
+          return { ...place, ...details };
+        }
+        return place;
+      } catch {
+        return place;
+      }
+    });
+
+    finalPlaces = await Promise.all(detailsPromises);
+  }
+
+  // Convertir y ordenar
+  const suggestions = finalPlaces
     .map((p) => placeResultToSuggestion(p, undefined, undefined, preferences))
     .sort((a, b) => {
-      // Priorizar por rating * log(totalRatings)
-      const scoreA = (a.rating || 0) * Math.log10((a.totalRatings || 1) + 1);
-      const scoreB = (b.rating || 0) * Math.log10((b.totalRatings || 1) + 1);
-      return scoreB - scoreA;
+      // Si tenemos rating, ordenar por rating * log(totalRatings)
+      if (a.rating && b.rating) {
+        const scoreA = a.rating * Math.log10((a.totalRatings || 1) + 1);
+        const scoreB = b.rating * Math.log10((b.totalRatings || 1) + 1);
+        return scoreB - scoreA;
+      }
+      // Si solo uno tiene rating, priorizarlo
+      if (a.rating && !b.rating) return -1;
+      if (!a.rating && b.rating) return 1;
+      // Si ninguno tiene rating, mantener orden original (relevancia de Google)
+      return 0;
     })
     .slice(0, maxResults);
 
