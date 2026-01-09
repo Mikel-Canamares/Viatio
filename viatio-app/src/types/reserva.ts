@@ -177,7 +177,6 @@ export const SUBTIPOS_ACTIVIDAD: Record<SubtipoActividad, { label: string; icon:
   nature: { label: ACTIVITY_SUBTYPES.nature.label, icon: ACTIVITY_SUBTYPES.nature.icon },
   entertainment: { label: ACTIVITY_SUBTYPES.entertainment.label, icon: ACTIVITY_SUBTYPES.entertainment.icon },
   nightlife: { label: ACTIVITY_SUBTYPES.nightlife.label, icon: ACTIVITY_SUBTYPES.nightlife.icon },
-  relaxation: { label: ACTIVITY_SUBTYPES.relaxation.label, icon: ACTIVITY_SUBTYPES.relaxation.icon },
   other: { label: ACTIVITY_SUBTYPES.other.label, icon: ACTIVITY_SUBTYPES.other.icon },
 };
 

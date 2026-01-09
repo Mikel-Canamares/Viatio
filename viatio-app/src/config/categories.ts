@@ -33,7 +33,7 @@ export type CategoryBase =
 
 export type TransportSubtype = 'plane' | 'train' | 'bus' | 'ferry' | 'taxi' | 'car' | 'other';
 export type AccommodationSubtype = 'hotel' | 'aparthotel' | 'apartment' | 'room' | 'camping' | 'other';
-export type ActivitySubtype = 'sightseeing' | 'culture' | 'sports' | 'nature' | 'entertainment' | 'nightlife' | 'relaxation' | 'other';
+export type ActivitySubtype = 'sightseeing' | 'culture' | 'sports' | 'nature' | 'entertainment' | 'nightlife' | 'other';
 
 // ============================================
 // CONFIGURACIÓN DE CATEGORÍAS BASE
@@ -143,7 +143,6 @@ export const ACTIVITY_SUBTYPES: Record<ActivitySubtype, SubcategoryConfig> = {
   nature: { label: 'Naturaleza', icon: 'leaf', parent: 'activity' },
   entertainment: { label: 'Ocio', icon: 'game-controller', parent: 'activity' },
   nightlife: { label: 'Noche', icon: 'moon', parent: 'activity' },
-  relaxation: { label: 'Descanso', icon: 'bed-outline', parent: 'activity' },
   other: { label: 'Otros', icon: 'ellipsis-horizontal', parent: 'activity' },
 };
 

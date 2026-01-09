@@ -801,7 +801,6 @@ export function mapEventoCategoriaToLugarCategoria(
     shopping: 'shopping',
     entertainment: 'attraction', // Entretenimiento → atracción
     nature: 'attraction', // Naturaleza/parques → atracción
-    relaxation: 'hotel', // Spa/wellness → hotel
     transport: 'transport',
     nightlife: 'restaurant', // Vida nocturna → restaurante (bares/pubs)
     sports: 'attraction',

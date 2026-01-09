@@ -61,6 +61,13 @@ export async function createReserva(
     updatedAt: now,
   };
 
+  // DEBUG: Verificar metadatos antes de stringify
+  console.log('[ReservasService] reserva.metadatos antes de guardar:', reserva.metadatos);
+  console.log('[ReservasService] Tipo de metadatos:', typeof reserva.metadatos);
+  console.log('[ReservasService] Constructor:', reserva.metadatos?.constructor?.name);
+  const metadatosStringified = reserva.metadatos ? JSON.stringify(reserva.metadatos) : null;
+  console.log('[ReservasService] metadatos después de JSON.stringify:', metadatosStringified);
+
   await db.runAsync(
     `INSERT INTO reservas (
       id, viajeId, diaId, categoria, nombre, proveedor, numeroConfirmacion,
@@ -93,7 +100,7 @@ export async function createReserva(
       reserva.participantUids ? JSON.stringify(reserva.participantUids) : null,
       reserva.shares ? JSON.stringify(reserva.shares) : null,
       reserva.notas || null,
-      reserva.metadatos ? JSON.stringify(reserva.metadatos) : null,
+      metadatosStringified,
       input.documentoId || null,
       reserva.lugarId || null,
       reserva.createdAt,
@@ -269,9 +276,19 @@ export async function getReservasByViajeId(viajeId: string): Promise<Reserva[]> 
   const db = await getDatabase();
 
   const rows = await db.getAllAsync<Reserva>(
-    `SELECT * FROM reservas
-     WHERE viajeId = ?
-     ORDER BY fechaInicio ASC, horaInicio ASC`,
+    `SELECT
+      id, viajeId, diaId, categoria, nombre, proveedor, numeroConfirmacion,
+      fechaInicio, horaInicio, fechaFin, horaFin, ubicacion, direccion,
+      latitud, longitud, precio, moneda, estadoPago, paidByUserId,
+      splitMethod,
+      CAST(participantUids AS TEXT) as participantUids,
+      CAST(shares AS TEXT) as shares,
+      notas,
+      CAST(metadatos AS TEXT) as metadatos,
+      documentoId, lugarId, createdAt, updatedAt
+    FROM reservas
+    WHERE viajeId = ?
+    ORDER BY fechaInicio ASC, horaInicio ASC`,
     [viajeId]
   );
 
@@ -293,9 +310,19 @@ export async function getReservasByCategoria(
   const db = await getDatabase();
 
   const rows = await db.getAllAsync<Reserva>(
-    `SELECT * FROM reservas
-     WHERE viajeId = ? AND categoria = ?
-     ORDER BY fechaInicio ASC, horaInicio ASC`,
+    `SELECT
+      id, viajeId, diaId, categoria, nombre, proveedor, numeroConfirmacion,
+      fechaInicio, horaInicio, fechaFin, horaFin, ubicacion, direccion,
+      latitud, longitud, precio, moneda, estadoPago, paidByUserId,
+      splitMethod,
+      CAST(participantUids AS TEXT) as participantUids,
+      CAST(shares AS TEXT) as shares,
+      notas,
+      CAST(metadatos AS TEXT) as metadatos,
+      documentoId, lugarId, createdAt, updatedAt
+    FROM reservas
+    WHERE viajeId = ? AND categoria = ?
+    ORDER BY fechaInicio ASC, horaInicio ASC`,
     [viajeId, categoria]
   );
 
@@ -314,7 +341,17 @@ export async function getReservaById(id: string): Promise<Reserva | null> {
   const db = await getDatabase();
 
   const row = await db.getFirstAsync<Reserva>(
-    'SELECT * FROM reservas WHERE id = ?',
+    `SELECT
+      id, viajeId, diaId, categoria, nombre, proveedor, numeroConfirmacion,
+      fechaInicio, horaInicio, fechaFin, horaFin, ubicacion, direccion,
+      latitud, longitud, precio, moneda, estadoPago, paidByUserId,
+      splitMethod,
+      CAST(participantUids AS TEXT) as participantUids,
+      CAST(shares AS TEXT) as shares,
+      notas,
+      CAST(metadatos AS TEXT) as metadatos,
+      documentoId, lugarId, createdAt, updatedAt
+    FROM reservas WHERE id = ?`,
     [id]
   );
 

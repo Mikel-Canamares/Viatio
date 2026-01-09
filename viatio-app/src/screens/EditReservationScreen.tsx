@@ -160,6 +160,11 @@ export default function EditReservationScreen({ route, navigation }: Props) {
       const docs = await getDocumentosByReservaId(reservaId);
       setExistingDocuments(docs);
 
+      // DEBUG: Verificar metadatos cargados
+      console.log('[EditReservationScreen] Reserva cargada:', reservaData.id);
+      console.log('[EditReservationScreen] Metadatos recibidos:', JSON.stringify(reservaData.metadatos, null, 2));
+      console.log('[EditReservationScreen] Tipo de metadatos:', typeof reservaData.metadatos);
+
       // Precargar formulario con datos existentes
       setFormData({
         viajeId: reservaData.viajeId,
@@ -180,6 +185,9 @@ export default function EditReservationScreen({ route, navigation }: Props) {
         notas: reservaData.notas,
         metadatos: reservaData.metadatos, // CRITICAL: Incluir metadatos para que se cargue el subtipo
       });
+
+      // DEBUG: Verificar formData después de setear
+      console.log('[EditReservationScreen] FormData.metadatos después de setear:', JSON.stringify(reservaData.metadatos, null, 2));
 
       // Cargar datos de reparto si existen
       if (reservaData.splitMethod) {
@@ -483,12 +491,17 @@ export default function EditReservationScreen({ route, navigation }: Props) {
             )}
 
             {formData.categoria === 'accommodation' && (
-              <SubtypeSelector
-                label="Tipo de alojamiento"
-                options={SUBTIPOS_ALOJAMIENTO}
-                value={formData.metadatos?.subtipoAlojamiento}
-                onSelect={(value) => updateMetadata('subtipoAlojamiento', value as SubtipoAlojamiento)}
-              />
+              <>
+                {console.log('[EditReservationScreen] Renderizando SubtypeSelector')}
+                {console.log('[EditReservationScreen] formData.metadatos:', formData.metadatos)}
+                {console.log('[EditReservationScreen] formData.metadatos?.subtipoAlojamiento:', formData.metadatos?.subtipoAlojamiento)}
+                <SubtypeSelector
+                  label="Tipo de alojamiento"
+                  options={SUBTIPOS_ALOJAMIENTO}
+                  value={formData.metadatos?.subtipoAlojamiento}
+                  onSelect={(value) => updateMetadata('subtipoAlojamiento', value as SubtipoAlojamiento)}
+                />
+              </>
             )}
 
             {formData.categoria === 'activity' && (

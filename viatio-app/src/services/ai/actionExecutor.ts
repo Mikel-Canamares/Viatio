@@ -57,7 +57,7 @@ async function executeCreateAgendaItem(
     // Validar que la categoría sea válida
     const validCategories: CategoriaEvento[] = [
       'sightseeing', 'culture', 'food', 'shopping', 'entertainment',
-      'nature', 'relaxation', 'transport', 'nightlife', 'sports', 'other'
+      'nature', 'transport', 'nightlife', 'sports', 'other'
     ];
     const categoria: CategoriaEvento = validCategories.includes(type as CategoriaEvento)
       ? (type as CategoriaEvento)

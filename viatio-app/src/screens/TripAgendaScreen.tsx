@@ -5,7 +5,7 @@
  * Muestra días agrupados con eventos (reservas y lugares).
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -24,8 +24,11 @@ import {
 } from '@/components';
 import { theme } from '@/config';
 import { getAgendaByViajeId } from '@/services/agendaService';
+import { getViajeById } from '@/services/viajesService';
+import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import type { DiaAgenda, EventoAgenda } from '@/types/diaViaje';
 import type { HomeStackParamList } from '@/navigation/types';
+import type { Viaje } from '@/types/viaje';
 import { useEventosStore } from '@/store/eventosStore';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'TripAgenda'>;
@@ -36,12 +39,41 @@ interface AgendaSection extends DiaAgenda {
 
 export default function TripAgendaScreen({ route, navigation }: Props) {
   const { viajeId } = route.params;
+  const [viaje, setViaje] = useState<Viaje | null>(null);
   const [agenda, setAgenda] = useState<AgendaSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [showChoiceModal, setShowChoiceModal] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<EventoAgenda | null>(null);
 
+  // Configuración para sincronización en tiempo real
+  const isShared = viaje?.isShared === 1;
+  const firestoreId = viaje?.firestoreId || null;
+
+  // Callbacks para sincronización
+  const handleEventsChange = useCallback(() => {
+    console.log('[TripAgenda] Eventos actualizados, recargando agenda...');
+    loadAgenda();
+  }, []);
+
+  const handleReservationsChange = useCallback(() => {
+    console.log('[TripAgenda] Reservas actualizadas, recargando agenda...');
+    loadAgenda();
+  }, []);
+
+  const handlePlacesChange = useCallback(() => {
+    console.log('[TripAgenda] Lugares actualizados, recargando agenda...');
+    loadAgenda();
+  }, []);
+
+  // Hook de sincronización en tiempo real
+  useRealtimeSync(firestoreId, viajeId, isShared, {
+    onEventsChange: handleEventsChange,
+    onReservationsChange: handleReservationsChange,
+    onPlacesChange: handlePlacesChange,
+  });
+
   useEffect(() => {
+    loadViaje();
     loadAgenda();
   }, [viajeId]);
 
@@ -53,6 +85,15 @@ export default function TripAgendaScreen({ route, navigation }: Props) {
 
     return unsubscribe;
   }, [navigation, viajeId]);
+
+  const loadViaje = async () => {
+    try {
+      const viajeData = await getViajeById(viajeId);
+      setViaje(viajeData);
+    } catch (error) {
+      console.error('Error loading viaje:', error);
+    }
+  };
 
   const loadAgenda = async () => {
     try {

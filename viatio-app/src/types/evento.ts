@@ -61,7 +61,6 @@ export type CategoriaEvento =
   | 'shopping' // Compras (categoría base)
   | 'entertainment' // Entretenimiento (subcategoría de activity)
   | 'nature' // Naturaleza / Parques (subcategoría de activity)
-  | 'relaxation' // Descanso / Spa (subcategoría de activity)
   | 'transport' // Transporte / Traslados (categoría base)
   | 'nightlife' // Vida nocturna (subcategoría de activity)
   | 'sports' // Deportes / Actividades (subcategoría de activity)
@@ -87,6 +86,7 @@ export interface EventoPersonalizado {
   notas?: string;
   completado: boolean;
   prioridad: PrioridadEvento;
+  firestoreId?: string | null; // ID en Firestore para viajes compartidos
   createdAt: string;
   updatedAt: string;
 }
@@ -142,83 +142,76 @@ export const EVENTO_CATEGORIAS: Record<
     bgColor: string;
   }
 > = {
-  // Subcategorías de actividad (color púrpura #8B5CF6)
+  // Subcategorías de actividad - cada una con su propio color
   sightseeing: {
     label: 'Turismo y visitas',
     labelCorto: ACTIVITY_SUBTYPES.sightseeing.label,
     icon: 'camera-outline',
-    color: BASE_CATEGORIES.activity.color,
-    bgColor: BASE_CATEGORIES.activity.bgColor,
+    color: '#8B5CF6', // Púrpura
+    bgColor: 'rgba(139, 92, 246, 0.1)',
   },
   culture: {
     label: 'Cultura y museos',
     labelCorto: ACTIVITY_SUBTYPES.culture.label,
     icon: 'library-outline',
-    color: BASE_CATEGORIES.activity.color,
-    bgColor: BASE_CATEGORIES.activity.bgColor,
+    color: '#06B6D4', // Cian
+    bgColor: 'rgba(6, 182, 212, 0.1)',
   },
   sports: {
     label: 'Deportes y actividades',
     labelCorto: ACTIVITY_SUBTYPES.sports.label,
     icon: 'fitness-outline',
-    color: BASE_CATEGORIES.activity.color,
-    bgColor: BASE_CATEGORIES.activity.bgColor,
+    color: '#EF4444', // Rojo
+    bgColor: 'rgba(239, 68, 68, 0.1)',
   },
   nature: {
     label: 'Naturaleza y parques',
     labelCorto: ACTIVITY_SUBTYPES.nature.label,
     icon: 'leaf-outline',
-    color: BASE_CATEGORIES.activity.color,
-    bgColor: BASE_CATEGORIES.activity.bgColor,
+    color: '#10B981', // Verde
+    bgColor: 'rgba(16, 185, 129, 0.1)',
   },
   entertainment: {
     label: 'Entretenimiento',
     labelCorto: ACTIVITY_SUBTYPES.entertainment.label,
     icon: 'game-controller-outline',
-    color: BASE_CATEGORIES.activity.color,
-    bgColor: BASE_CATEGORIES.activity.bgColor,
+    color: '#F59E0B', // Amarillo/Naranja
+    bgColor: 'rgba(245, 158, 11, 0.1)',
   },
   nightlife: {
     label: 'Vida nocturna',
     labelCorto: ACTIVITY_SUBTYPES.nightlife.label,
     icon: 'moon-outline',
-    color: BASE_CATEGORIES.activity.color,
-    bgColor: BASE_CATEGORIES.activity.bgColor,
-  },
-  relaxation: {
-    label: 'Descanso y relax',
-    labelCorto: ACTIVITY_SUBTYPES.relaxation.label,
-    icon: 'bed-outline',
-    color: BASE_CATEGORIES.activity.color,
-    bgColor: BASE_CATEGORIES.activity.bgColor,
+    color: '#6366F1', // Índigo
+    bgColor: 'rgba(99, 102, 241, 0.1)',
   },
   // Categorías base
   food: {
     label: 'Comida y restaurantes',
     labelCorto: BASE_CATEGORIES.food.label,
     icon: 'restaurant-outline',
-    color: BASE_CATEGORIES.food.color,
+    color: BASE_CATEGORIES.food.color, // Naranja #EA580C
     bgColor: BASE_CATEGORIES.food.bgColor,
   },
   shopping: {
     label: BASE_CATEGORIES.shopping.label,
     labelCorto: BASE_CATEGORIES.shopping.label,
     icon: 'bag-outline',
-    color: BASE_CATEGORIES.shopping.color,
+    color: BASE_CATEGORIES.shopping.color, // Rosa #EC4899
     bgColor: BASE_CATEGORIES.shopping.bgColor,
   },
   transport: {
     label: 'Transporte y traslados',
     labelCorto: BASE_CATEGORIES.transport.label,
     icon: 'car-outline',
-    color: BASE_CATEGORIES.transport.color,
+    color: BASE_CATEGORIES.transport.color, // Azul #0066CC
     bgColor: BASE_CATEGORIES.transport.bgColor,
   },
   other: {
     label: BASE_CATEGORIES.other.label,
     labelCorto: BASE_CATEGORIES.other.label,
     icon: 'ellipsis-horizontal-outline',
-    color: BASE_CATEGORIES.other.color,
+    color: BASE_CATEGORIES.other.color, // Gris #6B7280
     bgColor: BASE_CATEGORIES.other.bgColor,
   },
 };

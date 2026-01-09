@@ -23,6 +23,7 @@ import type { Reserva } from '@/types/reserva';
 import type { Lugar } from '@/types/lugar';
 import type { Gasto } from '@/types/gasto';
 import type { Documento } from '@/types/documento';
+import type { EventoPersonalizado } from '@/types/evento';
 
 // ============================================
 // TIPOS
@@ -104,7 +105,7 @@ export async function uploadReserva(
 
       // Otros
       notas: reserva.notas || null,
-      metadatos: reserva.metadatos || null,
+      metadatos: reserva.metadatos ? JSON.stringify(reserva.metadatos) : null,
 
       // Referencias
       localId: reserva.id,
@@ -192,6 +193,92 @@ export async function uploadLugar(
     return result;
   } catch (error: any) {
     logError(error, 'uploadLugar');
+    result.error = error.message;
+    return result;
+  }
+}
+
+// ============================================
+// UPLOAD DE EVENTOS PERSONALIZADOS
+// ============================================
+
+/**
+ * Sube un evento personalizado a Firestore
+ */
+export async function uploadEvento(
+  evento: EventoPersonalizado,
+  tripFirestoreId: string
+): Promise<UploadResult> {
+  const result: UploadResult = { success: false, firestoreId: null };
+
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      result.error = 'Usuario no autenticado';
+      return result;
+    }
+
+    const firestoreId = evento.firestoreId || evento.id;
+    const eventoRef = doc(firestoreDb, 'trips', tripFirestoreId, 'events', firestoreId);
+
+    // Obtener la fecha del día si hay diaId (para mapeo correcto en otros usuarios)
+    let diaFecha: string | null = null;
+    if (evento.diaId) {
+      const db = await getDatabase();
+      const dia = await db.getFirstAsync<{ fecha: string }>(
+        'SELECT fecha FROM dias_viaje WHERE id = ?',
+        [evento.diaId]
+      );
+      diaFecha = dia?.fecha || null;
+    }
+
+    await setDoc(eventoRef, {
+      nombre: evento.nombre,
+      descripcion: evento.descripcion || null,
+      categoria: evento.categoria,
+
+      // Fechas y horas
+      horaInicio: evento.horaInicio || null,
+      horaFin: evento.horaFin || null,
+      duracionMinutos: evento.duracionMinutos || null,
+
+      // Ubicación
+      ubicacion: evento.ubicacion || null,
+      direccion: evento.direccion || null,
+      latitud: evento.latitud || null,
+      longitud: evento.longitud || null,
+
+      // Estado
+      completado: Boolean(evento.completado),
+      prioridad: evento.prioridad || 'media',
+
+      // Notas
+      notas: evento.notas || null,
+
+      // Referencias
+      localId: evento.id,
+      diaId: diaFecha, // Guardar la fecha del día en lugar del ID local
+      lugarId: evento.lugarId || null,
+
+      // Auditoría
+      createdBy: user.uid,
+      updatedBy: user.uid,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      deletedAt: null,
+    }, { merge: true });
+
+    if (!evento.firestoreId) {
+      await updateLocalFirestoreId('eventos_personalizados', evento.id, firestoreId);
+    }
+
+    result.success = true;
+    result.firestoreId = firestoreId;
+    console.log('[SyncUpload] Evento subido:', evento.nombre, '->', firestoreId);
+
+    return result;
+  } catch (error: any) {
+    logError(error, 'uploadEvento');
     result.error = error.message;
     return result;
   }
@@ -361,7 +448,7 @@ export async function linkDocumentToReservationInFirestore(
  */
 export async function markDeletedInFirestore(
   tripFirestoreId: string,
-  collectionName: 'reservations' | 'places' | 'expenses' | 'documents',
+  collectionName: 'reservations' | 'places' | 'expenses' | 'documents' | 'events',
   entityFirestoreId: string
 ): Promise<boolean> {
   try {
@@ -452,6 +539,20 @@ export async function syncGastoIfShared(gasto: Gasto): Promise<void> {
 }
 
 /**
+ * Sincroniza un evento personalizado si el viaje es compartido
+ */
+export async function syncEventoIfShared(evento: EventoPersonalizado): Promise<void> {
+  try {
+    const tripFirestoreId = await getSharedTripFirestoreId(evento.viajeId);
+    if (tripFirestoreId) {
+      await uploadEvento(evento, tripFirestoreId);
+    }
+  } catch (error) {
+    console.warn('[SyncUpload] Error sincronizando evento:', error);
+  }
+}
+
+/**
  * Sincroniza un documento si el viaje es compartido
  */
 export async function syncDocumentoIfShared(documento: Documento): Promise<string | null> {
@@ -497,7 +598,7 @@ export async function syncDocumentLinkIfShared(
  */
 export async function syncDeleteIfShared(
   viajeId: string,
-  collectionName: 'reservations' | 'places' | 'expenses' | 'documents',
+  collectionName: 'reservations' | 'places' | 'expenses' | 'documents' | 'events',
   entityFirestoreId: string | null
 ): Promise<void> {
   if (!entityFirestoreId) return;
