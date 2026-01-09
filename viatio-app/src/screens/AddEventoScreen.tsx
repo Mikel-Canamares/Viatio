@@ -29,7 +29,7 @@ import {
   EventoCategoriaSelector,
   DayPicker,
   useDiasViaje,
-  TimePickerInput,
+  TimeInput,
 } from '@/components';
 import type { DiaViaje } from '@/components';
 import { useEventosStore } from '@/store/eventosStore';
@@ -498,17 +498,17 @@ export function AddEventoScreen() {
           <View style={styles.section}>
             <SectionHeader title="Horario (opcional)" />
             <View style={styles.sectionContent}>
-              <TimePickerInput
+              <TimeInput
                 label="Hora de inicio"
-                value={horaInicio}
-                onChange={setHoraInicio}
+                value={horaInicio || ''}
+                onChangeTime={(time) => setHoraInicio(time || undefined)}
                 placeholder="Seleccionar hora"
               />
 
-              <TimePickerInput
+              <TimeInput
                 label="Hora de fin"
-                value={horaFin}
-                onChange={setHoraFin}
+                value={horaFin || ''}
+                onChangeTime={(time) => setHoraFin(time || undefined)}
                 placeholder="Seleccionar hora"
               />
             </View>

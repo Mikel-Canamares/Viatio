@@ -136,7 +136,6 @@ export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
       shopping: 'activity',
       entertainment: 'activity',
       nature: 'activity',
-      relaxation: 'activity',
       transport: 'transport',
       nightlife: 'activity',
       sports: 'activity',

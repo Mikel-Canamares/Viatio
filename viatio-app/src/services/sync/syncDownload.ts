@@ -25,6 +25,7 @@ import type { Reserva } from '@/types/reserva';
 import type { Lugar } from '@/types/lugar';
 import type { Gasto } from '@/types/gasto';
 import type { CategoriaDocumento, TipoArchivo } from '@/types/documento';
+import type { CategoriaEvento, PrioridadEvento } from '@/types/evento';
 
 // ============================================
 // TIPOS
@@ -117,6 +118,28 @@ interface FirestoreDocument {
   deletedAt: Timestamp | null;
 }
 
+interface FirestoreEvent {
+  nombre: string;
+  descripcion: string | null;
+  categoria: CategoriaEvento;
+  horaInicio: string | null;
+  horaFin: string | null;
+  duracionMinutos: number | null;
+  ubicacion: string | null;
+  direccion: string | null;
+  latitud: number | null;
+  longitud: number | null;
+  completado: boolean;
+  prioridad: PrioridadEvento;
+  notas: string | null;
+  localId: string;
+  diaId: string | null;
+  lugarId: string | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  deletedAt: Timestamp | null;
+}
+
 export interface DownloadResult {
   success: boolean;
   viaje: Viaje | null;
@@ -125,6 +148,7 @@ export interface DownloadResult {
     places: number;
     expenses: number;
     documents: number;
+    events: number;
   };
   error?: string;
 }
@@ -148,7 +172,7 @@ export async function downloadSharedTrip(
   const result: DownloadResult = {
     success: false,
     viaje: null,
-    stats: { reservations: 0, places: 0, expenses: 0, documents: 0 },
+    stats: { reservations: 0, places: 0, expenses: 0, documents: 0, events: 0 },
   };
 
   try {
@@ -327,6 +351,18 @@ async function downloadSubcollectionsWithRetry(
       result.stats.documents++;
     }
     console.log('[SyncDownload] Documentos descargados:', result.stats.documents);
+
+    // Descargar eventos personalizados
+    const eventsRef = collection(firestoreDb, 'trips', firestoreId, 'events');
+    const eventsQuery = query(eventsRef, where('deletedAt', '==', null));
+    const eventsSnap = await getDocs(eventsQuery);
+
+    for (const eventDoc of eventsSnap.docs) {
+      const eventData = eventDoc.data() as FirestoreEvent;
+      await createLocalEvento(eventData, viajeId, eventDoc.id, diasMap, placeIdMap);
+      result.stats.events++;
+    }
+    console.log('[SyncDownload] Eventos descargados:', result.stats.events);
 
   } catch (error: any) {
     const isPermissionError = error.message?.includes('permission') ||
@@ -651,6 +687,58 @@ async function createLocalDocumento(
       docData.tipoArchivo,
       fileName,
       docData.tamano,
+      firestoreId,
+      now,
+      now,
+    ]
+  );
+
+  return id;
+}
+
+/**
+ * Crea un evento personalizado en SQLite a partir de datos de Firestore
+ */
+async function createLocalEvento(
+  eventData: FirestoreEvent,
+  viajeId: string,
+  firestoreId: string,
+  diasMap: Map<string, string>,
+  placeIdMap: Map<string, string>
+): Promise<string> {
+  const db = await getDatabase();
+  const id = generateId();
+  const now = getCurrentTimestamp();
+
+  // Mapear diaId y lugarId si existen
+  const localDiaId = eventData.diaId ? diasMap.get(eventData.diaId) || null : null;
+  const localLugarId = eventData.lugarId ? placeIdMap.get(eventData.lugarId) || null : null;
+
+  await db.runAsync(
+    `INSERT INTO eventos_personalizados (
+      id, viajeId, diaId, nombre, descripcion, categoria,
+      horaInicio, horaFin, duracionMinutos, ubicacion, direccion,
+      latitud, longitud, lugarId, notas, completado, prioridad,
+      firestoreId, createdAt, updatedAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      viajeId,
+      localDiaId,
+      eventData.nombre,
+      eventData.descripcion,
+      eventData.categoria,
+      eventData.horaInicio,
+      eventData.horaFin,
+      eventData.duracionMinutos,
+      eventData.ubicacion,
+      eventData.direccion,
+      eventData.latitud,
+      eventData.longitud,
+      localLugarId,
+      eventData.notas,
+      eventData.completado ? 1 : 0,
+      eventData.prioridad || 'media',
       firestoreId,
       now,
       now,

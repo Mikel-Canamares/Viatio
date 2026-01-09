@@ -298,6 +298,11 @@ export default function AddReservationScreen({ route, navigation }: Props) {
         throw new Error('Categoría y nombre son requeridos');
       }
 
+      // DEBUG: Verificar metadatos antes de crear reserva
+      console.log('[AddReservation] formData.metadatos:', formData.metadatos);
+      console.log('[AddReservation] formData.metadatos (JSON):', JSON.stringify(formData.metadatos));
+      console.log('[AddReservation] Tipo de metadatos:', typeof formData.metadatos);
+
       // Crear la reserva (sin documentoId, ya que usaremos la tabla intermedia)
       const input: CreateReservaInput = {
         viajeId,

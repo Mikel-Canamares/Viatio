@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,6 +33,11 @@ import { getViajeById } from '@/services/viajesService';
 import { theme } from '@/config';
 import type { HomeStackParamList } from '@/navigation/types';
 
+// Habilitar LayoutAnimation en Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
 // ============================================
 // TIPOS
 // ============================================
@@ -55,6 +60,7 @@ export function ExpensesScreen() {
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingViaje, setLoadingViaje] = useState(true);
+  const [expandedCategories, setExpandedCategories] = useState<Record<CategoriaGasto, boolean>>({} as Record<CategoriaGasto, boolean>);
 
   // Stores para gastos individuales (SQLite)
   const { gastos, resumen, loading: loadingGastos, fetchGastos, fetchResumen } = useGastosStore();
@@ -240,6 +246,14 @@ export function ExpensesScreen() {
     }
   };
 
+  const toggleCategory = (categoria: CategoriaGasto) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedCategories(prev => ({
+      ...prev,
+      [categoria]: !prev[categoria],
+    }));
+  };
+
   // ============================================
   // LOADING STATE
   // ============================================
@@ -312,42 +326,6 @@ export function ExpensesScreen() {
             </Text>
           </View>
 
-          {/* Balances */}
-          {balances.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Balances</Text>
-              <BalancesList
-                balances={balances}
-                currency={currency}
-              />
-            </View>
-          )}
-
-          {/* Sugerencias de liquidación */}
-          {settlementSuggestions.length > 0 && (
-            <View style={styles.section}>
-              <SettlementSuggestions
-                suggestions={settlementSuggestions}
-                currency={currency}
-                onSettlePress={(suggestion) => {
-                  navigation.navigate('RecordSettlement', {
-                    viajeId,
-                    firestoreId,
-                    fromUid: suggestion.fromUid,
-                    toUid: suggestion.toUid,
-                    amount: suggestion.amount,
-                  });
-                }}
-              />
-            </View>
-          )}
-
-          {/* Botón para ver todas las liquidaciones */}
-          <Pressable style={styles.settlementsLink} onPress={handleViewSettlements}>
-            <Text style={styles.settlementsLinkText}>Ver liquidaciones</Text>
-            <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} />
-          </Pressable>
-
           {/* Historial de gastos agrupados por categoría */}
           <View style={styles.historialHeader}>
             <Text style={styles.historialTitle}>Historial</Text>
@@ -357,11 +335,18 @@ export function ExpensesScreen() {
             const gastosDeCategoria = sharedExpensesPorCategoria[categoria];
             const totalCategoria = gastosDeCategoria.reduce((sum, e) => sum + e.amount, 0);
             const categoriaInfo = GASTO_CATEGORIAS[categoria];
+            const isExpanded = expandedCategories[categoria];
 
             return (
               <View key={categoria} style={styles.categoryGroup}>
                 {/* Header de categoría */}
-                <Pressable style={styles.categoryHeader}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.categoryHeader,
+                    pressed && styles.categoryHeaderPressed,
+                  ]}
+                  onPress={() => toggleCategory(categoria)}
+                >
                   <View style={[styles.categoryIcon, { backgroundColor: categoriaInfo.color + '20' }]}>
                     <Ionicons
                       name={categoriaInfo.icon as keyof typeof Ionicons.glyphMap}
@@ -378,10 +363,16 @@ export function ExpensesScreen() {
                   <Text style={styles.categoryTotal}>
                     {centsToDisplay(totalCategoria, currency)}
                   </Text>
+                  <Ionicons
+                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                    size={20}
+                    color={theme.colors.textSecondary}
+                    style={styles.categoryChevron}
+                  />
                 </Pressable>
 
-                {/* Lista de gastos de esta categoría */}
-                {gastosDeCategoria.map((expense) => {
+                {/* Lista de gastos de esta categoría - Solo visible cuando está expandido */}
+                {isExpanded && gastosDeCategoria.map((expense) => {
                   const isPayer = expense.paidByUid === user?.uid;
                   const myShare = expense.shares.find(s => s.uid === user?.uid);
                   let myImpact = 0;
@@ -423,6 +414,42 @@ export function ExpensesScreen() {
               </View>
             );
           })}
+
+          {/* Balances */}
+          {balances.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Balances</Text>
+              <BalancesList
+                balances={balances}
+                currency={currency}
+              />
+            </View>
+          )}
+
+          {/* Sugerencias de liquidación */}
+          {settlementSuggestions.length > 0 && (
+            <View style={styles.section}>
+              <SettlementSuggestions
+                suggestions={settlementSuggestions}
+                currency={currency}
+                onSettlePress={(suggestion) => {
+                  navigation.navigate('RecordSettlement', {
+                    viajeId,
+                    firestoreId,
+                    fromUid: suggestion.fromUid,
+                    toUid: suggestion.toUid,
+                    amount: suggestion.amount,
+                  });
+                }}
+              />
+            </View>
+          )}
+
+          {/* Botón para ver todas las liquidaciones */}
+          <Pressable style={styles.settlementsLink} onPress={handleViewSettlements}>
+            <Text style={styles.settlementsLinkText}>Ver liquidaciones</Text>
+            <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} />
+          </Pressable>
 
           <View style={styles.bottomSpacer} />
         </ScrollView>
@@ -604,8 +631,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+  },
+  categoryHeaderPressed: {
+    backgroundColor: theme.colors.secondary,
   },
   categoryIcon: {
     width: 40,
@@ -632,6 +660,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: theme.colors.text,
+    marginRight: theme.spacing.xs,
+  },
+  categoryChevron: {
+    marginLeft: theme.spacing.xs,
   },
   expenseItem: {
     flexDirection: 'row',

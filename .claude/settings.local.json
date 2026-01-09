@@ -21,7 +21,9 @@
       "Bash(python3:*)",
       "Bash(ls:*)",
       "Bash(grep:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)"
     ]
   }
 }

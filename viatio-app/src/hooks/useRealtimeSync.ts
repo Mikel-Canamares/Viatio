@@ -17,6 +17,7 @@ import { useEffect, useState, useRef } from 'react';
 import { subscribeToReservations } from '@/services/sync/syncRealtimeReservations';
 import { subscribeToPlaces } from '@/services/sync/syncRealtimePlaces';
 import { subscribeToDocuments } from '@/services/sync/syncRealtimeDocuments';
+import { subscribeToEvents } from '@/services/sync/syncRealtimeEvents';
 import { subscribeToExpenses } from '@/services/firestore/expensesService';
 import type { SharedExpense } from '@/types/shared';
 
@@ -33,6 +34,8 @@ export interface RealtimeSyncOptions {
   onPlacesChange?: () => void;
   /** Callback cuando se detectan cambios en documentos */
   onDocumentsChange?: () => void;
+  /** Callback cuando se detectan cambios en eventos personalizados */
+  onEventsChange?: () => void;
   /** Callback cuando se detectan cambios en gastos */
   onExpensesChange?: (expenses: SharedExpense[]) => void;
 }
@@ -71,6 +74,7 @@ export function useRealtimeSync(
     onReservationsChange,
     onPlacesChange,
     onDocumentsChange,
+    onEventsChange,
     onExpensesChange,
   } = options;
 
@@ -79,6 +83,7 @@ export function useRealtimeSync(
     onReservationsChange,
     onPlacesChange,
     onDocumentsChange,
+    onEventsChange,
     onExpensesChange,
   });
 
@@ -88,9 +93,10 @@ export function useRealtimeSync(
       onReservationsChange,
       onPlacesChange,
       onDocumentsChange,
+      onEventsChange,
       onExpensesChange,
     };
-  }, [onReservationsChange, onPlacesChange, onDocumentsChange, onExpensesChange]);
+  }, [onReservationsChange, onPlacesChange, onDocumentsChange, onEventsChange, onExpensesChange]);
 
   useEffect(() => {
     // Solo activar si el viaje es compartido, hay firestoreId y está enabled
@@ -153,6 +159,22 @@ export function useRealtimeSync(
       console.log('[useRealtimeSync] ✓ Listener de documentos activado');
     } catch (error) {
       console.error('[useRealtimeSync] Error en listener de documentos:', error);
+    }
+
+    // Listener de eventos personalizados
+    try {
+      const unsubEvents = subscribeToEvents(
+        firestoreId,
+        viajeId,
+        () => {
+          // Usar el callback del ref (siempre la versión más reciente)
+          callbacksRef.current.onEventsChange?.();
+        }
+      );
+      unsubscribers.push(unsubEvents);
+      console.log('[useRealtimeSync] ✓ Listener de eventos activado');
+    } catch (error) {
+      console.error('[useRealtimeSync] Error en listener de eventos:', error);
     }
 
     // Listener de gastos (ya existe en expensesService)

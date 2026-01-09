@@ -102,7 +102,7 @@ export function TimeInput({
             value={dateValue}
             mode="time"
             is24Hour={true}
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            display="spinner"
             onChange={handleChange}
           />
           {/* iOS: Botón para cerrar */}

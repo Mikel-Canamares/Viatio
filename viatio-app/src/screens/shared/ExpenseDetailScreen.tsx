@@ -8,7 +8,8 @@ import {
   Image,
   Alert,
 } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer, PageHeader, Card } from '@/components';
 import { useSharedTripsStore } from '@/store/sharedTripsStore';
@@ -42,16 +43,19 @@ export default function ExpenseDetailScreen() {
   const canEdit = isCreator || hasPermission(currentUserRole, 'canEditAnyExpense');
   const canDelete = isCreator || hasPermission(currentUserRole, 'canDeleteAnyExpense');
 
-  useEffect(() => {
-    loadExpense();
-  }, [expenseId]);
-
-  const loadExpense = async () => {
+  const loadExpense = useCallback(async () => {
     setLoading(true);
     const data = await getExpenseById(tripId, expenseId);
     setExpense(data);
     setLoading(false);
-  };
+  }, [tripId, expenseId, getExpenseById]);
+
+  // Recargar el gasto cada vez que la pantalla gana foco
+  useFocusEffect(
+    useCallback(() => {
+      loadExpense();
+    }, [loadExpense])
+  );
 
   const handleEdit = () => {
     navigation.navigate('AddSharedExpense', { tripId, expenseId });

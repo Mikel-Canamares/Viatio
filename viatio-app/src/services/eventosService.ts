@@ -13,6 +13,7 @@ import {
   CategoriaEvento,
 } from '@/types/evento';
 import { logError } from '@/utils/errorHandler';
+import { syncEventoIfShared, syncDeleteIfShared } from '@/services/sync/syncUpload';
 
 // ============================================
 // MAPEO DE BASE DE DATOS
@@ -37,6 +38,7 @@ function mapRowToEvento(row: any): EventoPersonalizado {
     notas: row.notas || undefined,
     completado: row.completado === 1,
     prioridad: row.prioridad || 'media',
+    firestoreId: row.firestoreId || undefined,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -91,6 +93,9 @@ export async function createEvento(
     if (!evento) {
       throw new Error('Error al crear evento');
     }
+
+    // Sincronizar con Firestore si el viaje es compartido
+    await syncEventoIfShared(evento);
 
     return evento;
   } catch (error) {
@@ -297,7 +302,14 @@ export async function updateEvento(
       values
     );
 
-    return await getEventoById(id);
+    const updated = await getEventoById(id);
+
+    // Sincronizar con Firestore si el viaje es compartido
+    if (updated) {
+      await syncEventoIfShared(updated);
+    }
+
+    return updated;
   } catch (error) {
     logError(error, 'eventosService.updateEvento');
     throw error;
@@ -310,7 +322,17 @@ export async function updateEvento(
 export async function deleteEvento(id: string): Promise<boolean> {
   try {
     const db = await getDatabase();
+
+    // Obtener el evento antes de eliminarlo para la sincronización
+    const evento = await getEventoById(id);
+
     await db.runAsync('DELETE FROM eventos_personalizados WHERE id = ?', [id]);
+
+    // Sincronizar eliminación con Firestore si el viaje es compartido
+    if (evento?.firestoreId) {
+      await syncDeleteIfShared(evento.viajeId, 'events', evento.firestoreId);
+    }
+
     return true;
   } catch (error) {
     logError(error, 'eventosService.deleteEvento');
