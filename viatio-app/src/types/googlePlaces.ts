@@ -58,6 +58,17 @@ export interface GooglePlace {
 }
 
 // ============================================
+// NIVELES DE DETALLE PARA PLACES API
+// ============================================
+
+export enum PlaceDetailLevel {
+  ESSENTIALS = 'ESSENTIALS',           // Solo campos básicos (id, address, location, types, photos)
+  PRO = 'PRO',                         // + displayName, primaryType, googleMapsUri
+  ENTERPRISE_BASIC = 'ENTERPRISE_BASIC', // + rating, priceLevel, openingHours
+  ENTERPRISE_FULL = 'ENTERPRISE_FULL'   // + phone, website, editorialSummary
+}
+
+// ============================================
 // TIPOS SIMPLIFICADOS PARA LA APP
 // ============================================
 
@@ -68,19 +79,21 @@ export interface PlaceResult {
   shortAddress?: string;
   latitude: number;
   longitude: number;
-  rating?: number;
-  totalRatings?: number;
-  priceLevel?: number;
   types: string[];
   primaryType?: string;
   primaryTypeLabel?: string;
   photoReference?: string; // Para construir URL de foto (primera foto)
   photoReferences?: string[]; // Array de todas las fotos disponibles
+  googleMapsUrl?: string;
+
+  // CAMPOS ENTERPRISE (opcionales, se cargan bajo demanda)
+  rating?: number;
+  totalRatings?: number;
+  priceLevel?: number;
   isOpen?: boolean;
   openingHours?: string[];
   phone?: string;
   website?: string;
-  googleMapsUrl?: string;
   description?: string;
 }
 
