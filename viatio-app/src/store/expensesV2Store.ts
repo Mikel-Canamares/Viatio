@@ -46,7 +46,7 @@ interface ExpensesV2State {
   unsubscribeExpenses: () => void;
   addExpense: (tripId: string, input: CreateExpenseInput, members: TripMember[]) => Promise<SharedExpense | null>;
   editExpense: (tripId: string, expenseId: string, updates: Partial<CreateExpenseInput>, members: TripMember[]) => Promise<boolean>;
-  removeExpense: (tripId: string, expenseId: string) => Promise<boolean>;
+  removeExpense: (tripId: string, expenseId: string, members: TripMember[]) => Promise<boolean>;
   selectExpense: (expense: SharedExpense | null) => void;
   getExpenseById: (tripId: string, expenseId: string) => Promise<SharedExpense | null>;
 
@@ -56,7 +56,7 @@ interface ExpensesV2State {
   // Liquidaciones
   fetchSettlements: (tripId: string) => Promise<void>;
   addSettlement: (tripId: string, input: Parameters<typeof createSettlement>[1], members: TripMember[]) => Promise<Settlement | null>;
-  markSettlementComplete: (tripId: string, settlementId: string) => Promise<boolean>;
+  markSettlementComplete: (tripId: string, settlementId: string, members: TripMember[]) => Promise<boolean>;
   removeSettlement: (tripId: string, settlementId: string) => Promise<boolean>;
 
   // Reset
@@ -83,7 +83,8 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const expenses = await getTripExpenses(tripId);
-      const balances = calculateBalances(expenses, members);
+      const { settlements } = get();
+      const balances = calculateBalances(expenses, members, settlements);
       const settlementSuggestions = calculateSettlementSuggestions(balances);
       const summary = calculateExpensesSummary(expenses);
 
@@ -109,7 +110,8 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
     const unsubscribe = subscribeToExpenses(
       tripId,
       (expenses) => {
-        const balances = calculateBalances(expenses, members);
+        const { settlements } = get();
+        const balances = calculateBalances(expenses, members, settlements);
         const settlementSuggestions = calculateSettlementSuggestions(balances);
         const summary = calculateExpensesSummary(expenses);
 
@@ -141,7 +143,7 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
       if (expense) {
         set((state) => {
           const newExpenses = [expense, ...state.expenses];
-          const balances = calculateBalances(newExpenses, members);
+          const balances = calculateBalances(newExpenses, members, state.settlements);
           const settlementSuggestions = calculateSettlementSuggestions(balances);
           const summary = calculateExpensesSummary(newExpenses);
 
@@ -170,7 +172,7 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
           const newExpenses = state.expenses.map((e) =>
             e.id === expenseId ? updated : e
           );
-          const balances = calculateBalances(newExpenses, members);
+          const balances = calculateBalances(newExpenses, members, state.settlements);
           const settlementSuggestions = calculateSettlementSuggestions(balances);
           const summary = calculateExpensesSummary(newExpenses);
 
@@ -192,14 +194,23 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
     }
   },
 
-  removeExpense: async (tripId, expenseId) => {
+  removeExpense: async (tripId, expenseId, members) => {
     try {
       const success = await deleteExpense(tripId, expenseId);
       if (success) {
         set((state) => {
           const newExpenses = state.expenses.filter((e) => e.id !== expenseId);
+
+          // Recalcular balances y sugerencias con los gastos actualizados
+          const balances = calculateBalances(newExpenses, members, state.settlements);
+          const settlementSuggestions = calculateSettlementSuggestions(balances);
+          const summary = calculateExpensesSummary(newExpenses);
+
           return {
             expenses: newExpenses,
+            balances,
+            settlementSuggestions,
+            summary,
             selectedExpense: state.selectedExpense?.id === expenseId ? null : state.selectedExpense,
           };
         });
@@ -225,8 +236,8 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
   },
 
   recalculateBalances: (members) => {
-    const { expenses } = get();
-    const balances = calculateBalances(expenses, members);
+    const { expenses, settlements } = get();
+    const balances = calculateBalances(expenses, members, settlements);
     const settlementSuggestions = calculateSettlementSuggestions(balances);
     set({ balances, settlementSuggestions });
   },
@@ -238,7 +249,14 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
   fetchSettlements: async (tripId) => {
     try {
       const settlements = await getTripSettlements(tripId);
-      set({ settlements });
+      set((state) => {
+        // Recalcular balances con los settlements actualizados
+        // Necesitamos members para esto, pero solo recalculamos si ya hay datos cargados
+        if (state.expenses.length > 0) {
+          return { settlements };
+        }
+        return { settlements };
+      });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Error desconocido';
       set({ error: message });
@@ -247,11 +265,34 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
 
   addSettlement: async (tripId, input, members) => {
     try {
+      // Validar que no exista un settlement pendiente idéntico
+      const { settlements } = get();
+      const duplicatePending = settlements.find(
+        s => s.status === 'pending' &&
+             s.fromUid === input.fromUid &&
+             s.toUid === input.toUid &&
+             s.amount === input.amount
+      );
+
+      if (duplicatePending) {
+        throw new Error('Ya existe un pago pendiente idéntico');
+      }
+
       const settlement = await createSettlement(tripId, input, members);
       if (settlement) {
-        set((state) => ({
-          settlements: [settlement, ...state.settlements],
-        }));
+        set((state) => {
+          const updatedSettlements = [settlement, ...state.settlements];
+
+          // Recalcular balances con el nuevo settlement
+          const balances = calculateBalances(state.expenses, members, updatedSettlements);
+          const settlementSuggestions = calculateSettlementSuggestions(balances);
+
+          return {
+            settlements: updatedSettlements,
+            balances,
+            settlementSuggestions,
+          };
+        });
       }
       return settlement;
     } catch (error: unknown) {
@@ -261,17 +302,28 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
     }
   },
 
-  markSettlementComplete: async (tripId, settlementId) => {
+  markSettlementComplete: async (tripId, settlementId, members) => {
     try {
       const success = await completeSettlement(tripId, settlementId);
       if (success) {
-        set((state) => ({
-          settlements: state.settlements.map((s) =>
+        // Actualizar el settlement y recalcular balances
+        set((state) => {
+          const updatedSettlements = state.settlements.map((s) =>
             s.id === settlementId
               ? { ...s, status: 'completed' as const, completedAt: new Date() }
               : s
-          ),
-        }));
+          );
+
+          // Recalcular balances con los settlements actualizados
+          const balances = calculateBalances(state.expenses, members, updatedSettlements);
+          const settlementSuggestions = calculateSettlementSuggestions(balances);
+
+          return {
+            settlements: updatedSettlements,
+            balances,
+            settlementSuggestions,
+          };
+        });
       }
       return success;
     } catch (error: unknown) {

@@ -68,9 +68,9 @@ export default function TripSettlementsScreen() {
         {
           text: 'Confirmar',
           onPress: async () => {
-            const success = await markSettlementComplete(tripId, settlement.id);
+            const success = await markSettlementComplete(tripId, settlement.id, members);
             if (success) {
-              showToast.success('Pago completado');
+              showToast.success('Pago completado', 'Los balances se han actualizado');
             }
           },
         },
