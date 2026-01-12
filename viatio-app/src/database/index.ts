@@ -8,5 +8,5 @@
  */
 
 export { initializeDatabase, getDatabase, closeDatabase } from './database';
-export { generateId, getCurrentTimestamp, clearDatabase } from './utils';
+export { generateId, getCurrentTimestamp, clearDatabase, deepCleanDatabase } from './utils';
 export { CURRENT_SCHEMA_VERSION } from './schema';

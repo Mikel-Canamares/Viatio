@@ -8,6 +8,7 @@ import {
   deleteDoc,
   query,
   orderBy,
+  onSnapshot,
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
@@ -170,4 +171,55 @@ export async function cancelSettlement(
     logError(error, 'settlementsService.cancelSettlement');
     return false;
   }
+}
+
+/**
+ * Suscribirse a cambios en settlements de un viaje en tiempo real
+ */
+export function subscribeToSettlements(
+  tripId: string,
+  onUpdate: (settlements: Settlement[]) => void,
+  onError?: (error: Error) => void
+): () => void {
+  const settlementsRef = collection(db, 'trips', tripId, 'settlements');
+  const q = query(settlementsRef, orderBy('createdAt', 'desc'));
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const settlements: Settlement[] = snapshot.docs
+        .filter(docSnap => {
+          const data = docSnap.data();
+          return data.createdAt !== null;
+        })
+        .map(docSnap => {
+          const data = docSnap.data() as SettlementDoc;
+          const createdAt = data.createdAt?.toDate() ?? new Date();
+          const completedAt = data.completedAt?.toDate() ?? null;
+
+          return {
+            id: docSnap.id,
+            tripId,
+            fromUid: data.fromUid,
+            fromName: data.fromName,
+            toUid: data.toUid,
+            toName: data.toName,
+            amount: data.amount,
+            currency: data.currency,
+            date: data.date,
+            notes: data.notes,
+            status: data.status,
+            createdBy: data.createdBy,
+            createdAt,
+            completedAt,
+          };
+        });
+
+      onUpdate(settlements);
+    },
+    (error) => {
+      logError(error, 'settlementsService.subscribeToSettlements');
+      onError?.(error);
+    }
+  );
 }

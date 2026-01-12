@@ -24,6 +24,7 @@ import {
   getTripSettlements,
   completeSettlement,
   cancelSettlement,
+  subscribeToSettlements,
 } from '@/services/firestore/settlementsService';
 
 interface ExpensesV2State {
@@ -39,11 +40,14 @@ interface ExpensesV2State {
 
   // Unsubscribe
   _unsubscribe: (() => void) | null;
+  _unsubscribeSettlements: (() => void) | null;
 
   // Acciones de gastos
   fetchExpenses: (tripId: string, members: TripMember[]) => Promise<void>;
   subscribeExpenses: (tripId: string, members: TripMember[]) => void;
   unsubscribeExpenses: () => void;
+  subscribeSettlementsRealtime: (tripId: string, members: TripMember[]) => void;
+  unsubscribeSettlementsRealtime: () => void;
   addExpense: (tripId: string, input: CreateExpenseInput, members: TripMember[]) => Promise<SharedExpense | null>;
   editExpense: (tripId: string, expenseId: string, updates: Partial<CreateExpenseInput>, members: TripMember[]) => Promise<boolean>;
   removeExpense: (tripId: string, expenseId: string, members: TripMember[]) => Promise<boolean>;
@@ -74,6 +78,7 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
   loading: false,
   error: null,
   _unsubscribe: null,
+  _unsubscribeSettlements: null,
 
   // ============================================
   // ACCIONES DE GASTOS
@@ -133,6 +138,39 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
     if (_unsubscribe) {
       _unsubscribe();
       set({ _unsubscribe: null });
+    }
+  },
+
+  subscribeSettlementsRealtime: (tripId, members) => {
+    const { _unsubscribeSettlements } = get();
+    if (_unsubscribeSettlements) {
+      _unsubscribeSettlements();
+    }
+
+    const unsubscribe = subscribeToSettlements(
+      tripId,
+      (settlements) => {
+        const { expenses } = get();
+        const balances = calculateBalances(expenses, members, settlements);
+        const settlementSuggestions = calculateSettlementSuggestions(balances);
+
+        set({
+          settlements,
+          balances,
+          settlementSuggestions,
+        });
+      },
+      (error) => set({ error: error.message })
+    );
+
+    set({ _unsubscribeSettlements: unsubscribe });
+  },
+
+  unsubscribeSettlementsRealtime: () => {
+    const { _unsubscribeSettlements } = get();
+    if (_unsubscribeSettlements) {
+      _unsubscribeSettlements();
+      set({ _unsubscribeSettlements: null });
     }
   },
 
@@ -354,8 +392,9 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
   // ============================================
 
   reset: () => {
-    const { unsubscribeExpenses } = get();
+    const { unsubscribeExpenses, unsubscribeSettlementsRealtime } = get();
     unsubscribeExpenses();
+    unsubscribeSettlementsRealtime();
     set({
       expenses: [],
       selectedExpense: null,

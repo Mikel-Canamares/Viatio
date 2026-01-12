@@ -71,6 +71,7 @@ export function ExpensesScreen() {
     balances,
     settlementSuggestions,
     subscribeExpenses,
+    subscribeSettlementsRealtime,
   } = useExpensesV2Store();
   const { members, fetchMembers } = useSharedTripsStore();
 
@@ -106,13 +107,14 @@ export function ExpensesScreen() {
     }
   }, [isShared, firestoreId]);
 
-  // Suscribirse a gastos cuando hay miembros cargados
+  // Suscribirse a gastos y settlements cuando hay miembros cargados
   useEffect(() => {
     if (!viaje) return;
 
     if (isShared && firestoreId && members.length > 0) {
       // Suscribirse a Firestore con los miembros
       subscribeExpenses(firestoreId, members);
+      subscribeSettlementsRealtime(firestoreId, members);
     } else if (!isShared) {
       // Cargar de SQLite
       fetchGastos(viajeId);
