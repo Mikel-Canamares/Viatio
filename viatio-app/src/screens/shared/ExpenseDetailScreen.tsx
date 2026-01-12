@@ -71,9 +71,9 @@ export default function ExpenseDetailScreen() {
           text: 'Eliminar',
           style: 'destructive',
           onPress: async () => {
-            const success = await removeExpense(tripId, expenseId);
+            const success = await removeExpense(tripId, expenseId, members);
             if (success) {
-              showToast.success('Gasto eliminado');
+              showToast.success('Gasto eliminado', 'Los balances se han actualizado');
               navigation.goBack();
             } else {
               showToast.error('Error', 'No se pudo eliminar el gasto');

@@ -22,6 +22,7 @@ import {
   MemberBalance,
   SettlementSuggestion,
   ExpensesSummary,
+  Settlement,
 } from '@/types/shared';
 import { TripMember } from '@/types/shared';
 import { generateId } from '@/database';
@@ -380,10 +381,12 @@ export async function deleteExpense(
 
 /**
  * Calcular balances de todos los miembros
+ * Considera tanto gastos como settlements completados
  */
 export function calculateBalances(
   expenses: SharedExpense[],
-  members: TripMember[]
+  members: TripMember[],
+  settlements: Settlement[] = []
 ): MemberBalance[] {
   // Inicializar balances
   const balances: Map<string, MemberBalance> = new Map();
@@ -415,6 +418,28 @@ export function calculateBalances(
       }
     });
   });
+
+  // Procesar settlements completados
+  // Los settlements son PAGOS REALES que liquidan deudas
+  // Cuando A paga X€ a B:
+  //  - A reduce su deuda (aumenta totalPaid)
+  //  - B reduce lo que le deben (aumenta totalOwed)
+  // Esto hace que ambos balances se acerquen a 0
+  settlements
+    .filter(s => s.status === 'completed')
+    .forEach(settlement => {
+      const fromBalance = balances.get(settlement.fromUid);
+      if (fromBalance) {
+        // El que paga salda parte de su deuda
+        fromBalance.totalPaid += settlement.amount;
+      }
+
+      const toBalance = balances.get(settlement.toUid);
+      if (toBalance) {
+        // El que recibe ya no se le debe tanto
+        toBalance.totalOwed += settlement.amount;
+      }
+    });
 
   // Calcular balance neto
   balances.forEach(balance => {
