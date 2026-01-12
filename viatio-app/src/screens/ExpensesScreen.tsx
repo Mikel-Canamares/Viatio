@@ -61,6 +61,7 @@ export function ExpensesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadingViaje, setLoadingViaje] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<Record<CategoriaGasto, boolean>>({} as Record<CategoriaGasto, boolean>);
+  const [balancesExpanded, setBalancesExpanded] = useState(true);
 
   // Stores para gastos individuales (SQLite)
   const { gastos, resumen, loading: loadingGastos, fetchGastos, fetchResumen } = useGastosStore();
@@ -256,6 +257,11 @@ export function ExpensesScreen() {
     }));
   };
 
+  const toggleBalances = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setBalancesExpanded(prev => !prev);
+  };
+
   // ============================================
   // LOADING STATE
   // ============================================
@@ -417,33 +423,29 @@ export function ExpensesScreen() {
             );
           })}
 
-          {/* Balances */}
+          {/* Balances - Desplegable */}
           {balances.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Balances</Text>
-              <BalancesList
-                balances={balances}
-                currency={currency}
-              />
-            </View>
-          )}
-
-          {/* Sugerencias de liquidación */}
-          {settlementSuggestions.length > 0 && (
-            <View style={styles.section}>
-              <SettlementSuggestions
-                suggestions={settlementSuggestions}
-                currency={currency}
-                onSettlePress={(suggestion) => {
-                  navigation.navigate('RecordSettlement', {
-                    viajeId,
-                    firestoreId,
-                    fromUid: suggestion.fromUid,
-                    toUid: suggestion.toUid,
-                    amount: suggestion.amount,
-                  });
-                }}
-              />
+            <View style={styles.balancesSection}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.balancesHeader,
+                  pressed && styles.balancesHeaderPressed,
+                ]}
+                onPress={toggleBalances}
+              >
+                <Text style={styles.sectionTitle}>Balances</Text>
+                <Ionicons
+                  name={balancesExpanded ? 'chevron-up' : 'chevron-down'}
+                  size={20}
+                  color={theme.colors.textSecondary}
+                />
+              </Pressable>
+              {balancesExpanded && (
+                <BalancesList
+                  balances={balances}
+                  currency={currency}
+                />
+              )}
             </View>
           )}
 
@@ -609,6 +611,21 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: theme.colors.text,
     marginBottom: theme.spacing.md,
+  },
+
+  // Balances desplegable
+  balancesSection: {
+    marginBottom: theme.spacing.lg,
+  },
+  balancesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+  },
+  balancesHeaderPressed: {
+    opacity: 0.7,
   },
 
   // Historial
