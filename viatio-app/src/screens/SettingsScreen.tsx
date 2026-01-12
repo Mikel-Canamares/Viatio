@@ -22,6 +22,7 @@ import { IDIOMAS_DISPONIBLES, MONEDAS_DISPONIBLES } from '@/types/perfil';
 import { theme } from '@/config';
 import { showToast } from '@/utils/toast';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { deepCleanDatabase } from '@/database';
 
 // Opciones de configuración
 const TEMAS_DISPONIBLES: SelectOption[] = [
@@ -151,6 +152,41 @@ export default function SettingsScreen() {
               showToast.success('Éxito', 'Caché limpiada correctamente');
             } catch (error) {
               showToast.error('Error', 'No se pudo limpiar la caché');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Limpiar base de datos completamente (DESARROLLO)
+  const handleDeepCleanDatabase = () => {
+    Alert.alert(
+      '🔥 LIMPIEZA PROFUNDA DE BASE DE DATOS',
+      '⚠️ ADVERTENCIA: Esta acción es IRREVERSIBLE.\n\nSe eliminará COMPLETAMENTE:\n• Todos tus viajes\n• Todas tus reservas\n• Todos tus lugares\n• Todos tus gastos\n• Todos tus documentos\n\nLa base de datos se recreará desde cero.\n\n¿Continuar?',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'LIMPIAR TODO',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              showToast.info('Limpiando...', 'Esto puede tardar unos segundos');
+              await deepCleanDatabase();
+              showToast.success('✅ Completado', 'Base de datos limpiada y recreada exitosamente');
+
+              // Instrucciones post-limpieza
+              Alert.alert(
+                '✅ Base de datos limpia',
+                'La base de datos se ha recreado completamente.\n\nPara mejores resultados:\n1. Cierra la app completamente\n2. Vuelve a abrirla\n3. Prueba creando un nuevo viaje',
+                [{ text: 'Entendido' }]
+              );
+            } catch (error) {
+              showToast.error('Error', 'No se pudo limpiar la base de datos');
+              console.error('[Settings] Error en deepClean:', error);
             }
           },
         },
@@ -296,6 +332,18 @@ export default function SettingsScreen() {
             label="Limpiar caché"
             value={cacheSize}
             onPress={handleClearCache}
+          />
+        </Card>
+
+        {/* DESARROLLO - Herramientas de debug */}
+        <SectionTitle title="🛠️ Desarrollo (Temporal)" />
+        <Card padding={0} style={styles.card}>
+          <ProfileMenuItem
+            icon="refresh-outline"
+            label="🔥 Limpiar base de datos"
+            value="Resetear SQLite completamente"
+            onPress={handleDeepCleanDatabase}
+            isDestructive
           />
         </Card>
 

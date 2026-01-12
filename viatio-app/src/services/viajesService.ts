@@ -198,14 +198,14 @@ export async function createViaje(
 // ============================================
 
 /**
- * Obtiene todos los viajes de un usuario
+ * Obtiene todos los viajes activos (no archivados) de un usuario
  */
 export async function getViajesByUsuario(usuarioId: string): Promise<Viaje[]> {
   try {
     const db = await getDatabase();
 
     const viajes = await db.getAllAsync<Viaje>(
-      'SELECT * FROM viajes WHERE usuarioId = ? ORDER BY fechaInicio DESC',
+      'SELECT * FROM viajes WHERE usuarioId = ? AND archived = 0 ORDER BY fechaInicio DESC',
       [usuarioId]
     );
 
