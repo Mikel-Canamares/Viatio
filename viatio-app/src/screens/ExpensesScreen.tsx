@@ -190,16 +190,10 @@ export function ExpensesScreen() {
   // Para viajes compartidos - calcular total y mis gastos
   const sharedTotal = sharedExpenses.reduce((sum, e) => sum + e.amount, 0);
 
-  // Calcular mis gastos reales: lo que pagué menos lo que me han devuelto en liquidaciones
-  const myPaid = sharedExpenses
-    .filter(e => e.paidByUid === user?.uid)
-    .reduce((sum, e) => sum + e.amount, 0);
-
-  const settlementsReceived = settlements
-    .filter(s => s.status === 'completed' && s.toUid === user?.uid)
-    .reduce((sum, s) => sum + s.amount, 0);
-
-  const myExpenses = myPaid - settlementsReceived;
+  // "Mis Gastos" representa mi parte justa de los gastos totales
+  // Es lo que realmente gasté en el viaje, independiente de quién pagó cada gasto
+  const myBalance = balances.find(b => b.uid === user?.uid);
+  const myExpenses = myBalance ? myBalance.totalOwed : 0;
   const currency = viaje?.moneda || 'EUR';
 
   // Mapeo de categorías inglés a español para gastos compartidos
@@ -528,27 +522,6 @@ export function ExpensesScreen() {
                 </View>
               )}
 
-              {/* Sugerencias de liquidación */}
-              {settlementSuggestions.length > 0 && (
-                <View style={styles.settlementsSection}>
-                  <View style={styles.settlementsHeader}>
-                    <Ionicons
-                      name="swap-horizontal"
-                      size={18}
-                      color={theme.colors.primary}
-                      style={styles.balancesIcon}
-                    />
-                    <Text style={styles.sectionTitle}>Liquidaciones sugeridas</Text>
-                  </View>
-                  <SettlementSuggestions
-                    suggestions={settlementSuggestions}
-                    currency={currency}
-                    currentUserId={user?.uid}
-                    onSettlePress={handleSettlePress}
-                  />
-                </View>
-              )}
-
               {/* Botón para ver todas las liquidaciones */}
               <Pressable
                 style={({ pressed }) => [
@@ -839,6 +812,9 @@ const styles = StyleSheet.create({
   balancesContent: {
     paddingHorizontal: theme.spacing.lg,
     paddingBottom: theme.spacing.lg,
+  },
+  settlementsContent: {
+    padding: theme.spacing.lg,
   },
 
   // Historial

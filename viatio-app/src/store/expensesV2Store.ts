@@ -61,7 +61,7 @@ interface ExpensesV2State {
   fetchSettlements: (tripId: string) => Promise<void>;
   addSettlement: (tripId: string, input: Parameters<typeof createSettlement>[1], members: TripMember[]) => Promise<Settlement | null>;
   markSettlementComplete: (tripId: string, settlementId: string, members: TripMember[]) => Promise<boolean>;
-  removeSettlement: (tripId: string, settlementId: string) => Promise<boolean>;
+  removeSettlement: (tripId: string, settlementId: string, members: TripMember[]) => Promise<boolean>;
 
   // Reset
   reset: () => void;
@@ -90,7 +90,7 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
       const expenses = await getTripExpenses(tripId);
       const { settlements } = get();
       const balances = calculateBalances(expenses, members, settlements);
-      const settlementSuggestions = calculateSettlementSuggestions(balances);
+      const settlementSuggestions = calculateSettlementSuggestions(balances, settlements);
       const summary = calculateExpensesSummary(expenses);
 
       set({
@@ -117,7 +117,7 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
       (expenses) => {
         const { settlements } = get();
         const balances = calculateBalances(expenses, members, settlements);
-        const settlementSuggestions = calculateSettlementSuggestions(balances);
+        const settlementSuggestions = calculateSettlementSuggestions(balances, settlements);
         const summary = calculateExpensesSummary(expenses);
 
         set({
@@ -152,7 +152,7 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
       (settlements) => {
         const { expenses } = get();
         const balances = calculateBalances(expenses, members, settlements);
-        const settlementSuggestions = calculateSettlementSuggestions(balances);
+        const settlementSuggestions = calculateSettlementSuggestions(balances, settlements);
 
         set({
           settlements,
@@ -182,7 +182,7 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
         set((state) => {
           const newExpenses = [expense, ...state.expenses];
           const balances = calculateBalances(newExpenses, members, state.settlements);
-          const settlementSuggestions = calculateSettlementSuggestions(balances);
+          const settlementSuggestions = calculateSettlementSuggestions(balances, state.settlements);
           const summary = calculateExpensesSummary(newExpenses);
 
           return {
@@ -211,7 +211,7 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
             e.id === expenseId ? updated : e
           );
           const balances = calculateBalances(newExpenses, members, state.settlements);
-          const settlementSuggestions = calculateSettlementSuggestions(balances);
+          const settlementSuggestions = calculateSettlementSuggestions(balances, state.settlements);
           const summary = calculateExpensesSummary(newExpenses);
 
           return {
@@ -241,7 +241,7 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
 
           // Recalcular balances y sugerencias con los gastos actualizados
           const balances = calculateBalances(newExpenses, members, state.settlements);
-          const settlementSuggestions = calculateSettlementSuggestions(balances);
+          const settlementSuggestions = calculateSettlementSuggestions(balances, state.settlements);
           const summary = calculateExpensesSummary(newExpenses);
 
           return {
@@ -276,7 +276,7 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
   recalculateBalances: (members) => {
     const { expenses, settlements } = get();
     const balances = calculateBalances(expenses, members, settlements);
-    const settlementSuggestions = calculateSettlementSuggestions(balances);
+    const settlementSuggestions = calculateSettlementSuggestions(balances, settlements);
     set({ balances, settlementSuggestions });
   },
 
@@ -323,7 +323,7 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
 
           // Recalcular balances con el nuevo settlement
           const balances = calculateBalances(state.expenses, members, updatedSettlements);
-          const settlementSuggestions = calculateSettlementSuggestions(balances);
+          const settlementSuggestions = calculateSettlementSuggestions(balances, updatedSettlements);
 
           return {
             settlements: updatedSettlements,
@@ -354,7 +354,7 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
 
           // Recalcular balances con los settlements actualizados
           const balances = calculateBalances(state.expenses, members, updatedSettlements);
-          const settlementSuggestions = calculateSettlementSuggestions(balances);
+          const settlementSuggestions = calculateSettlementSuggestions(balances, updatedSettlements);
 
           return {
             settlements: updatedSettlements,
@@ -371,13 +371,23 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
     }
   },
 
-  removeSettlement: async (tripId, settlementId) => {
+  removeSettlement: async (tripId, settlementId, members) => {
     try {
       const success = await cancelSettlement(tripId, settlementId);
       if (success) {
-        set((state) => ({
-          settlements: state.settlements.filter((s) => s.id !== settlementId),
-        }));
+        set((state) => {
+          const updatedSettlements = state.settlements.filter((s) => s.id !== settlementId);
+
+          // Recalcular balances y sugerencias
+          const balances = calculateBalances(state.expenses, members, updatedSettlements);
+          const settlementSuggestions = calculateSettlementSuggestions(balances, updatedSettlements);
+
+          return {
+            settlements: updatedSettlements,
+            balances,
+            settlementSuggestions,
+          };
+        });
       }
       return success;
     } catch (error: unknown) {
