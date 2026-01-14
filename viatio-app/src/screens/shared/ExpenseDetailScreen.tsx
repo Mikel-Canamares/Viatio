@@ -108,13 +108,6 @@ export default function ExpenseDetailScreen() {
       <PageHeader
         title="Detalle del gasto"
         onBack={() => navigation.goBack()}
-        rightElement={
-          canEdit ? (
-            <Pressable onPress={handleEdit}>
-              <Ionicons name="create-outline" size={24} color="#FFFFFF" />
-            </Pressable>
-          ) : undefined
-        }
       />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
@@ -229,14 +222,27 @@ export default function ExpenseDetailScreen() {
           )}
         </View>
 
-        {/* Botón eliminar */}
-        {canDelete && (
-          <Pressable style={styles.deleteButton} onPress={handleDelete}>
-            <Ionicons name="trash-outline" size={20} color={theme.colors.error} />
-            <Text style={styles.deleteButtonText}>Eliminar gasto</Text>
-          </Pressable>
-        )}
+        {/* Espaciador para los botones fijos */}
+        <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Botones fijos en la parte inferior */}
+      {(canEdit || canDelete) && (
+        <View style={styles.bottomButtonsContainer}>
+          {canEdit && (
+            <Pressable style={styles.editButton} onPress={handleEdit}>
+              <Ionicons name="create-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.editButtonText}>Editar</Text>
+            </Pressable>
+          )}
+          {canDelete && (
+            <Pressable style={styles.deleteButton} onPress={handleDelete}>
+              <Ionicons name="trash-outline" size={20} color={theme.colors.error} />
+              <Text style={styles.deleteButtonText}>Eliminar</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
     </ScreenContainer>
   );
 }
@@ -383,17 +389,45 @@ const styles = StyleSheet.create({
     color: theme.colors.textTertiary,
     marginBottom: 4,
   },
-  deleteButton: {
+  bottomButtonsContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    gap: 12,
+    padding: 16,
+    backgroundColor: theme.colors.background,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    ...theme.shadows.card,
+  },
+  editButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginHorizontal: 16,
-    marginTop: 24,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: theme.colors.primary,
+  },
+  editButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  deleteButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
     paddingVertical: 14,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: theme.colors.error,
+    backgroundColor: '#FFFFFF',
   },
   deleteButtonText: {
     fontSize: 15,

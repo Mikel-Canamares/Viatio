@@ -9,10 +9,11 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, LayoutAnimation, Platform, UIManager, Animated } from 'react-native';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { PageHeader } from '@/components/PageHeader';
 import { PrimaryButton } from '@/components/PrimaryButton';
@@ -62,6 +63,7 @@ export function ExpensesScreen() {
   const [loadingViaje, setLoadingViaje] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<Record<CategoriaGasto, boolean>>({} as Record<CategoriaGasto, boolean>);
   const [balancesExpanded, setBalancesExpanded] = useState(true);
+  const [activeTab, setActiveTab] = useState<'gastos' | 'saldos'>('gastos');
 
   // Stores para gastos individuales (SQLite)
   const { gastos, resumen, loading: loadingGastos, fetchGastos, fetchResumen } = useGastosStore();
@@ -71,6 +73,7 @@ export function ExpensesScreen() {
     expenses: sharedExpenses,
     balances,
     settlementSuggestions,
+    settlements,
     subscribeExpenses,
     subscribeSettlementsRealtime,
   } = useExpensesV2Store();
@@ -184,8 +187,19 @@ export function ExpensesScreen() {
       return totalB - totalA;
     });
 
-  // Para viajes compartidos - calcular total
+  // Para viajes compartidos - calcular total y mis gastos
   const sharedTotal = sharedExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+  // Calcular mis gastos reales: lo que pagué menos lo que me han devuelto en liquidaciones
+  const myPaid = sharedExpenses
+    .filter(e => e.paidByUid === user?.uid)
+    .reduce((sum, e) => sum + e.amount, 0);
+
+  const settlementsReceived = settlements
+    .filter(s => s.status === 'completed' && s.toUid === user?.uid)
+    .reduce((sum, s) => sum + s.amount, 0);
+
+  const myExpenses = myPaid - settlementsReceived;
   const currency = viaje?.moneda || 'EUR';
 
   // Mapeo de categorías inglés a español para gastos compartidos
@@ -247,6 +261,11 @@ export function ExpensesScreen() {
     if (firestoreId) {
       navigation.navigate('TripSettlements', { viajeId, firestoreId });
     }
+  };
+
+  const handleSettlePress = () => {
+    // Por ahora, redirigir a la pantalla de liquidaciones
+    handleViewSettlements();
   };
 
   const toggleCategory = (categoria: CategoriaGasto) => {
@@ -323,23 +342,66 @@ export function ExpensesScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
           }
         >
-          {/* Resumen Total */}
-          <View style={styles.card}>
-            <Text style={styles.totalLabel}>Total del grupo</Text>
-            <Text style={styles.totalAmount}>
-              {centsToDisplay(sharedTotal, currency)}
-            </Text>
-            <Text style={styles.memberCount}>
-              {members.length} {members.length === 1 ? 'persona' : 'personas'}
-            </Text>
+          {/* Resumen con Mis Gastos y Gastos Totales */}
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryRow}>
+              <View style={styles.summaryColumn}>
+                <View style={styles.summaryIconContainer}>
+                  <Ionicons name="wallet" size={26} color={theme.colors.primary} />
+                </View>
+                <Text style={styles.summaryLabel}>Mis Gastos</Text>
+                <Text style={styles.summaryAmount}>
+                  {centsToDisplay(myExpenses, currency)}
+                </Text>
+              </View>
+
+              <View style={styles.summaryDivider} />
+
+              <View style={styles.summaryColumn}>
+                <View style={styles.summaryIconContainer}>
+                  <Ionicons name="receipt" size={26} color={theme.colors.primary} />
+                </View>
+                <Text style={styles.summaryLabel}>Gastos Totales</Text>
+                <Text style={styles.summaryAmount}>
+                  {centsToDisplay(sharedTotal, currency)}
+                </Text>
+              </View>
+            </View>
           </View>
 
-          {/* Historial de gastos agrupados por categoría */}
-          <View style={styles.historialHeader}>
-            <Text style={styles.historialTitle}>Historial</Text>
+          {/* Tabs */}
+          <View style={styles.tabsContainer}>
+            <Pressable
+              style={[styles.tab, activeTab === 'gastos' && styles.tabActive]}
+              onPress={() => setActiveTab('gastos')}
+            >
+              <Text style={[styles.tabText, activeTab === 'gastos' && styles.tabTextActive]}>
+                Gastos
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.tab, activeTab === 'saldos' && styles.tabActive]}
+              onPress={() => setActiveTab('saldos')}
+            >
+              <Text style={[styles.tabText, activeTab === 'saldos' && styles.tabTextActive]}>
+                Saldos
+              </Text>
+            </Pressable>
           </View>
 
-          {sharedCategoriasOrdenadas.map((categoria) => {
+          {/* Tab Content: Gastos */}
+          {activeTab === 'gastos' && (
+            <>
+              <View style={styles.historialHeader}>
+                <Text style={styles.historialTitle}>Historial</Text>
+                <View style={styles.historialBadge}>
+                  <Text style={styles.historialBadgeText}>
+                    {sharedExpenses.length}
+                  </Text>
+                </View>
+              </View>
+
+              {sharedCategoriasOrdenadas.map((categoria) => {
             const gastosDeCategoria = sharedExpensesPorCategoria[categoria];
             const totalCategoria = gastosDeCategoria.reduce((sum, e) => sum + e.amount, 0);
             const categoriaInfo = GASTO_CATEGORIAS[categoria];
@@ -355,22 +417,26 @@ export function ExpensesScreen() {
                   ]}
                   onPress={() => toggleCategory(categoria)}
                 >
-                  <View style={[styles.categoryIcon, { backgroundColor: categoriaInfo.color + '20' }]}>
+                  <View style={[styles.categoryIcon, { backgroundColor: categoriaInfo.color + '15' }]}>
                     <Ionicons
                       name={categoriaInfo.icon as keyof typeof Ionicons.glyphMap}
-                      size={20}
+                      size={22}
                       color={categoriaInfo.color}
                     />
                   </View>
                   <View style={styles.categoryInfo}>
-                    <Text style={styles.categoryName}>{categoriaInfo.label}</Text>
-                    <Text style={styles.categoryCount}>
-                      {gastosDeCategoria.length} {gastosDeCategoria.length === 1 ? 'gasto' : 'gastos'}
+                    <View style={styles.categoryNameRow}>
+                      <Text style={styles.categoryName}>{categoriaInfo.label}</Text>
+                      <View style={[styles.categoryCountBadge, { backgroundColor: categoriaInfo.color + '20' }]}>
+                        <Text style={[styles.categoryCountBadgeText, { color: categoriaInfo.color }]}>
+                          {gastosDeCategoria.length}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.categoryTotal}>
+                      {centsToDisplay(totalCategoria, currency)}
                     </Text>
                   </View>
-                  <Text style={styles.categoryTotal}>
-                    {centsToDisplay(totalCategoria, currency)}
-                  </Text>
                   <Ionicons
                     name={isExpanded ? 'chevron-up' : 'chevron-down'}
                     size={20}
@@ -393,26 +459,37 @@ export function ExpensesScreen() {
                   return (
                     <Pressable
                       key={expense.id}
-                      style={styles.expenseItem}
+                      style={({ pressed }) => [
+                        styles.expenseItem,
+                        pressed && styles.expenseItemPressed,
+                      ]}
                       onPress={() => handleExpensePress(expense)}
                     >
-                      <View style={styles.expenseInfo}>
-                        <Text style={styles.expenseDescription}>{expense.description}</Text>
-                        <Text style={styles.expensePaidBy}>
-                          {isPayer ? 'Pagaste tú' : `Pagó ${expense.paidByName}`}
-                        </Text>
+                      <View style={styles.expenseLeftContent}>
+                        <View style={[styles.expenseDot, { backgroundColor: categoriaInfo.color }]} />
+                        <View style={styles.expenseInfo}>
+                          <Text style={styles.expenseDescription}>{expense.description}</Text>
+                          <Text style={styles.expensePaidBy}>
+                            {isPayer ? 'Pagaste tú' : `Pagó ${expense.paidByName}`}
+                          </Text>
+                        </View>
                       </View>
                       <View style={styles.expenseAmounts}>
                         <Text style={styles.expenseAmount}>
                           {centsToDisplay(expense.amount, expense.currency)}
                         </Text>
                         {myShare && myImpact !== 0 && (
-                          <Text style={[
-                            styles.expenseImpact,
-                            myImpact > 0 ? styles.impactPositive : styles.impactNegative,
+                          <View style={[
+                            styles.expenseImpactBadge,
+                            myImpact > 0 ? styles.impactBadgePositive : styles.impactBadgeNegative,
                           ]}>
-                            {myImpact > 0 ? '+' : ''}{centsToDisplay(myImpact, expense.currency)}
-                          </Text>
+                            <Text style={[
+                              styles.expenseImpact,
+                              myImpact > 0 ? styles.impactPositive : styles.impactNegative,
+                            ]}>
+                              {myImpact > 0 ? '+' : ''}{centsToDisplay(myImpact, expense.currency)}
+                            </Text>
+                          </View>
                         )}
                       </View>
                       <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
@@ -422,38 +499,70 @@ export function ExpensesScreen() {
               </View>
             );
           })}
-
-          {/* Balances - Desplegable */}
-          {balances.length > 0 && (
-            <View style={styles.balancesSection}>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.balancesHeader,
-                  pressed && styles.balancesHeaderPressed,
-                ]}
-                onPress={toggleBalances}
-              >
-                <Text style={styles.sectionTitle}>Balances</Text>
-                <Ionicons
-                  name={balancesExpanded ? 'chevron-up' : 'chevron-down'}
-                  size={20}
-                  color={theme.colors.textSecondary}
-                />
-              </Pressable>
-              {balancesExpanded && (
-                <BalancesList
-                  balances={balances}
-                  currency={currency}
-                />
-              )}
-            </View>
+            </>
           )}
 
-          {/* Botón para ver todas las liquidaciones */}
-          <Pressable style={styles.settlementsLink} onPress={handleViewSettlements}>
-            <Text style={styles.settlementsLinkText}>Ver liquidaciones</Text>
-            <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} />
-          </Pressable>
+          {/* Tab Content: Saldos */}
+          {activeTab === 'saldos' && (
+            <>
+              {/* Balances */}
+              {balances.length > 0 && (
+                <View style={styles.balancesSection}>
+                  <View style={styles.balancesHeader}>
+                    <View style={styles.balancesHeaderContent}>
+                      <Ionicons
+                        name="stats-chart"
+                        size={18}
+                        color={theme.colors.primary}
+                        style={styles.balancesIcon}
+                      />
+                      <Text style={styles.sectionTitle}>Balances</Text>
+                    </View>
+                  </View>
+                  <View style={styles.balancesContent}>
+                    <BalancesList
+                      balances={balances}
+                      currency={currency}
+                    />
+                  </View>
+                </View>
+              )}
+
+              {/* Sugerencias de liquidación */}
+              {settlementSuggestions.length > 0 && (
+                <View style={styles.settlementsSection}>
+                  <View style={styles.settlementsHeader}>
+                    <Ionicons
+                      name="swap-horizontal"
+                      size={18}
+                      color={theme.colors.primary}
+                      style={styles.balancesIcon}
+                    />
+                    <Text style={styles.sectionTitle}>Liquidaciones sugeridas</Text>
+                  </View>
+                  <SettlementSuggestions
+                    suggestions={settlementSuggestions}
+                    currency={currency}
+                    currentUserId={user?.uid}
+                    onSettlePress={handleSettlePress}
+                  />
+                </View>
+              )}
+
+              {/* Botón para ver todas las liquidaciones */}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.settlementsLink,
+                  pressed && styles.settlementsLinkPressed,
+                ]}
+                onPress={handleViewSettlements}
+              >
+                <Ionicons name="wallet-outline" size={18} color={theme.colors.primary} />
+                <Text style={styles.settlementsLinkText}>Ver liquidaciones</Text>
+                <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} />
+              </Pressable>
+            </>
+          )}
 
           <View style={styles.bottomSpacer} />
         </ScrollView>
@@ -562,21 +671,94 @@ const styles = StyleSheet.create({
     ...theme.shadows.card,
   },
 
-  // Resumen total
+  // Resumen unificado
+  summaryCard: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
+    marginBottom: theme.spacing.lg,
+    ...theme.shadows.card,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  summaryColumn: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  summaryIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: theme.colors.primary + '15',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  summaryDivider: {
+    width: 1,
+    height: 80,
+    backgroundColor: theme.colors.border,
+    marginHorizontal: theme.spacing.md,
+  },
+  summaryLabel: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.xs,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  summaryAmount: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    letterSpacing: -0.5,
+    textAlign: 'center',
+  },
+
+  // Tabs
+  tabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius.lg,
+    padding: 4,
+    marginBottom: theme.spacing.lg,
+    ...theme.shadows.card,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabActive: {
+    backgroundColor: theme.colors.primary,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.textSecondary,
+  },
+  tabTextActive: {
+    color: '#FFFFFF',
+  },
+
+  // Estilos antiguos (mantener para viajes individuales)
   totalLabel: {
     fontSize: 14,
     color: theme.colors.textSecondary,
     marginBottom: theme.spacing.xs,
+    fontWeight: '500',
   },
   totalAmount: {
-    fontSize: 36,
+    fontSize: 32,
     fontWeight: 'bold',
     color: theme.colors.text,
     marginBottom: theme.spacing.md,
-  },
-  memberCount: {
-    fontSize: 14,
-    color: theme.colors.textSecondary,
+    letterSpacing: -0.5,
   },
   presupuestoContainer: {
     marginTop: theme.spacing.sm,
@@ -613,29 +795,77 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
 
-  // Balances desplegable
+  // Balances y Settlements sections
   balancesSection: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius.lg,
     marginBottom: theme.spacing.lg,
+    overflow: 'hidden',
+    ...theme.shadows.card,
+  },
+  settlementsSection: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius.lg,
+    marginBottom: theme.spacing.lg,
+    overflow: 'hidden',
+    ...theme.shadows.card,
   },
   balancesHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: theme.spacing.sm,
-    marginBottom: theme.spacing.md,
+    padding: theme.spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  settlementsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: theme.spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
   balancesHeaderPressed: {
-    opacity: 0.7,
+    backgroundColor: theme.colors.secondary + '80',
+  },
+  balancesHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  balancesIcon: {
+    marginRight: theme.spacing.xs,
+  },
+  balancesContent: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingBottom: theme.spacing.lg,
   },
 
   // Historial
   historialHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: theme.spacing.md,
   },
   historialTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
     color: theme.colors.text,
+  },
+  historialBadge: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 4,
+    borderRadius: theme.radius.full,
+    minWidth: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  historialBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 
   // Gastos compartidos - Agrupación por categoría
@@ -649,75 +879,113 @@ const styles = StyleSheet.create({
   categoryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: theme.spacing.md,
+    padding: theme.spacing.lg,
   },
   categoryHeaderPressed: {
-    backgroundColor: theme.colors.secondary,
+    backgroundColor: theme.colors.secondary + '80',
   },
   categoryIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: theme.spacing.sm,
+    marginRight: theme.spacing.md,
   },
   categoryInfo: {
     flex: 1,
   },
+  categoryNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.xs,
+    gap: theme.spacing.xs,
+  },
   categoryName: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     color: theme.colors.text,
   },
-  categoryCount: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
-    marginTop: 2,
+  categoryCountBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: theme.radius.full,
+    minWidth: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryCountBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   categoryTotal: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     color: theme.colors.text,
-    marginRight: theme.spacing.xs,
   },
   categoryChevron: {
-    marginLeft: theme.spacing.xs,
+    marginLeft: theme.spacing.md,
   },
   expenseItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
   },
+  expenseItemPressed: {
+    backgroundColor: theme.colors.secondary + '60',
+  },
+  expenseLeftContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: theme.spacing.sm,
+  },
+  expenseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: theme.spacing.sm,
+  },
   expenseInfo: {
     flex: 1,
-    marginRight: theme.spacing.sm,
   },
   expenseDescription: {
     fontSize: 14,
     fontWeight: '500',
     color: theme.colors.text,
+    marginBottom: 3,
   },
   expensePaidBy: {
     fontSize: 12,
     color: theme.colors.textSecondary,
-    marginTop: 2,
   },
   expenseAmounts: {
     alignItems: 'flex-end',
-    marginRight: theme.spacing.xs,
+    marginRight: theme.spacing.sm,
   },
   expenseAmount: {
     fontSize: 15,
     fontWeight: '600',
     color: theme.colors.text,
+    marginBottom: 4,
+  },
+  expenseImpactBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: theme.radius.sm,
+  },
+  impactBadgePositive: {
+    backgroundColor: theme.colors.success + '15',
+  },
+  impactBadgeNegative: {
+    backgroundColor: theme.colors.error + '15',
   },
   expenseImpact: {
     fontSize: 11,
-    marginTop: 2,
+    fontWeight: '600',
   },
   impactPositive: {
     color: theme.colors.success,
@@ -731,14 +999,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: theme.colors.card,
     paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
     marginBottom: theme.spacing.md,
+    borderRadius: theme.radius.lg,
+    gap: theme.spacing.xs,
+    ...theme.shadows.card,
+  },
+  settlementsLinkPressed: {
+    backgroundColor: theme.colors.secondary,
   },
   settlementsLinkText: {
     fontSize: 14,
     fontWeight: '600',
     color: theme.colors.primary,
-    marginRight: 4,
   },
 
   // Espaciador para el botón
