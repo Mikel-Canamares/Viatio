@@ -72,6 +72,12 @@ export { SelectItem } from './SelectItem';
 export type { SelectOption } from './SelectItem';
 export { Accordion } from './Accordion';
 
+// Componentes de Centro de Ayuda
+export { CategoryAccordion } from './CategoryAccordion';
+export { FAQCard } from './FAQCard';
+export { ImageCarousel } from './ImageCarousel';
+export { SearchHighlight } from './SearchHighlight';
+
 // Componentes de Asistente IA (Copilot)
 export { ChatBubble } from './ChatBubble';
 export { SuggestionChips } from './SuggestionChips';

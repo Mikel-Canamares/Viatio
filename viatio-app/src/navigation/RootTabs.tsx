@@ -11,6 +11,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CommonActions } from '@react-navigation/native';
 import { TripCalendarScreen } from '@/screens';
 import { HomeStackNavigator } from './HomeStackNavigator';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
@@ -56,6 +57,20 @@ export function RootTabs() {
             <Ionicons name="home" size={size} color={color} />
           ),
         }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            // Prevenir el comportamiento por defecto
+            e.preventDefault();
+
+            // Resetear el stack de Home a TripList siempre
+            navigation.dispatch(
+              CommonActions.reset({
+                index: 0,
+                routes: [{ name: 'Home', state: { routes: [{ name: 'TripList' }] } }],
+              })
+            );
+          },
+        })}
       />
 
       <Tab.Screen

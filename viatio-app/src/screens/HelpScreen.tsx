@@ -1,7 +1,8 @@
 /**
  * HELP SCREEN
  *
- * Pantalla de centro de ayuda con FAQs, búsqueda, contacto y recursos.
+ * Centro de ayuda rediseñado con 67+ FAQs organizadas en categorías,
+ * búsqueda mejorada, soporte multimedia y navegación directa.
  */
 
 import { useState } from 'react';
@@ -13,6 +14,7 @@ import {
   Pressable,
   Linking,
   Alert,
+  FlatList,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,79 +23,50 @@ import { PageHeader } from '@/components/PageHeader';
 import { Card } from '@/components/Card';
 import { SectionTitle } from '@/components/SectionTitle';
 import { ProfileMenuItem } from '@/components/ProfileMenuItem';
-import { Accordion } from '@/components/Accordion';
+import { CategoryAccordion } from '@/components/CategoryAccordion';
+import { FAQCard } from '@/components/FAQCard';
+import { SearchHighlight } from '@/components/SearchHighlight';
 import { theme } from '@/config';
 import { showToast } from '@/utils/toast';
+import { faqCategories, searchFAQs, FAQItem } from '@/data/helpContent';
 import Constants from 'expo-constants';
-
-// Tipos para FAQs
-interface FAQ {
-  id: string;
-  question: string;
-  answer: string;
-}
-
-// Lista de FAQs
-const FAQS: FAQ[] = [
-  {
-    id: '1',
-    question: '¿Cómo creo un nuevo viaje?',
-    answer:
-      'Para crear un nuevo viaje, ve a la pantalla principal y pulsa el botón amarillo "+" en la esquina inferior derecha. Completa el formulario con el nombre del viaje, destino y fechas, y pulsa "Crear viaje".',
-  },
-  {
-    id: '2',
-    question: '¿Cómo escaneo una reserva?',
-    answer:
-      'Dentro de un viaje, ve a la sección "Reservas" y pulsa "Añadir reserva". Puedes escanear un archivo .pkpass (Apple Wallet) o usar OCR para extraer información de capturas de pantalla de confirmaciones. El asistente de IA te ayudará a extraer todos los detalles.',
-  },
-  {
-    id: '3',
-    question: '¿Puedo usar la app sin internet?',
-    answer:
-      'Sí, Viatio funciona completamente offline. Todos tus viajes, reservas y documentos se almacenan localmente en tu dispositivo usando SQLite. Necesitarás conexión solo para funciones como el asistente de IA, mapas en tiempo real o sincronización.',
-  },
-  {
-    id: '4',
-    question: '¿Cómo comparto mi viaje?',
-    answer:
-      'Esta funcionalidad estará disponible en una próxima actualización. Podrás compartir tus viajes con otros usuarios de Viatio o exportar el itinerario en formato PDF.',
-  },
-  {
-    id: '5',
-    question: '¿Mis datos están seguros?',
-    answer:
-      'Absolutamente. Todos tus datos se almacenan localmente en tu dispositivo y están protegidos por las medidas de seguridad del sistema operativo. Firebase Auth gestiona tu autenticación de forma segura. No compartimos ni vendemos tus datos personales.',
-  },
-  {
-    id: '6',
-    question: '¿Cómo gestiono mis gastos?',
-    answer:
-      'En la pantalla de un viaje, accede a la sección "Gastos". Puedes añadir gastos manualmente, categorizarlos (transporte, alojamiento, comida, actividad, otros), y ver estadísticas de tu presupuesto en diferentes monedas.',
-  },
-  {
-    id: '7',
-    question: '¿Qué es el asistente de IA?',
-    answer:
-      'El asistente de viaje impulsado por Gemini Flash te ayuda a planificar actividades, extraer información de reservas mediante OCR, responder preguntas sobre tu viaje y sugerir rutas optimizadas. Necesitas conexión a internet para usarlo.',
-  },
-];
 
 export default function HelpScreen() {
   const navigation = useNavigation();
   const [searchQuery, setSearchQuery] = useState('');
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
 
-  // Filtrar FAQs según la búsqueda
-  const filteredFaqs = FAQS.filter(
-    (faq) =>
-      faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      faq.answer.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Determinar si estamos en modo búsqueda
+  const isSearching = searchQuery.trim().length > 0;
 
-  // Toggle de acordeón
-  const toggleFaq = (id: string) => {
-    setExpandedFaq(expandedFaq === id ? null : id);
+  // Obtener resultados de búsqueda
+  const searchResults = isSearching ? searchFAQs(searchQuery) : [];
+
+  // Toggle de categoría
+  const toggleCategory = (categoryId: string) => {
+    setExpandedCategory(expandedCategory === categoryId ? null : categoryId);
+  };
+
+  // Toggle de FAQ
+  const toggleFaq = (faqId: string) => {
+    setExpandedFaq(expandedFaq === faqId ? null : faqId);
+  };
+
+  // Limpiar búsqueda
+  const clearSearch = () => {
+    setSearchQuery('');
+    setExpandedFaq(null);
+  };
+
+  // Navegación a pantalla relacionada
+  const handleNavigate = (screenName: string) => {
+    try {
+      // Intentar navegar a la pantalla
+      (navigation as any).navigate(screenName);
+    } catch (error) {
+      showToast.info('Información', `Esta pantalla aún no está disponible: ${screenName}`);
+    }
   };
 
   // Handlers de contacto
@@ -107,11 +80,15 @@ export default function HelpScreen() {
       if (supported) {
         await Linking.openURL(url);
       } else {
-        showToast.error('Error', 'No se pudo abrir el cliente de correo. Por favor, contacta a soporte@viatio.com manualmente.'
+        showToast.error(
+          'Error',
+          'No se pudo abrir el cliente de correo. Por favor, contacta a soporte@viatio.com manualmente.'
         );
       }
     } catch (error) {
-      showToast.error('Error', 'No se pudo abrir el cliente de correo. Por favor, contacta a soporte@viatio.com manualmente.'
+      showToast.error(
+        'Error',
+        'No se pudo abrir el cliente de correo. Por favor, contacta a soporte@viatio.com manualmente.'
       );
     }
   };
@@ -155,8 +132,64 @@ export default function HelpScreen() {
   // Versión de la app
   const appVersion = Constants.expoConfig?.version || '1.0.0';
 
+  // Renderizar resultado de búsqueda
+  const renderSearchResult = ({ item }: { item: FAQItem }) => {
+    // Encontrar la categoría a la que pertenece
+    const category = faqCategories.find((cat) => cat.id === item.category);
+
+    return (
+      <View style={styles.searchResultContainer}>
+        {/* Badge de categoría */}
+        {category && (
+          <View style={[styles.categoryBadge, { backgroundColor: `${category.color}20` }]}>
+            <Ionicons name={category.icon as any} size={14} color={category.color} />
+            <Text style={[styles.categoryBadgeText, { color: category.color }]}>
+              {category.title}
+            </Text>
+          </View>
+        )}
+
+        {/* FAQ Card con texto resaltado */}
+        <FAQCard
+          question={item.question}
+          answer={item.answer}
+          images={item.images}
+          expanded={expandedFaq === item.id}
+          onToggle={() => toggleFaq(item.id)}
+          onNavigate={handleNavigate}
+          relatedScreens={item.relatedScreens}
+        />
+      </View>
+    );
+  };
+
+  // Renderizar categoría
+  const renderCategory = ({ item }: { item: typeof faqCategories[0] }) => (
+    <CategoryAccordion
+      title={item.title}
+      icon={item.icon}
+      color={item.color}
+      itemCount={item.faqs.length}
+      expanded={expandedCategory === item.id}
+      onToggle={() => toggleCategory(item.id)}
+    >
+      {item.faqs.map((faq) => (
+        <FAQCard
+          key={faq.id}
+          question={faq.question}
+          answer={faq.answer}
+          images={faq.images}
+          expanded={expandedFaq === faq.id}
+          onToggle={() => toggleFaq(faq.id)}
+          onNavigate={handleNavigate}
+          relatedScreens={faq.relatedScreens}
+        />
+      ))}
+    </CategoryAccordion>
+  );
+
   return (
-    <ScreenContainer scroll>
+    <ScreenContainer>
       <PageHeader title="Centro de ayuda" onBack={() => navigation.goBack()} />
 
       <View style={styles.content}>
@@ -174,96 +207,169 @@ export default function HelpScreen() {
             placeholderTextColor={theme.colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
+            returnKeyType="search"
           />
           {searchQuery.length > 0 && (
-            <Pressable onPress={() => setSearchQuery('')}>
-              <Ionicons
-                name="close-circle"
-                size={20}
-                color={theme.colors.textMuted}
-              />
+            <Pressable onPress={clearSearch}>
+              <Ionicons name="close-circle" size={20} color={theme.colors.textMuted} />
             </Pressable>
           )}
         </View>
 
-        {/* Preguntas frecuentes */}
-        <SectionTitle title="Preguntas frecuentes" marginTop={false} />
-        <Card padding={0} style={styles.card}>
-          {filteredFaqs.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons
-                name="search-outline"
-                size={48}
-                color={theme.colors.textMuted}
-              />
-              <Text style={styles.emptyText}>
-                No se encontraron resultados para "{searchQuery}"
+        {/* Estadísticas de ayuda (solo cuando NO hay búsqueda) */}
+        {!isSearching && (
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>
+                {faqCategories.reduce((sum, cat) => sum + cat.faqs.length, 0)}
               </Text>
+              <Text style={styles.statLabel}>Preguntas</Text>
             </View>
-          ) : (
-            filteredFaqs.map((faq, index) => (
-              <View key={faq.id}>
-                <Accordion
-                  title={faq.question}
-                  expanded={expandedFaq === faq.id}
-                  onToggle={() => toggleFaq(faq.id)}
-                >
-                  <Text style={styles.faqAnswer}>{faq.answer}</Text>
-                </Accordion>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{faqCategories.length}</Text>
+              <Text style={styles.statLabel}>Categorías</Text>
+            </View>
+          </View>
+        )}
 
-                {/* Separador (no mostrar en el último) */}
-                {index < filteredFaqs.length - 1 && (
-                  <View style={styles.separator} />
+        {/* Contenido principal con FlatList */}
+        {isSearching ? (
+          /* Vista de búsqueda */
+          <FlatList
+            data={searchResults}
+            renderItem={renderSearchResult}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              <View style={styles.searchHeader}>
+                <SectionTitle
+                  title={
+                    searchResults.length === 0
+                      ? 'Sin resultados'
+                      : `${searchResults.length} ${
+                          searchResults.length === 1 ? 'resultado' : 'resultados'
+                        }`
+                  }
+                  marginTop={false}
+                />
+                {searchResults.length > 0 && (
+                  <Text style={styles.searchSubtitle}>
+                    para "<Text style={styles.searchTerm}>{searchQuery}</Text>"
+                  </Text>
                 )}
               </View>
-            ))
-          )}
-        </Card>
-
-        {/* Contacto */}
-        <SectionTitle title="Contacto" />
-        <Card padding={0} style={styles.card}>
-          <ProfileMenuItem
-            icon="mail-outline"
-            label="Enviar email"
-            onPress={handleSendEmail}
-          />
-          <ProfileMenuItem
-            icon="chatbubble-ellipses-outline"
-            label="Chat de soporte"
-            value="Próximamente"
-            onPress={handleChatSupport}
-          />
-          <ProfileMenuItem
-            icon="bug-outline"
-            label="Reportar un problema"
-            onPress={handleReportProblem}
-          />
-        </Card>
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerTitle}>Enlaces útiles</Text>
-          <Pressable
-            onPress={() =>
-              openLink('https://viatio.com/terminos-de-servicio')
             }
-          >
-            <Text style={styles.footerLink}>Términos de servicio</Text>
-          </Pressable>
-          <Pressable
-            onPress={() =>
-              openLink('https://viatio.com/politica-de-privacidad')
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <Ionicons name="search-outline" size={48} color={theme.colors.textMuted} />
+                <Text style={styles.emptyText}>
+                  No se encontraron resultados para "{searchQuery}"
+                </Text>
+                <Text style={styles.emptyHint}>Intenta con otros términos de búsqueda</Text>
+              </View>
             }
-          >
-            <Text style={styles.footerLink}>Política de privacidad</Text>
-          </Pressable>
+            ListFooterComponent={
+              <>
+                {/* Contacto */}
+                <SectionTitle title="Contacto" />
+                <Card padding={0} style={styles.card}>
+                  <ProfileMenuItem
+                    icon="mail-outline"
+                    label="Enviar email"
+                    onPress={handleSendEmail}
+                  />
+                  <ProfileMenuItem
+                    icon="chatbubble-ellipses-outline"
+                    label="Chat de soporte"
+                    value="Próximamente"
+                    onPress={handleChatSupport}
+                  />
+                  <ProfileMenuItem
+                    icon="bug-outline"
+                    label="Reportar un problema"
+                    onPress={handleReportProblem}
+                  />
+                </Card>
 
-          <Text style={styles.versionText}>Versión {appVersion}</Text>
-        </View>
+                {/* Footer */}
+                <View style={styles.footer}>
+                  <Text style={styles.footerTitle}>Enlaces útiles</Text>
+                  <Pressable
+                    onPress={() => openLink('https://viatio.com/terminos-de-servicio')}
+                  >
+                    <Text style={styles.footerLink}>Términos de servicio</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => openLink('https://viatio.com/politica-de-privacidad')}
+                  >
+                    <Text style={styles.footerLink}>Política de privacidad</Text>
+                  </Pressable>
 
-        {/* Espaciado inferior */}
-        <View style={styles.bottomSpacing} />
+                  <Text style={styles.versionText}>Versión {appVersion}</Text>
+                </View>
+
+                {/* Espaciado inferior */}
+                <View style={styles.bottomSpacing} />
+              </>
+            }
+          />
+        ) : (
+          /* Vista de categorías */
+          <FlatList
+            data={faqCategories}
+            renderItem={renderCategory}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={<SectionTitle title="Categorías" marginTop={false} />}
+            ListFooterComponent={
+              <>
+                {/* Contacto */}
+                <SectionTitle title="Contacto" />
+                <Card padding={0} style={styles.card}>
+                  <ProfileMenuItem
+                    icon="mail-outline"
+                    label="Enviar email"
+                    onPress={handleSendEmail}
+                  />
+                  <ProfileMenuItem
+                    icon="chatbubble-ellipses-outline"
+                    label="Chat de soporte"
+                    value="Próximamente"
+                    onPress={handleChatSupport}
+                  />
+                  <ProfileMenuItem
+                    icon="bug-outline"
+                    label="Reportar un problema"
+                    onPress={handleReportProblem}
+                  />
+                </Card>
+
+                {/* Footer */}
+                <View style={styles.footer}>
+                  <Text style={styles.footerTitle}>Enlaces útiles</Text>
+                  <Pressable
+                    onPress={() => openLink('https://viatio.com/terminos-de-servicio')}
+                  >
+                    <Text style={styles.footerLink}>Términos de servicio</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => openLink('https://viatio.com/politica-de-privacidad')}
+                  >
+                    <Text style={styles.footerLink}>Política de privacidad</Text>
+                  </Pressable>
+
+                  <Text style={styles.versionText}>Versión {appVersion}</Text>
+                </View>
+
+                {/* Espaciado inferior */}
+                <View style={styles.bottomSpacing} />
+              </>
+            }
+          />
+        )}
       </View>
     </ScreenContainer>
   );
@@ -282,7 +388,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
     marginHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
@@ -294,35 +400,91 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: theme.colors.text,
   },
-  card: {
+  statsContainer: {
+    flexDirection: 'row',
     marginHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.lg,
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
-  faqAnswer: {
-    fontSize: 14,
-    lineHeight: 20,
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: theme.colors.primary,
+    marginBottom: theme.spacing.xs,
+  },
+  statLabel: {
+    fontSize: 13,
     color: theme.colors.textSecondary,
   },
-  separator: {
-    height: 1,
+  statDivider: {
+    width: 1,
     backgroundColor: theme.colors.border,
-    marginHorizontal: theme.spacing.lg,
+    marginHorizontal: theme.spacing.md,
+  },
+  listContent: {
+    paddingHorizontal: theme.spacing.lg,
+  },
+  searchHeader: {
+    marginBottom: theme.spacing.md,
+  },
+  searchSubtitle: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.xs,
+  },
+  searchTerm: {
+    fontWeight: '600',
+    color: theme.colors.text,
+  },
+  searchResultContainer: {
+    marginBottom: theme.spacing.md,
+  },
+  categoryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.radius.sm,
+    marginBottom: theme.spacing.xs,
+    gap: theme.spacing.xs,
+  },
+  categoryBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  card: {
+    marginBottom: theme.spacing.sm,
   },
   emptyState: {
-    paddingVertical: theme.spacing.xxl,
+    paddingVertical: theme.spacing.xxl * 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   emptyText: {
-    fontSize: 14,
-    color: theme.colors.textMuted,
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.colors.text,
     textAlign: 'center',
     marginTop: theme.spacing.md,
     paddingHorizontal: theme.spacing.xl,
   },
+  emptyHint: {
+    fontSize: 14,
+    color: theme.colors.textMuted,
+    textAlign: 'center',
+    marginTop: theme.spacing.xs,
+  },
   footer: {
     marginTop: theme.spacing.xl,
-    paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.lg,
   },
   footerTitle: {
