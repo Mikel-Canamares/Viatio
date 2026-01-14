@@ -206,5 +206,23 @@ service cloud.firestore {
     match /{path=**}/invitations/{inviteId} {
       allow read: if isAuthenticated();
     }
+
+    // ============================================
+    // COLECCION: notifications
+    // Notificaciones en tiempo real para usuarios
+    // ============================================
+
+    match /notifications/{userId}/notifications/{notificationId} {
+      // Solo el propietario puede leer sus notificaciones
+      allow read: if isAuthenticated() && currentUserId() == userId;
+
+      // Solo el propietario puede actualizar (marcar como leída)
+      allow update: if isAuthenticated() && currentUserId() == userId;
+
+      allow delete: if isAuthenticated() && currentUserId() == userId;
+
+      // Solo usuarios autenticados pueden crear notificaciones
+      allow create: if isAuthenticated();
+    }
   }
 }

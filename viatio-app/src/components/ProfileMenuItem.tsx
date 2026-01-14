@@ -30,6 +30,9 @@ interface ProfileMenuItemProps {
 
   /** Color personalizado del icono (hex) */
   iconColor?: string;
+
+  /** Badge numérico (contador) */
+  badge?: number;
 }
 
 export function ProfileMenuItem({
@@ -40,6 +43,7 @@ export function ProfileMenuItem({
   showChevron = true,
   isDestructive = false,
   iconColor,
+  badge,
 }: ProfileMenuItemProps) {
   return (
     <Pressable
@@ -66,14 +70,23 @@ export function ProfileMenuItem({
 
       {/* Contenido */}
       <View style={styles.content}>
-        <Text
-          style={[
-            styles.label,
-            isDestructive && styles.labelDestructive,
-          ]}
-        >
-          {label}
-        </Text>
+        <View style={styles.labelContainer}>
+          <Text
+            style={[
+              styles.label,
+              isDestructive && styles.labelDestructive,
+            ]}
+          >
+            {label}
+          </Text>
+          {badge !== undefined && badge > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {badge > 99 ? '99+' : badge}
+              </Text>
+            </View>
+          )}
+        </View>
         {value && <Text style={styles.value}>{value}</Text>}
       </View>
 
@@ -118,6 +131,11 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: theme.spacing.md,
   },
+  labelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   label: {
     fontSize: 16,
     fontWeight: '400',
@@ -131,5 +149,19 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: theme.colors.textSecondary,
     marginTop: 2,
+  },
+  badge: {
+    backgroundColor: theme.colors.error,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
 });

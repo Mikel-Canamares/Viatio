@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TripCalendarScreen } from '@/screens';
 import { HomeStackNavigator } from './HomeStackNavigator';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
+import { useNotificationsStore } from '@/store/notificationsStore';
 import type { RootTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -24,6 +25,7 @@ const Tab = createBottomTabNavigator<RootTabParamList>();
 
 export function RootTabs() {
   const insets = useSafeAreaInsets();
+  const unreadCount = useNotificationsStore((state) => state.unreadCount);
 
   return (
     <Tab.Navigator
@@ -90,6 +92,7 @@ export function RootTabs() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" size={size} color={color} />
           ),
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
         }}
       />
     </Tab.Navigator>

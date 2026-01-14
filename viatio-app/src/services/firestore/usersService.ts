@@ -65,10 +65,13 @@ export async function upsertUser(
   }
 ): Promise<FirestoreUser | null> {
   try {
+    console.log('[UsersService] upsertUser llamado:', { uid, email: data.email });
+
     const userRef = doc(db, 'users', uid);
     const userSnap = await getDoc(userRef);
 
     if (userSnap.exists()) {
+      console.log('[UsersService] Usuario existe, actualizando...');
       // Actualizar solo si hay cambios
       const updateData: Record<string, unknown> = {
         updatedAt: serverTimestamp(),
@@ -78,19 +81,28 @@ export async function upsertUser(
       if (data.photoURL !== undefined) updateData.photoURL = data.photoURL;
 
       await updateDoc(userRef, updateData);
+      console.log('[UsersService] ✅ Usuario actualizado');
     } else {
+      console.log('[UsersService] Usuario NO existe, creando nuevo documento...');
       // Crear nuevo usuario
-      await setDoc(userRef, {
+      const userData = {
         email: data.email,
         displayName: data.displayName || data.email.split('@')[0],
         photoURL: data.photoURL || null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      });
+      };
+
+      console.log('[UsersService] Datos a guardar:', userData);
+      await setDoc(userRef, userData);
+      console.log('[UsersService] ✅ Usuario creado exitosamente');
     }
 
-    return await getUser(uid);
+    const result = await getUser(uid);
+    console.log('[UsersService] Resultado final:', result ? 'OK' : 'NULL');
+    return result;
   } catch (error) {
+    console.error('[UsersService] ❌ Error en upsertUser:', error);
     logError(error, 'usersService.upsertUser');
     return null;
   }

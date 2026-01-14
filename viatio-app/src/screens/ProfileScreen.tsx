@@ -27,11 +27,13 @@ import { getEstadisticasUsuario } from '@/services/perfilService';
 import type { EstadisticasUsuario } from '@/types/perfil';
 import type { ProfileStackParamList } from '@/navigation/types';
 import { showToast } from '@/utils/toast';
+import { useNotificationsStore } from '@/store/notificationsStore';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileMain'>;
 
 export default function ProfileScreen({ navigation }: Props) {
   const { user, logout } = useAuth();
+  const unreadCount = useNotificationsStore((state) => state.unreadCount);
 
   const [estadisticas, setEstadisticas] = useState<EstadisticasUsuario | null>(null);
   const [loading, setLoading] = useState(true);
@@ -171,16 +173,30 @@ export default function ProfileScreen({ navigation }: Props) {
           </Card>
         </View>
 
+        {/* Sección Notificaciones */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Notificaciones</Text>
+          <Card style={styles.menuCard}>
+            <ProfileMenuItem
+              icon="mail-outline"
+              label="Mis notificaciones"
+              iconColor="#8B5CF6"
+              badge={unreadCount}
+              onPress={() => navigation.navigate('Notifications')}
+            />
+            <ProfileMenuItem
+              icon="notifications-outline"
+              label="Configuración"
+              iconColor="#8B5CF6"
+              onPress={() => navigation.navigate('NotificationsSettings')}
+            />
+          </Card>
+        </View>
+
         {/* Sección Preferencias */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Preferencias</Text>
           <Card style={styles.menuCard}>
-            <ProfileMenuItem
-              icon="notifications-outline"
-              label="Notificaciones"
-              iconColor="#EA580C"
-              onPress={() => navigation.navigate('NotificationsSettings')}
-            />
             <ProfileMenuItem
               icon="settings-outline"
               label="Configuración"

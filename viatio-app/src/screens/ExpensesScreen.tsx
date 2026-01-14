@@ -190,10 +190,30 @@ export function ExpensesScreen() {
   // Para viajes compartidos - calcular total y mis gastos
   const sharedTotal = sharedExpenses.reduce((sum, e) => sum + e.amount, 0);
 
-  // "Mis Gastos" representa mi parte justa de los gastos totales
-  // Es lo que realmente gasté en el viaje, independiente de quién pagó cada gasto
+  // "Mis Gastos" representa el dinero REAL que salió de mi bolsillo
+  // = Lo que pagué - lo que me han devuelto (settlements completados recibidos) + lo que he pagado a otros (settlements completados pagados)
+  // Esto se calcula como: totalPaid - (settlements recibidos) + (settlements pagados)
+  // O más simple: totalPaid - (settlements recibidos - settlements pagados)
+  // Que es equivalente a: totalPaid - (lo que me deben - lo que debo)
+  // Y dado que netBalance = totalPaid - totalOwed, podemos calcular:
+  // myExpenses = totalPaid - (totalPaid - totalOwed - netBalanceAdjustedBySettlements)
   const myBalance = balances.find(b => b.uid === user?.uid);
-  const myExpenses = myBalance ? myBalance.totalOwed : 0;
+
+  // Calcular cuánto he recibido/pagado en settlements completados
+  const completedSettlementsImpact = settlements
+    .filter(s => s.status === 'completed')
+    .reduce((sum, s) => {
+      if (s.toUid === user?.uid) {
+        // He recibido dinero, reduce mi gasto real
+        return sum - s.amount;
+      } else if (s.fromUid === user?.uid) {
+        // He pagado dinero, aumenta mi gasto real
+        return sum + s.amount;
+      }
+      return sum;
+    }, 0);
+
+  const myExpenses = myBalance ? myBalance.totalPaid + completedSettlementsImpact : 0;
   const currency = viaje?.moneda || 'EUR';
 
   // Mapeo de categorías inglés a español para gastos compartidos

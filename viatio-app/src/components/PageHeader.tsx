@@ -9,7 +9,9 @@ import { ReactNode } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { theme } from '@/config';
+import { useNotificationsStore } from '@/store/notificationsStore';
 
 interface PageHeaderProps {
   /** Título del encabezado */
@@ -20,9 +22,20 @@ interface PageHeaderProps {
 
   /** Elemento opcional a la derecha del encabezado */
   rightElement?: ReactNode;
+
+  /** Mostrar badge de notificaciones */
+  showNotificationBadge?: boolean;
 }
 
-export function PageHeader({ title, onBack, rightElement }: PageHeaderProps) {
+export function PageHeader({
+  title,
+  onBack,
+  rightElement,
+  showNotificationBadge = false,
+}: PageHeaderProps) {
+  const navigation = useNavigation<any>();
+  const unreadCount = useNotificationsStore((state) => state.unreadCount);
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <View style={styles.container}>
@@ -36,6 +49,24 @@ export function PageHeader({ title, onBack, rightElement }: PageHeaderProps) {
         >
           {title}
         </Text>
+
+        {/* Badge de notificaciones */}
+        {showNotificationBadge && (
+          <Pressable
+            style={styles.notificationButton}
+            onPress={() => navigation.navigate('Notifications')}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="notifications-outline" size={24} color="#FFFFFF" />
+            {unreadCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Text>
+              </View>
+            )}
+          </Pressable>
+        )}
 
         {/* Elemento derecho */}
         {rightElement && <View style={styles.rightElement}>{rightElement}</View>}
@@ -102,5 +133,33 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: theme.spacing.lg,
     zIndex: 10,
+  },
+  notificationButton: {
+    position: 'absolute',
+    right: theme.spacing.lg + 48,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9,
+  },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: theme.colors.error,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 5,
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
 });
