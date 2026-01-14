@@ -68,16 +68,6 @@ export default function ProfileScreen({ navigation }: Props) {
   };
 
   /**
-   * Formatea el total gastado con la moneda
-   */
-  const formatTotalGastado = () => {
-    if (!estadisticas) return '0 €';
-    const moneda = estadisticas.monedaDefault || 'EUR';
-    const simbolo = moneda === 'EUR' ? '€' : moneda === 'USD' ? '$' : moneda;
-    return `${estadisticas.totalGastado.toFixed(0)} ${simbolo}`;
-  };
-
-  /**
    * Maneja el cierre de sesión con confirmación
    */
   const handleLogout = () => {
@@ -151,15 +141,9 @@ export default function ProfileScreen({ navigation }: Props) {
               </View>
 
               {/* Viajes completados */}
-              <View style={styles.statItem}>
+              <View style={[styles.statItem, styles.statItemLast]}>
                 <Text style={styles.statValue}>{estadisticas?.viajesCompletados || 0}</Text>
                 <Text style={styles.statLabel}>Completados</Text>
-              </View>
-
-              {/* Total gastado */}
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{formatTotalGastado()}</Text>
-                <Text style={styles.statLabel}>Gastado</Text>
               </View>
             </View>
           )}
@@ -172,11 +156,13 @@ export default function ProfileScreen({ navigation }: Props) {
             <ProfileMenuItem
               icon="person-outline"
               label="Editar perfil"
+              iconColor="#0066CC"
               onPress={() => navigation.navigate('EditProfile')}
             />
             <ProfileMenuItem
               icon="lock-closed-outline"
               label="Cambiar contraseña"
+              iconColor="#0066CC"
               onPress={() => {
                 // TODO: Implementar cambio de contraseña
                 showToast.info('Próximamente', 'Esta función estará disponible pronto.');
@@ -192,11 +178,13 @@ export default function ProfileScreen({ navigation }: Props) {
             <ProfileMenuItem
               icon="notifications-outline"
               label="Notificaciones"
+              iconColor="#EA580C"
               onPress={() => navigation.navigate('NotificationsSettings')}
             />
             <ProfileMenuItem
               icon="settings-outline"
               label="Configuración"
+              iconColor="#EA580C"
               onPress={() => navigation.navigate('Settings')}
             />
           </Card>
@@ -209,11 +197,13 @@ export default function ProfileScreen({ navigation }: Props) {
             <ProfileMenuItem
               icon="help-circle-outline"
               label="Centro de ayuda"
+              iconColor="#16A34A"
               onPress={() => navigation.navigate('Help')}
             />
             <ProfileMenuItem
               icon="chatbubbles-outline"
               label="Enviar feedback"
+              iconColor="#16A34A"
               onPress={() => {
                 showToast.info('Feedback', 'Próximamente podrás enviarnos tus comentarios.');
               }}
@@ -221,6 +211,7 @@ export default function ProfileScreen({ navigation }: Props) {
             <ProfileMenuItem
               icon="shield-checkmark-outline"
               label="Términos y privacidad"
+              iconColor="#16A34A"
               onPress={() => {
                 showToast.info('Legal', 'Próximamente: Términos y Política de Privacidad.');
               }}
@@ -316,12 +307,14 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   statItem: {
-    width: '50%',
+    width: '33.33%',
     alignItems: 'center',
     paddingVertical: theme.spacing.md,
     borderRightWidth: 1,
-    borderBottomWidth: 1,
     borderColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  statItemLast: {
+    borderRightWidth: 0,
   },
   statValue: {
     fontSize: 20,

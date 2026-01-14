@@ -3,7 +3,7 @@
  *
  * Sección de miembros para mostrar en TripDetailScreen.
  * - Si el viaje no está compartido: Muestra botón para compartir
- * - Si el viaje está compartido: Muestra avatares de miembros
+ * - Si el viaje está compartido: Muestra card con icono de personas
  */
 
 import { useState, useEffect } from 'react';
@@ -12,14 +12,15 @@ import {
   Text,
   StyleSheet,
   Pressable,
-  Image,
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '@/config';
+import { Card } from '@/components';
 import type { Viaje } from '@/types/viaje';
 import type { TripMember } from '@/types/shared';
 import { getTripMembers } from '@/services/firestore/tripsService';
+import { useAuth } from '@/context/AuthContext';
 
 interface MembersSectionProps {
   viaje: Viaje;
@@ -36,6 +37,7 @@ export function MembersSection({
 }: MembersSectionProps) {
   const [members, setMembers] = useState<TripMember[]>([]);
   const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
 
   const isShared = viaje.isShared === 1 && viaje.firestoreId;
 
@@ -60,204 +62,113 @@ export function MembersSection({
     }
   };
 
+  // Verificar si el usuario actual es administrador (owner o admin)
+  const currentMember = members.find(m => m.uid === user?.uid);
+  const isAdmin = currentMember?.role === 'owner' || currentMember?.role === 'admin';
+
   // Vista para viaje no compartido
   if (!isShared) {
     return (
-      <Pressable
-        style={styles.shareContainer}
-        onPress={onShareTrip}
-      >
-        <View style={styles.shareIconContainer}>
-          <Ionicons name="people-outline" size={24} color={theme.colors.primaryLight} />
+      <Card onPress={onShareTrip} style={styles.menuCard}>
+        <View style={styles.menuRow}>
+          <View style={[styles.iconContainer, styles.iconViajeros]}>
+            <Ionicons name="people-outline" size={24} color="#EC4899" />
+          </View>
+          <View style={styles.menuTextContainer}>
+            <Text style={styles.menuTitle}>Compartir viaje</Text>
+            <Text style={styles.menuDescription}>Invita a otras personas</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
         </View>
-        <View style={styles.shareTextContainer}>
-          <Text style={styles.shareTitle}>Compartir viaje</Text>
-          <Text style={styles.shareDescription}>
-            Invita a otras personas para planificar juntos
-          </Text>
-        </View>
-        <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
-      </Pressable>
+      </Card>
     );
   }
 
   // Vista para viaje compartido
-  return (
-    <View style={styles.sharedContainer}>
-      <View style={styles.headerRow}>
-        <Text style={styles.sectionTitle}>Viajeros</Text>
-        <Pressable onPress={onViewMembers} hitSlop={8}>
-          <Text style={styles.viewAllText}>Ver todos</Text>
-        </Pressable>
-      </View>
-
-      {loading ? (
-        <ActivityIndicator size="small" color={theme.colors.primaryLight} />
-      ) : (
-        <View style={styles.membersRow}>
-          {/* Avatares de miembros */}
-          <View style={styles.avatarsContainer}>
-            {members.slice(0, 4).map((member, index) => (
-              <View
-                key={member.uid}
-                style={[
-                  styles.avatarWrapper,
-                  { marginLeft: index > 0 ? -8 : 0, zIndex: 4 - index },
-                ]}
-              >
-                {member.photoURL ? (
-                  <Image source={{ uri: member.photoURL }} style={styles.avatar} />
-                ) : (
-                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                    <Text style={styles.avatarInitial}>
-                      {member.displayName?.charAt(0)?.toUpperCase() || '?'}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            ))}
-            {members.length > 4 && (
-              <View style={[styles.avatarWrapper, { marginLeft: -8 }]}>
-                <View style={[styles.avatar, styles.moreAvatar]}>
-                  <Text style={styles.moreText}>+{members.length - 4}</Text>
-                </View>
-              </View>
-            )}
+  if (loading) {
+    return (
+      <Card style={styles.menuCard}>
+        <View style={styles.menuRow}>
+          <View style={[styles.iconContainer, styles.iconViajeros]}>
+            <Ionicons name="people-outline" size={24} color="#EC4899" />
           </View>
+          <View style={styles.menuTextContainer}>
+            <ActivityIndicator size="small" color={theme.colors.primaryLight} />
+          </View>
+        </View>
+      </Card>
+    );
+  }
 
-          {/* Texto de conteo */}
-          <Text style={styles.memberCount}>
+  return (
+    <Card onPress={onViewMembers} style={styles.menuCard}>
+      <View style={styles.menuRow}>
+        <View style={[styles.iconContainer, styles.iconViajeros]}>
+          <Ionicons name="people-outline" size={24} color="#EC4899" />
+        </View>
+        <View style={styles.menuTextContainer}>
+          <Text style={styles.menuTitle}>Viajeros</Text>
+          <Text style={styles.menuDescription}>
             {members.length} {members.length === 1 ? 'viajero' : 'viajeros'}
           </Text>
-
-          {/* Botón invitar */}
-          <Pressable style={styles.inviteButton} onPress={onInvite}>
-            <Ionicons name="person-add-outline" size={18} color={theme.colors.primaryLight} />
-            <Text style={styles.inviteText}>Invitar</Text>
-          </Pressable>
         </View>
-      )}
-    </View>
+        {isAdmin && (
+          <Pressable
+            style={styles.inviteButton}
+            onPress={(e) => {
+              e.stopPropagation();
+              onInvite();
+            }}
+            hitSlop={8}
+          >
+            <Ionicons name="person-add-outline" size={20} color={theme.colors.primaryLight} />
+          </Pressable>
+        )}
+        <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+      </View>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  // Container para viaje no compartido
-  shareContainer: {
+  menuCard: {
+    marginBottom: theme.spacing.sm,
+  },
+  menuRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
-    marginBottom: theme.spacing.lg,
-    ...theme.shadows.card,
   },
-  shareIconContainer: {
+  iconContainer: {
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: 'rgba(0, 102, 204, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: theme.spacing.md,
   },
-  shareTextContainer: {
+  iconViajeros: {
+    backgroundColor: 'rgba(236, 72, 153, 0.1)', // Rosa pink
+  },
+  menuTextContainer: {
     flex: 1,
   },
-  shareTitle: {
+  menuTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: theme.colors.text,
+    color: '#111827',
     marginBottom: 2,
   },
-  shareDescription: {
+  menuDescription: {
     fontSize: 12,
     color: theme.colors.textSecondary,
   },
-
-  // Container para viaje compartido
-  sharedContainer: {
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
-    marginBottom: theme.spacing.lg,
-    ...theme.shadows.card,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.md,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: theme.colors.text,
-  },
-  viewAllText: {
-    fontSize: 14,
-    color: theme.colors.primaryLight,
-    fontWeight: '500',
-  },
-
-  // Row de miembros
-  membersRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  avatarsContainer: {
-    flexDirection: 'row',
-  },
-  avatarWrapper: {
-    borderWidth: 2,
-    borderColor: theme.colors.card,
-    borderRadius: theme.radius.full,
-  },
-  avatar: {
+  inviteButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-  },
-  avatarPlaceholder: {
-    backgroundColor: theme.colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarInitial: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  moreAvatar: {
-    backgroundColor: theme.colors.secondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  moreText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: theme.colors.textSecondary,
-  },
-
-  // Conteo y botón
-  memberCount: {
-    flex: 1,
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-    marginLeft: theme.spacing.md,
-  },
-  inviteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
     backgroundColor: 'rgba(0, 102, 204, 0.1)',
-    borderRadius: theme.radius.md,
-    gap: 4,
-  },
-  inviteText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: theme.colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: theme.spacing.sm,
   },
 });

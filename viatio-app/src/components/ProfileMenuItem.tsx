@@ -27,6 +27,9 @@ interface ProfileMenuItemProps {
 
   /** Si es acción destructiva (logout, eliminar cuenta) */
   isDestructive?: boolean;
+
+  /** Color personalizado del icono (hex) */
+  iconColor?: string;
 }
 
 export function ProfileMenuItem({
@@ -36,6 +39,7 @@ export function ProfileMenuItem({
   onPress,
   showChevron = true,
   isDestructive = false,
+  iconColor,
 }: ProfileMenuItemProps) {
   return (
     <Pressable
@@ -49,13 +53,14 @@ export function ProfileMenuItem({
       <View
         style={[
           styles.iconContainer,
-          isDestructive ? styles.iconContainerDestructive : styles.iconContainerNormal,
+          isDestructive && styles.iconContainerDestructive,
+          iconColor && { backgroundColor: `${iconColor}15` }, // Color con 15% opacidad
         ]}
       >
         <Ionicons
           name={icon}
           size={20}
-          color={isDestructive ? theme.colors.error : theme.colors.primaryLight}
+          color={isDestructive ? theme.colors.error : iconColor || theme.colors.primaryLight}
         />
       </View>
 
