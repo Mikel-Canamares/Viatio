@@ -13,6 +13,7 @@ import { ScreenContainer, PageHeader, PrimaryButton, Card } from '@/components';
 import { DatePickerInput } from '@/components/DatePickerInput';
 import { useSharedTripsStore } from '@/store/sharedTripsStore';
 import { useExpensesV2Store } from '@/store/expensesV2Store';
+import { useConfiguracionStore } from '@/store/useConfiguracionStore';
 import { centsToDisplay, displayToCents } from '@/types/shared';
 import { theme } from '@/theme';
 import { format } from 'date-fns';
@@ -37,8 +38,10 @@ export default function RecordSettlementScreen() {
 
   const { currentTrip, members } = useSharedTripsStore();
   const { addSettlement } = useExpensesV2Store();
+  const { config } = useConfiguracionStore();
+  const userCurrency = config.monedaDefault || 'EUR';
 
-  const [amount, setAmount] = useState((suggestedAmount / 100).toFixed(2));
+  const [amount, setAmount] = useState((suggestedAmount / 100).toFixed(3));
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
@@ -62,7 +65,7 @@ export default function RecordSettlementScreen() {
           fromUid,
           toUid,
           amount: displayToCents(amountNum),
-          currency: currentTrip?.currency || 'EUR',
+          currency: userCurrency,
           date,
           notes: notes.trim() || undefined,
         },
@@ -151,11 +154,11 @@ export default function RecordSettlementScreen() {
               placeholder="0.00"
               placeholderTextColor={theme.colors.textTertiary}
             />
-            <Text style={styles.currency}>{currentTrip?.currency || 'EUR'}</Text>
+            <Text style={styles.currency}>{userCurrency}</Text>
           </View>
 
           <Text style={styles.suggestedText}>
-            Sugerido: {centsToDisplay(suggestedAmount, currentTrip?.currency)}
+            Sugerido: {centsToDisplay(suggestedAmount, userCurrency)}
           </Text>
         </Card>
 

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { ScreenContainer, PageHeader, PrimaryButton, Card, DateInput } from '@/components';
+import { CurrencyPicker } from '@/components/CurrencyPicker';
 import { useSharedTripsStore } from '@/store/sharedTripsStore';
 import { theme } from '@/config';
 import { showToast } from '@/utils/toast';
@@ -146,28 +147,11 @@ export default function CreateSharedTripScreen() {
           </Card>
 
           <Card style={styles.card}>
-            <Text style={styles.inputLabel}>Moneda</Text>
-            <View style={styles.currencyOptions}>
-              {['EUR', 'USD', 'GBP', 'MXN'].map((curr) => (
-                <View
-                  key={curr}
-                  style={[
-                    styles.currencyOption,
-                    currency === curr && styles.currencyOptionSelected,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.currencyOptionText,
-                      currency === curr && styles.currencyOptionTextSelected,
-                    ]}
-                    onPress={() => setCurrency(curr)}
-                  >
-                    {curr}
-                  </Text>
-                </View>
-              ))}
-            </View>
+            <CurrencyPicker
+              value={currency}
+              onChange={setCurrency}
+              label="Divisa del viaje"
+            />
           </Card>
 
           <View style={styles.footer}>

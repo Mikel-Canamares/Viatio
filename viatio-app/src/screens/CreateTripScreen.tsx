@@ -25,6 +25,7 @@ import {
   LoadingOverlay,
   PlaceAutocompleteInput,
 } from '@/components';
+import { CurrencyPicker } from '@/components/CurrencyPicker';
 import { useViajesStore } from '@/store';
 import { useAuth } from '@/context';
 import { theme } from '@/config';
@@ -42,6 +43,7 @@ export default function CreateTripScreen({ navigation }: Props) {
   const [destinoPlaceId, setDestinoPlaceId] = useState<string | undefined>(undefined);
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin, setFechaFin] = useState('');
+  const [moneda, setMoneda] = useState('EUR');
 
   // Validation
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -102,6 +104,7 @@ export default function CreateTripScreen({ navigation }: Props) {
         destinoPlaceId: destinoPlaceId,
         fechaInicio,
         fechaFin,
+        moneda,
       },
       user.uid
     );
@@ -158,6 +161,12 @@ export default function CreateTripScreen({ navigation }: Props) {
               }}
               placeholder="Seleccionar fechas"
               error={errors.fechaInicio || errors.fechaFin}
+            />
+
+            <CurrencyPicker
+              value={moneda}
+              onChange={setMoneda}
+              label="Divisa del viaje"
             />
           </Card>
 

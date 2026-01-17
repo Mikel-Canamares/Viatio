@@ -30,6 +30,7 @@ import {
 } from '@/utils/errorHandler';
 import { upsertUser } from '@/services/firestore/usersService';
 import { processPendingInvitations } from '@/services/firestore/invitesService';
+import { useConfiguracionStore } from '@/store/useConfiguracionStore';
 
 /**
  * Tipo para errores de autenticación con sugerencias
@@ -105,8 +106,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         setUser(mapFirebaseUser(firebaseUser));
+
+        // Cargar configuración del usuario autenticado
+        useConfiguracionStore.getState().loadConfig(firebaseUser.uid);
       } else {
         setUser(null);
+
+        // Limpiar configuración al hacer logout
+        useConfiguracionStore.getState().clearLocalConfig();
       }
       setLoading(false);
     });

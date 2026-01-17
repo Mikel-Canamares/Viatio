@@ -24,7 +24,10 @@ import { BalancesList, SettlementSuggestions } from '@/components/shared';
 import { useGastosStore } from '@/store/gastosStore';
 import { useExpensesV2Store } from '@/store/expensesV2Store';
 import { useSharedTripsStore } from '@/store/sharedTripsStore';
+import { useCurrencyStore } from '@/store/currencyStore';
+import { useConfiguracionStore } from '@/store/useConfiguracionStore';
 import { useAuth } from '@/context/AuthContext';
+import { formatCurrency } from '@/utils/currencyFormatter';
 import { Gasto, CategoriaGasto, GASTO_CATEGORIAS } from '@/types/gasto';
 import { Reserva } from '@/types/reserva';
 import { Viaje } from '@/types/viaje';
@@ -68,6 +71,20 @@ export function ExpensesScreen() {
   // Stores para gastos individuales (SQLite)
   const { gastos, resumen, loading: loadingGastos, fetchGastos, fetchResumen } = useGastosStore();
 
+  // Currency store para conversiones
+  const { loadRates, convert } = useCurrencyStore();
+
+  // Configuración del usuario (moneda del perfil)
+  const { config } = useConfiguracionStore();
+  const userCurrency = config.monedaDefault || 'EUR';
+
+  // Estados para conversiones de moneda
+  const [convertedMyExpenses, setConvertedMyExpenses] = useState<number | null>(null);
+  const [convertedSharedTotal, setConvertedSharedTotal] = useState<number | null>(null);
+  const [convertedCategoryTotals, setConvertedCategoryTotals] = useState<Record<string, number | null>>({});
+  const [expenseAmountConversions, setExpenseAmountConversions] = useState<Record<string, number | null>>({});
+  const [convertedBalances, setConvertedBalances] = useState<any[]>([]);
+
   // Stores para gastos compartidos (Firestore)
   const {
     expenses: sharedExpenses,
@@ -97,6 +114,11 @@ export function ExpensesScreen() {
       setLoadingViaje(true);
       const viajeData = await getViajeById(viajeId);
       setViaje(viajeData);
+
+      // Cargar tasas de cambio para la divisa del perfil del usuario (para conversiones)
+      if (userCurrency) {
+        loadRates(userCurrency);
+      }
     } catch (error) {
       console.error('Error cargando viaje:', error);
     } finally {
@@ -251,6 +273,136 @@ export function ExpensesScreen() {
     });
 
   // ============================================
+  // CONVERSIONES DE MONEDA
+  // ============================================
+
+  // Convertir totales cuando cambien los gastos o la moneda
+  useEffect(() => {
+    const convertTotals = async () => {
+      if (!isShared || !viaje) return;
+
+      const tripCurrency = viaje.moneda || 'EUR';
+
+      // Si la moneda del viaje es la misma que la del perfil, no hay conversión
+      if (tripCurrency === userCurrency) {
+        setConvertedMyExpenses(myExpenses);
+        setConvertedSharedTotal(sharedTotal);
+        return;
+      }
+
+      // Convertir "Mis Gastos" (en centavos)
+      const myExpensesInUnits = myExpenses / 100;
+      const convertedMy = await convert(myExpensesInUnits, tripCurrency, userCurrency);
+      setConvertedMyExpenses(convertedMy ? convertedMy.converted * 100 : myExpenses);
+
+      // Convertir "Gastos Totales" (en centavos)
+      const sharedTotalInUnits = sharedTotal / 100;
+      const convertedTotal = await convert(sharedTotalInUnits, tripCurrency, userCurrency);
+      setConvertedSharedTotal(convertedTotal ? convertedTotal.converted * 100 : sharedTotal);
+    };
+
+    convertTotals();
+  }, [isShared, viaje, myExpenses, sharedTotal, userCurrency, convert]);
+
+  // Convertir totales de categorías
+  useEffect(() => {
+    const convertCategoryTotals = async () => {
+      if (!isShared || !viaje) return;
+
+      const tripCurrency = viaje.moneda || 'EUR';
+      const conversions: Record<string, number | null> = {};
+
+      // Si la moneda del viaje es la misma que la del perfil, usar valores originales
+      if (tripCurrency === userCurrency) {
+        for (const categoria of sharedCategoriasOrdenadas) {
+          const totalCategoria = sharedExpensesPorCategoria[categoria].reduce((sum, e) => sum + e.amount, 0);
+          conversions[categoria] = totalCategoria;
+        }
+        setConvertedCategoryTotals(conversions);
+        return;
+      }
+
+      // Convertir cada total de categoría
+      for (const categoria of sharedCategoriasOrdenadas) {
+        const totalCategoria = sharedExpensesPorCategoria[categoria].reduce((sum, e) => sum + e.amount, 0);
+        const totalInUnits = totalCategoria / 100;
+        const converted = await convert(totalInUnits, tripCurrency, userCurrency);
+        conversions[categoria] = converted ? converted.converted * 100 : totalCategoria;
+      }
+
+      setConvertedCategoryTotals(conversions);
+    };
+
+    convertCategoryTotals();
+  }, [isShared, viaje, sharedExpensesPorCategoria, sharedCategoriasOrdenadas, userCurrency, convert]);
+
+  // Convertir montos individuales de gastos (para mostrar debajo del monto original)
+  useEffect(() => {
+    const convertExpenseAmounts = async () => {
+      if (!isShared || !viaje) return;
+
+      const tripCurrency = viaje.moneda || 'EUR';
+
+      // Si la moneda del viaje es la misma que la del perfil, limpiar conversiones
+      if (tripCurrency === userCurrency) {
+        setExpenseAmountConversions({});
+        return;
+      }
+
+      const conversions: Record<string, number | null> = {};
+
+      for (const expense of sharedExpenses) {
+        const amountInUnits = expense.amount / 100;
+        const converted = await convert(amountInUnits, expense.currency, userCurrency);
+        conversions[expense.id] = converted?.converted || null;
+      }
+
+      setExpenseAmountConversions(conversions);
+    };
+
+    convertExpenseAmounts();
+  }, [isShared, viaje, sharedExpenses, userCurrency, convert]);
+
+  // Convertir balances a la moneda del perfil
+  useEffect(() => {
+    const convertBalancesData = async () => {
+      if (!isShared || !viaje || balances.length === 0) return;
+
+      const tripCurrency = viaje.moneda || 'EUR';
+
+      // Si la moneda del viaje es la misma que la del perfil, usar balances originales
+      if (tripCurrency === userCurrency) {
+        setConvertedBalances(balances);
+        return;
+      }
+
+      // Convertir cada balance
+      const converted = await Promise.all(
+        balances.map(async (balance) => {
+          const totalPaidInUnits = balance.totalPaid / 100;
+          const totalOwedInUnits = balance.totalOwed / 100;
+          const netBalanceInUnits = balance.netBalance / 100;
+
+          const convertedPaid = await convert(totalPaidInUnits, tripCurrency, userCurrency);
+          const convertedOwed = await convert(totalOwedInUnits, tripCurrency, userCurrency);
+          const convertedNet = await convert(netBalanceInUnits, tripCurrency, userCurrency);
+
+          return {
+            ...balance,
+            totalPaid: convertedPaid ? convertedPaid.converted * 100 : balance.totalPaid,
+            totalOwed: convertedOwed ? convertedOwed.converted * 100 : balance.totalOwed,
+            netBalance: convertedNet ? convertedNet.converted * 100 : balance.netBalance,
+          };
+        })
+      );
+
+      setConvertedBalances(converted);
+    };
+
+    convertBalancesData();
+  }, [isShared, viaje, balances, userCurrency, convert]);
+
+  // ============================================
   // HANDLERS
   // ============================================
 
@@ -365,7 +517,7 @@ export function ExpensesScreen() {
                 </View>
                 <Text style={styles.summaryLabel}>Mis Gastos</Text>
                 <Text style={styles.summaryAmount}>
-                  {centsToDisplay(myExpenses, currency)}
+                  {centsToDisplay(convertedMyExpenses !== null ? convertedMyExpenses : myExpenses, userCurrency)}
                 </Text>
               </View>
 
@@ -377,7 +529,7 @@ export function ExpensesScreen() {
                 </View>
                 <Text style={styles.summaryLabel}>Gastos Totales</Text>
                 <Text style={styles.summaryAmount}>
-                  {centsToDisplay(sharedTotal, currency)}
+                  {centsToDisplay(convertedSharedTotal !== null ? convertedSharedTotal : sharedTotal, userCurrency)}
                 </Text>
               </View>
             </View>
@@ -417,7 +569,9 @@ export function ExpensesScreen() {
 
               {sharedCategoriasOrdenadas.map((categoria) => {
             const gastosDeCategoria = sharedExpensesPorCategoria[categoria];
-            const totalCategoria = gastosDeCategoria.reduce((sum, e) => sum + e.amount, 0);
+            const totalCategoriaConverted = convertedCategoryTotals[categoria] !== undefined
+              ? convertedCategoryTotals[categoria]!
+              : gastosDeCategoria.reduce((sum, e) => sum + e.amount, 0);
             const categoriaInfo = GASTO_CATEGORIAS[categoria];
             const isExpanded = expandedCategories[categoria];
 
@@ -448,7 +602,7 @@ export function ExpensesScreen() {
                       </View>
                     </View>
                     <Text style={styles.categoryTotal}>
-                      {centsToDisplay(totalCategoria, currency)}
+                      {centsToDisplay(totalCategoriaConverted, userCurrency)}
                     </Text>
                   </View>
                   <Ionicons
@@ -462,13 +616,6 @@ export function ExpensesScreen() {
                 {/* Lista de gastos de esta categoría - Solo visible cuando está expandido */}
                 {isExpanded && gastosDeCategoria.map((expense) => {
                   const isPayer = expense.paidByUid === user?.uid;
-                  const myShare = expense.shares.find(s => s.uid === user?.uid);
-                  let myImpact = 0;
-                  if (myShare) {
-                    myImpact = isPayer
-                      ? expense.amount - myShare.calculatedAmount
-                      : -myShare.calculatedAmount;
-                  }
 
                   return (
                     <Pressable
@@ -492,18 +639,10 @@ export function ExpensesScreen() {
                         <Text style={styles.expenseAmount}>
                           {centsToDisplay(expense.amount, expense.currency)}
                         </Text>
-                        {myShare && myImpact !== 0 && (
-                          <View style={[
-                            styles.expenseImpactBadge,
-                            myImpact > 0 ? styles.impactBadgePositive : styles.impactBadgeNegative,
-                          ]}>
-                            <Text style={[
-                              styles.expenseImpact,
-                              myImpact > 0 ? styles.impactPositive : styles.impactNegative,
-                            ]}>
-                              {myImpact > 0 ? '+' : ''}{centsToDisplay(myImpact, expense.currency)}
-                            </Text>
-                          </View>
+                        {expenseAmountConversions[expense.id] !== undefined && expenseAmountConversions[expense.id] !== null && (
+                          <Text style={styles.expenseConversion}>
+                            ≈ {formatCurrency(expenseAmountConversions[expense.id]!, userCurrency, { decimals: 3 })}
+                          </Text>
                         )}
                       </View>
                       <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
@@ -520,7 +659,7 @@ export function ExpensesScreen() {
           {activeTab === 'saldos' && (
             <>
               {/* Balances */}
-              {balances.length > 0 && (
+              {convertedBalances.length > 0 && (
                 <View style={styles.balancesSection}>
                   <View style={styles.balancesHeader}>
                     <View style={styles.balancesHeaderContent}>
@@ -535,8 +674,8 @@ export function ExpensesScreen() {
                   </View>
                   <View style={styles.balancesContent}>
                     <BalancesList
-                      balances={balances}
-                      currency={currency}
+                      balances={convertedBalances}
+                      currency={userCurrency}
                     />
                   </View>
                 </View>
@@ -966,28 +1105,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: theme.colors.text,
-    marginBottom: 4,
   },
-  expenseImpactBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: theme.radius.sm,
-  },
-  impactBadgePositive: {
-    backgroundColor: theme.colors.success + '15',
-  },
-  impactBadgeNegative: {
-    backgroundColor: theme.colors.error + '15',
-  },
-  expenseImpact: {
+  expenseConversion: {
     fontSize: 11,
-    fontWeight: '600',
-  },
-  impactPositive: {
-    color: theme.colors.success,
-  },
-  impactNegative: {
-    color: theme.colors.error,
+    color: theme.colors.textSecondary,
+    marginTop: 2,
+    fontStyle: 'italic',
   },
 
   // Link a liquidaciones

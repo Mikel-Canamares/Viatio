@@ -29,12 +29,17 @@ import { es } from 'date-fns/locale';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { PageHeader } from '@/components/PageHeader';
 import { PrimaryButton } from '@/components/PrimaryButton';
+import { ReservationCurrencyPicker } from '@/components/ReservationCurrencyPicker';
+import { ConvertedAmount } from '@/components/ConvertedAmount';
 import { useGastosStore } from '@/store/gastosStore';
+import { useCurrencyStore } from '@/store/currencyStore';
+import { useConfiguracionStore } from '@/store/useConfiguracionStore';
 import { parseLocalDate } from '@/utils';
 import { CategoriaGasto, GASTO_CATEGORIAS } from '@/types/gasto';
 import { getViajeById } from '@/services';
 import type { Viaje } from '@/types/viaje';
 import { theme } from '@/config';
+import { getCurrencySymbol } from '@/utils/currencyFormatter';
 import type { HomeStackParamList } from '@/navigation/types';
 import { showToast } from '@/utils/toast';
 
@@ -76,7 +81,14 @@ export function AddExpenseScreen() {
   const [descripcion, setDescripcion] = useState<string>('');
   const [categoria, setCategoria] = useState<CategoriaGasto | null>(null);
   const [diaSeleccionado, setDiaSeleccionado] = useState<DiaViaje | null>(null);
+  const [selectedCurrency, setSelectedCurrency] = useState<string>('EUR');
   const [showDayPicker, setShowDayPicker] = useState(false);
+
+  // Currency store
+  const { loadRates } = useCurrencyStore();
+
+  // Configuración del usuario (para obtener moneda por defecto)
+  const { config } = useConfiguracionStore();
 
   // Cargar viaje y generar días
   useEffect(() => {
@@ -94,6 +106,13 @@ export function AddExpenseScreen() {
       }
 
       setViaje(viajeData);
+
+      // Establecer divisa del viaje
+      const viajeCurrency = viajeData.moneda || 'EUR';
+      setSelectedCurrency(viajeCurrency);
+
+      // Cargar tasas de cambio para la divisa del viaje
+      loadRates(viajeCurrency);
 
       // Generar lista de días del viaje (parseLocalDate evita problemas de zona horaria)
       const fechaInicio = parseLocalDate(viajeData.fechaInicio);
@@ -183,7 +202,7 @@ export function AddExpenseScreen() {
       categoria: categoria!,
       descripcion: descripcion.trim(),
       monto: montoNum,
-      moneda: viaje?.moneda || '€',
+      moneda: selectedCurrency,
       fecha: diaSeleccionado.fechaISO,
       diaId: undefined, // Por ahora no usamos diaId
     });
@@ -251,7 +270,7 @@ export function AddExpenseScreen() {
         {/* Input de monto grande */}
         <View style={styles.montoContainer}>
           <View style={styles.montoInputWrapper}>
-            <Text style={styles.montoSymbol}>€</Text>
+            <Text style={styles.montoSymbol}>{getCurrencySymbol(selectedCurrency)}</Text>
             <TextInput
               style={styles.montoInput}
               value={monto}
@@ -263,6 +282,19 @@ export function AddExpenseScreen() {
               autoFocus
             />
           </View>
+
+          {/* Conversión en tiempo real si la divisa es diferente */}
+          {monto && parseFloat(monto) > 0 && selectedCurrency !== viaje?.moneda && (
+            <View style={styles.conversionContainer}>
+              <ConvertedAmount
+                amount={parseFloat(monto)}
+                currency={selectedCurrency}
+                targetCurrency={viaje?.moneda || 'EUR'}
+                showOriginal={false}
+                convertedStyle={styles.conversionText}
+              />
+            </View>
+          )}
         </View>
 
         {/* Card - Categoría */}
@@ -320,6 +352,17 @@ export function AddExpenseScreen() {
               placeholder="Ej: Cena en restaurante"
               placeholderTextColor={theme.colors.textMuted}
               maxLength={100}
+            />
+          </View>
+
+          {/* Selector de divisa (solo moneda del viaje y moneda del usuario) */}
+          <View style={styles.inputGroup}>
+            <ReservationCurrencyPicker
+              value={selectedCurrency}
+              onChange={setSelectedCurrency}
+              tripCurrency={viaje?.moneda || 'EUR'}
+              userCurrency={config.monedaDefault}
+              label="Divisa"
             />
           </View>
 
@@ -642,5 +685,16 @@ const styles = StyleSheet.create({
   dayDate: {
     fontSize: 13,
     color: theme.colors.textSecondary,
+  },
+
+  // Conversión de divisa
+  conversionContainer: {
+    marginTop: theme.spacing.sm,
+    alignItems: 'center',
+  },
+  conversionText: {
+    fontSize: 16,
+    color: theme.colors.textSecondary,
+    fontStyle: 'italic',
   },
 });

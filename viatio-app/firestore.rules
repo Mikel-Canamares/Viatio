@@ -54,6 +54,12 @@ service cloud.firestore {
       allow create: if isAuthenticated() && currentUserId() == userId;
       allow update: if isAuthenticated() && currentUserId() == userId;
       allow delete: if false;
+
+      // Subcolección: settings (configuración del usuario)
+      match /settings/{settingId} {
+        allow read: if isAuthenticated() && currentUserId() == userId;
+        allow write: if isAuthenticated() && currentUserId() == userId;
+      }
     }
 
     // ============================================

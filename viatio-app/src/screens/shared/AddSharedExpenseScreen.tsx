@@ -12,10 +12,14 @@ import {
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer, PageHeader, PrimaryButton, Card, Dropdown, DropdownOption, ParticipantCheckboxList } from '@/components';
+import { ReservationCurrencyPicker } from '@/components/ReservationCurrencyPicker';
+import { ConvertedAmount } from '@/components/ConvertedAmount';
 import { SharesEditor } from '@/components/shared';
 import { DatePickerInput } from '@/components/DatePickerInput';
 import { useSharedTripsStore } from '@/store/sharedTripsStore';
 import { useExpensesV2Store } from '@/store/expensesV2Store';
+import { useCurrencyStore } from '@/store/currencyStore';
+import { useConfiguracionStore } from '@/store/useConfiguracionStore';
 import { useAuth } from '@/context/AuthContext';
 import {
   SplitMethod,
@@ -39,12 +43,15 @@ export default function AddSharedExpenseScreen() {
   const { user } = useAuth();
   const isEditing = !!expenseId;
 
-  const { currentTrip, members, fetchMembers } = useSharedTripsStore();
+  const { currentTrip, members, fetchMembers, selectTrip } = useSharedTripsStore();
   const { addExpense, editExpense, getExpenseById } = useExpensesV2Store();
+  const { loadRates } = useCurrencyStore();
+  const { config } = useConfiguracionStore();
 
   // Estado del formulario
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
+  const [currency, setCurrency] = useState('EUR');
   const [category, setCategory] = useState<CategoriaGasto>('comida');
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [paidByUid, setPaidByUid] = useState<string>(user?.uid || '');
@@ -72,10 +79,24 @@ export default function AddSharedExpenseScreen() {
     { label: 'Como montos', value: 'exact', icon: 'cash-outline' },
   ];
 
-  // Cargar miembros del viaje al montar
+  // Cargar viaje y miembros al montar
   useEffect(() => {
-    fetchMembers(tripId);
-  }, [tripId]);
+    // Si currentTrip no existe o no coincide con el tripId, cargarlo
+    if (!currentTrip || currentTrip.id !== tripId) {
+      selectTrip(tripId);
+    } else {
+      // Solo cargar miembros si el viaje ya está cargado
+      fetchMembers(tripId);
+    }
+  }, [tripId, currentTrip?.id]);
+
+  // Cargar divisa del viaje y tasas de cambio
+  useEffect(() => {
+    if (currentTrip?.currency) {
+      setCurrency(currentTrip.currency);
+      loadRates(currentTrip.currency);
+    }
+  }, [currentTrip]);
 
   // Cargar gasto existente si es edición
   useEffect(() => {
@@ -93,6 +114,7 @@ export default function AddSharedExpenseScreen() {
     if (expense) {
       setDescription(expense.description);
       setAmount((expense.amount / 100).toFixed(2));
+      setCurrency(expense.currency);
       setCategory(expense.category as CategoriaGasto);
       setDate(expense.date);
       setPaidByUid(expense.paidByUid);
@@ -222,7 +244,7 @@ export default function AddSharedExpenseScreen() {
       const input: CreateExpenseInput = {
         description: description.trim(),
         amount: amountInCents,
-        currency: currentTrip?.currency || 'EUR',
+        currency,
         category,
         date,
         paidByUid,
@@ -303,9 +325,30 @@ export default function AddSharedExpenseScreen() {
                 keyboardType="decimal-pad"
                 placeholderTextColor={theme.colors.textTertiary}
               />
-              <Text style={styles.currency}>{currentTrip?.currency || 'EUR'}</Text>
+              <Text style={styles.currency}>{currency}</Text>
             </View>
             {errors.amount && <Text style={styles.errorText}>{errors.amount}</Text>}
+
+            {/* Conversión en tiempo real */}
+            {amount && parseFloat(amount) > 0 && currency !== currentTrip?.currency && currentTrip?.currency && (
+              <View style={styles.conversionContainer}>
+                <ConvertedAmount
+                  amount={parseFloat(amount.replace(',', '.'))}
+                  currency={currency}
+                  targetCurrency={currentTrip.currency}
+                  showOriginal={false}
+                />
+              </View>
+            )}
+
+            {/* Selector de divisa (solo moneda del viaje y moneda del usuario) */}
+            <ReservationCurrencyPicker
+              value={currency}
+              onChange={setCurrency}
+              tripCurrency={currentTrip?.currency || 'EUR'}
+              userCurrency={config.monedaDefault}
+              label="Divisa"
+            />
 
             <Text style={styles.inputLabel}>Categoría</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -583,5 +626,10 @@ const styles = StyleSheet.create({
   },
   footer: {
     marginTop: 8,
+  },
+  conversionContainer: {
+    marginTop: 8,
+    marginBottom: 12,
+    alignItems: 'center',
   },
 });

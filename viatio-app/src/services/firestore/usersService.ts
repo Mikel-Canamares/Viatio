@@ -8,6 +8,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { logError } from '@/utils/errorHandler';
+import { ConfiguracionApp, DEFAULT_CONFIGURACION_APP } from '@/types/perfil';
 
 export interface FirestoreUser {
   uid: string;
@@ -142,5 +143,81 @@ export async function findUserByEmail(email: string): Promise<FirestoreUser | nu
   } catch (error) {
     logError(error, 'usersService.findUserByEmail');
     return null;
+  }
+}
+
+/**
+ * Obtener configuración del usuario desde Firestore
+ */
+export async function getUserConfig(uid: string): Promise<ConfiguracionApp | null> {
+  try {
+    const configRef = doc(db, 'users', uid, 'settings', 'config');
+    const configSnap = await getDoc(configRef);
+
+    if (!configSnap.exists()) {
+      return null;
+    }
+
+    return configSnap.data() as ConfiguracionApp;
+  } catch (error) {
+    logError(error, 'usersService.getUserConfig');
+    return null;
+  }
+}
+
+/**
+ * Guardar configuración del usuario en Firestore
+ */
+export async function saveUserConfig(
+  uid: string,
+  config: ConfiguracionApp
+): Promise<boolean> {
+  try {
+    const configRef = doc(db, 'users', uid, 'settings', 'config');
+    await setDoc(configRef, {
+      ...config,
+      updatedAt: serverTimestamp(),
+    });
+    console.log('[UsersService] ✅ Configuración guardada en Firestore');
+    return true;
+  } catch (error) {
+    console.error('[UsersService] ❌ Error guardando configuración:', error);
+    logError(error, 'usersService.saveUserConfig');
+    return false;
+  }
+}
+
+/**
+ * Actualizar parcialmente la configuración del usuario en Firestore
+ */
+export async function updateUserConfig(
+  uid: string,
+  updates: Partial<ConfiguracionApp>
+): Promise<boolean> {
+  try {
+    const configRef = doc(db, 'users', uid, 'settings', 'config');
+    const configSnap = await getDoc(configRef);
+
+    if (!configSnap.exists()) {
+      // Si no existe, crear con valores por defecto + updates
+      await setDoc(configRef, {
+        ...DEFAULT_CONFIGURACION_APP,
+        ...updates,
+        updatedAt: serverTimestamp(),
+      });
+    } else {
+      // Si existe, actualizar solo los campos proporcionados
+      await updateDoc(configRef, {
+        ...updates,
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    console.log('[UsersService] ✅ Configuración actualizada en Firestore');
+    return true;
+  } catch (error) {
+    console.error('[UsersService] ❌ Error actualizando configuración:', error);
+    logError(error, 'usersService.updateUserConfig');
+    return false;
   }
 }

@@ -30,9 +30,12 @@ import {
   PrimaryButton,
   SubtypeSelector,
   useHandlePlaceMatch,
+  Dropdown,
+  DropdownOption,
+  ParticipantCheckboxList,
 } from '@/components';
-import { MemberChipsSelector } from '@/components/shared/MemberChipsSelector';
-import { SplitMethodSelector } from '@/components/shared/SplitMethodSelector';
+import { DatePickerInput } from '@/components/DatePickerInput';
+import { ReservationCurrencyPicker } from '@/components/ReservationCurrencyPicker';
 import { SharesEditor } from '@/components/shared/SharesEditor';
 import { theme } from '@/config';
 import { showToast } from '@/utils/toast';
@@ -43,6 +46,7 @@ import { detectTipoArchivo, linkMultipleDocumentosToReserva } from '@/services/d
 import { confirmPlaceSuggestion, mapReservaCategoriaToLugarCategoria } from '@/services/placeMatchingService';
 import { parseLocalDate } from '@/utils';
 import { useTripMembers } from '@/hooks';
+import { useConfiguracionStore } from '@/store/useConfiguracionStore';
 import type {
   CreateReservaInput,
   CategoriaReserva,
@@ -91,6 +95,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
   const { addReserva, loading } = useReservasStore();
   const { addDocumento } = useDocumentosStore();
   const { handlePlaceMatch } = useHandlePlaceMatch();
+  const { config } = useConfiguracionStore();
 
   // Debug: Log de datos recibidos
   console.log('[AddReservation] viajeId:', viajeId);
@@ -123,6 +128,21 @@ export default function AddReservationScreen({ route, navigation }: Props) {
   const [splitMethod, setSplitMethod] = useState<SplitMethod>('equal');
   const [participantUids, setParticipantUids] = useState<string[]>([]);
   const [shares, setShares] = useState<Omit<ExpenseShare, 'calculatedAmount'>[]>([]);
+  const [paidDate, setPaidDate] = useState<string>(new Date().toISOString().split('T')[0]);
+
+  // Opciones para dropdowns de pago
+  const paidByOptions: DropdownOption[] = members.length > 0
+    ? members.map(member => ({
+        label: member.displayName + (member.uid === formData.paidByUserId ? '' : ''),
+        value: member.uid,
+      }))
+    : [];
+
+  const splitMethodOptions: DropdownOption<SplitMethod>[] = [
+    { label: 'Igualmente', value: 'equal', icon: 'git-compare-outline' },
+    { label: 'Partes', value: 'shares', icon: 'grid-outline' },
+    { label: 'Como montos', value: 'exact', icon: 'cash-outline' },
+  ];
 
   // Cargar datos del viaje para limitar fechas
   useEffect(() => {
@@ -175,6 +195,10 @@ export default function AddReservationScreen({ route, navigation }: Props) {
     try {
       const viajeData = await getViajeById(viajeId);
       setViaje(viajeData);
+      // Inicializar la moneda con la moneda del viaje si no hay prefillData
+      if (viajeData?.moneda && !prefillData?.moneda) {
+        setFormData((prev) => ({ ...prev, moneda: viajeData.moneda }));
+      }
     } catch (error) {
       console.error('[AddReservationScreen] Error al cargar viaje:', error);
     }
@@ -195,6 +219,63 @@ export default function AddReservationScreen({ route, navigation }: Props) {
       ...prev,
       metadatos: { ...prev.metadatos, [field]: value },
     }));
+  };
+
+  // Toggle participante en el reparto
+  const handleToggleParticipant = (uid: string) => {
+    if (participantUids.includes(uid)) {
+      // Deseleccionar (mantener al menos uno)
+      if (participantUids.length > 1) {
+        setParticipantUids(participantUids.filter((id) => id !== uid));
+      }
+    } else {
+      // Seleccionar
+      setParticipantUids([...participantUids, uid]);
+    }
+  };
+
+  // Manejar cambio de monto individual (para método 'exact')
+  const handleAmountChange = (uid: string, amountInCents: number) => {
+    const updated = shares.map((s) =>
+      s.uid === uid ? { ...s, value: amountInCents } : s
+    );
+    setShares(updated);
+  };
+
+  // Calcular montos por participante según el método de reparto
+  const calculateAmounts = (): Record<string, number> => {
+    const amounts: Record<string, number> = {};
+    const priceInCents = formData.precio
+      ? Math.round(parseFloat(formData.precio.toString()) * 100)
+      : 0;
+
+    if (splitMethod === 'equal') {
+      const equalAmount = participantUids.length > 0
+        ? Math.floor(priceInCents / participantUids.length)
+        : 0;
+      participantUids.forEach((uid) => {
+        amounts[uid] = equalAmount;
+      });
+    } else if (splitMethod === 'shares') {
+      // Calcular proporcionalmente basado en partes
+      const totalShares = shares.reduce((sum, s) => sum + s.value, 0);
+      if (totalShares > 0) {
+        shares.forEach((share) => {
+          amounts[share.uid] = Math.floor((priceInCents * share.value) / totalShares);
+        });
+      } else {
+        shares.forEach((share) => {
+          amounts[share.uid] = 0;
+        });
+      }
+    } else {
+      // Para 'exact', usar shares directamente
+      shares.forEach((share) => {
+        amounts[share.uid] = share.value;
+      });
+    }
+
+    return amounts;
   };
 
   const handleSave = async () => {
@@ -800,11 +881,12 @@ export default function AddReservationScreen({ route, navigation }: Props) {
                   />
                 </View>
                 <View style={styles.halfWidth}>
-                  <Input
+                  <ReservationCurrencyPicker
                     label="Moneda"
-                    value={formData.moneda || 'EUR'}
-                    onChangeText={(value) => updateField('moneda', value)}
-                    placeholder="EUR"
+                    value={formData.moneda || viaje?.moneda || config.monedaDefault}
+                    onChange={(value) => updateField('moneda', value)}
+                    tripCurrency={viaje?.moneda || 'EUR'}
+                    userCurrency={config.monedaDefault}
                   />
                 </View>
               </View>
@@ -836,51 +918,62 @@ export default function AddReservationScreen({ route, navigation }: Props) {
               {/* Selector de quién pagó - Solo en viajes compartidos y si el estado es pagado o parcial */}
               {viaje?.isShared && members.length > 0 && (formData.estadoPago === 'paid' || formData.estadoPago === 'partial') && (
                 <>
-                  <MemberChipsSelector
-                    members={members}
-                    selectedUids={formData.paidByUserId ? [formData.paidByUserId] : []}
-                    onToggle={(uid) => updateField('paidByUserId', uid)}
-                    singleSelect={true}
-                    label="Pagado por"
-                  />
+                  {/* Fila: Pagado por + Cuando */}
+                  <View style={styles.row}>
+                    <View style={styles.halfWidth}>
+                      <Dropdown
+                        label="Pagado por"
+                        options={paidByOptions}
+                        value={formData.paidByUserId || ''}
+                        onChange={(uid) => updateField('paidByUserId', uid)}
+                        placeholder="Seleccionar..."
+                      />
+                    </View>
+                    <View style={styles.halfWidth}>
+                      <DatePickerInput
+                        label="Cuando"
+                        value={paidDate}
+                        onChange={setPaidDate}
+                      />
+                    </View>
+                  </View>
 
                   {/* Sistema de reparto - Solo si hay precio y alguien pagó */}
                   {formData.precio && formData.paidByUserId && (
                     <>
                       <View style={styles.divider} />
-                      <Text style={styles.sectionTitle}>Reparto del gasto</Text>
 
-                      <MemberChipsSelector
-                        members={members}
-                        selectedUids={participantUids}
-                        onToggle={(uid) => {
-                          setParticipantUids((prev) =>
-                            prev.includes(uid)
-                              ? prev.filter((id) => id !== uid)
-                              : [...prev, uid]
-                          );
-                        }}
-                        singleSelect={false}
-                        label="Participantes"
+                      {/* Dropdown de método de reparto */}
+                      <Dropdown<SplitMethod>
+                        label="Dividir"
+                        options={splitMethodOptions}
+                        value={splitMethod}
+                        onChange={setSplitMethod}
                       />
 
-                      {participantUids.length > 0 && (
-                        <>
-                          <SplitMethodSelector
-                            selected={splitMethod}
-                            onSelect={setSplitMethod}
-                          />
+                      {/* Lista de participantes con checkboxes y montos */}
+                      <ParticipantCheckboxList
+                        participants={members}
+                        selectedIds={participantUids}
+                        onToggle={handleToggleParticipant}
+                        showAmounts={true}
+                        amounts={calculateAmounts()}
+                        currency={formData.moneda || 'EUR'}
+                        editable={splitMethod === 'exact'}
+                        onAmountChange={handleAmountChange}
+                      />
 
-                          <SharesEditor
-                            members={members}
-                            participantUids={participantUids}
-                            splitMethod={splitMethod}
-                            shares={shares}
-                            onChange={setShares}
-                            totalAmount={Math.round(parseFloat(formData.precio.toString()) * 100)}
-                            currency={formData.moneda || 'EUR'}
-                          />
-                        </>
+                      {/* SharesEditor solo para 'shares' y 'percentage' */}
+                      {(splitMethod === 'shares' || splitMethod === 'percentage') && (
+                        <SharesEditor
+                          members={members}
+                          participantUids={participantUids}
+                          splitMethod={splitMethod}
+                          shares={shares}
+                          onChange={setShares}
+                          totalAmount={Math.round(parseFloat(formData.precio.toString()) * 100)}
+                          currency={formData.moneda || 'EUR'}
+                        />
                       )}
                     </>
                   )}

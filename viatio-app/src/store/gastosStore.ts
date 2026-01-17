@@ -72,7 +72,8 @@ export const useGastosStore = create<GastosState & GastosActions>((set, get) => 
 
   fetchResumen: async (viajeId) => {
     try {
-      const resumen = await gastosService.getResumenGastos(viajeId);
+      // Usar resumen convertido que maneja múltiples divisas automáticamente
+      const resumen = await gastosService.getResumenGastosConvertido(viajeId);
       set({ resumen });
     } catch (error) {
       set({ error: 'Error al cargar resumen' });

@@ -559,3 +559,291 @@ Se ha integrado completamente la funcionalidad de viajes compartidos en el flujo
 - [x] Gastos agrupados por categoría con totales
 - [x] Botones editar/eliminar visibles en detalle
 - [x] Liquidaciones se actualizan en tiempo real
+
+---
+
+## 💳 Mejora de Controles de Pago en Reservas (17/01/2026)
+
+### Objetivo
+Unificar la UI de registro de pagos en reservas compartidas con la de gastos compartidos.
+
+### Cambios Realizados
+
+**Archivo modificado**: `screens/AddReservationScreen.tsx`
+
+1. **Importaciones actualizadas**:
+   - Añadido `Dropdown`, `DropdownOption`, `ParticipantCheckboxList`
+   - Añadido `DatePickerInput`
+   - Eliminados `MemberChipsSelector` y `SplitMethodSelector`
+
+2. **Nuevos estados y opciones**:
+   - `paidDate`: Estado para la fecha de pago
+   - `paidByOptions`: Opciones de dropdown para "Pagado por"
+   - `splitMethodOptions`: Opciones de dropdown para método de reparto (Igualmente, Partes, Como montos)
+
+3. **Nuevas funciones**:
+   - `handleToggleParticipant`: Toggle de selección de participante
+   - `handleAmountChange`: Cambio de monto individual para método 'exact'
+   - `calculateAmounts`: Cálculo de montos por participante según método
+
+4. **Nueva UI de pago compartido**:
+   - Fila con Dropdown "Pagado por" + DatePickerInput "Cuando"
+   - Dropdown "Dividir" con icono para cada método
+   - `ParticipantCheckboxList` con checkboxes, nombres y montos
+   - `SharesEditor` solo visible para métodos 'shares' y 'percentage'
+
+### Verificación
+- [x] Compilación TypeScript sin errores
+- [ ] Probar en viaje compartido con reserva de estado "Pagado"
+- [ ] Verificar que se muestran los miembros en el dropdown
+- [ ] Verificar que el método de reparto calcula correctamente
+- [ ] Verificar que los montos se actualizan al cambiar participantes
+
+---
+
+## 💱 Conversión de Divisas en Gastos Compartidos (17/01/2026)
+
+### Objetivo
+Implementar conversión automática de divisas en la pantalla de gastos compartidos para mostrar los importes en la moneda configurada en el perfil del usuario.
+
+### Cambios Realizados
+
+**Archivo modificado**: `screens/ExpensesScreen.tsx`
+
+1. **Nuevos imports**:
+   - `useConfiguracionStore` - Para obtener la moneda del perfil del usuario
+   - `formatCurrency` - Para formatear las cantidades convertidas
+
+2. **Nuevos estados**:
+   - `convertedMyExpenses`: Conversión de "Mis Gastos" a la moneda del perfil
+   - `convertedSharedTotal`: Conversión de "Gastos Totales" a la moneda del perfil
+   - `expenseConversions`: Record con conversiones de balance individual para cada gasto
+
+3. **Carga de tasas de cambio**:
+   - Modificado `loadViaje()` para cargar tasas usando `userCurrency` (moneda del perfil) en lugar de la moneda del viaje
+
+4. **Conversión de totales** (nuevo useEffect):
+   - Convierte "Mis Gastos" y "Gastos Totales" cuando la moneda del viaje difiere de la del perfil
+   - Solo convierte cuando `tripCurrency !== userCurrency`
+   - Maneja céntimos correctamente (divide por 100 antes de convertir)
+
+5. **Conversión de balances individuales** (nuevo useEffect):
+   - Para cada gasto, convierte el balance individual (myImpact) a la moneda del perfil
+   - Almacena conversiones en un Record indexado por expense.id
+   - Solo convierte si hay impacto diferente de 0
+
+6. **UI actualizada**:
+   - **Resumen**: Muestra conversión debajo de "Mis Gastos" y "Gastos Totales" con formato `≈ {monto convertido}`
+   - **Gastos individuales**: Muestra conversión del balance debajo del badge de impacto con formato `≈ +/-{monto convertido}`
+
+7. **Nuevos estilos**:
+   - `summaryConverted`: Estilo para conversión en resumen (12px, itálica, gris)
+   - `expenseConversion`: Estilo para conversión en gastos individuales (10px, itálica, gris)
+
+### Ejemplo Visual
+
+**Antes**:
+```
+Mis Gastos          Gastos Totales
+0 JPY               10 JPY
+```
+
+**Después** (con moneda del perfil = EUR):
+```
+Mis Gastos          Gastos Totales
+0 JPY               10 JPY
+≈ 0.00 €            ≈ 0.06 €
+```
+
+**Gasto individual**:
+```
+Ferry isla
+Pagó Mikel 1                10 JPY
+                            -5 JPY
+                            ≈ -0.03 €  ← NUEVO
+```
+
+### Corrección (17/01/2026 - 2da iteración)
+
+Se corrigió la implementación según los requisitos reales:
+
+**Cambios**:
+1. **"Mis Gastos" y "Gastos Totales"**: Ahora muestran directamente el monto convertido a la moneda del perfil (no la moneda del viaje con conversión debajo)
+   - Ejemplo: Si el viaje es en JPY y el perfil en EUR, muestra "0.06 €" en lugar de "10 JPY ≈ 0.06 €"
+
+2. **Total de categoría**: Muestra el total ya convertido a la moneda del perfil
+   - Ejemplo: "Transporte" muestra "0.06 €" en lugar de "10 JPY"
+
+3. **Gastos individuales**:
+   - Monto principal: Se mantiene en la moneda original del gasto (ej: "10 JPY")
+   - Debajo: Muestra la conversión "≈ 0.06 €"
+   - **NO se muestra el balance** (se eliminó el badge de +/- impacto)
+
+**Estados modificados**:
+- Eliminado: `expenseConversions` (conversiones de balances)
+- Añadido: `convertedCategoryTotals` (totales de categoría convertidos)
+- Añadido: `expenseAmountConversions` (conversiones de montos individuales)
+
+**Estilos eliminados**:
+- `summaryConverted` (ya no se usa)
+- `expenseImpactBadge`, `impactBadgePositive`, `impactBadgeNegative` (se eliminó el badge de impacto)
+- `expenseImpact`, `impactPositive`, `impactNegative`
+
+### Corrección (17/01/2026 - 3ra iteración)
+
+Se implementaron mejoras adicionales según los requisitos:
+
+**Cambios**:
+1. **Formato de conversión**: Ahora usa 3 decimales en lugar de 2 para mayor precisión
+   - Modificado en `ExpensesScreen.tsx`: `formatCurrency(amount, currency, { decimals: 3 })`
+
+2. **Balances convertidos**:
+   - Añadido estado `convertedBalances` que convierte todos los balances a la moneda del perfil
+   - Los balances ahora se muestran directamente en EUR (o moneda del perfil)
+   - Se convierten: `totalPaid`, `totalOwed` y `netBalance`
+
+3. **Liquidaciones convertidas** (`TripSettlementsScreen.tsx`):
+   - Añadidos imports: `useConfiguracionStore`, `useCurrencyStore`, `getViajeById`
+   - Añadidos estados: `viaje`, `convertedSuggestions`, `convertedSettlements`
+   - Nuevos useEffect que convierten sugerencias y settlements a la moneda del perfil
+   - Todos los montos se muestran en EUR (o moneda del perfil)
+
+4. **Registro de pagos** (`RecordSettlementScreen.tsx`):
+   - Añadido import: `useConfiguracionStore`
+   - El formulario ahora muestra la moneda del perfil (EUR)
+   - El campo de importe usa 3 decimales: `.toFixed(3)`
+   - El "Sugerido" se muestra en la moneda del perfil
+
+**Archivos modificados**:
+- `screens/ExpensesScreen.tsx` - Formato 3 decimales + balances convertidos
+- `screens/shared/TripSettlementsScreen.tsx` - Conversión completa de liquidaciones
+- `screens/shared/RecordSettlementScreen.tsx` - Formulario con moneda del perfil
+
+### Verificación
+- [x] Compilación TypeScript sin errores
+- [ ] Probar con viaje en JPY y perfil en EUR
+- [ ] Verificar que "Mis Gastos" y "Gastos Totales" muestran montos en EUR directamente
+- [ ] Verificar que totales de categoría muestran montos en EUR
+- [ ] Verificar que gastos individuales muestran monto original + conversión (3 decimales) debajo
+- [ ] Verificar que NO se muestran balances (+/- impacto) en los gastos
+- [ ] Verificar que balances se muestran en EUR
+- [ ] Verificar que liquidaciones (sugerencias + pagos) se muestran en EUR
+- [ ] Verificar que el formulario de registro de pago muestra EUR y usa 3 decimales
+
+---
+
+## 🐛 Duplicación de Eventos/Reservas/Lugares al Compartir Viaje (17/01/2026)
+
+### Problema Detectado
+Al compartir un viaje y descargarlo con otra cuenta, todos los eventos, reservas y lugares se duplican (aparecen 2 veces cada uno).
+
+### Análisis del Problema
+
+He identificado el flujo completo del problema:
+
+**1. Migración de SQLite a Firestore** ([migrateTripToFirestore.ts:234-350](viatio-app/src/services/migration/migrateTripToFirestore.ts#L234-L350))
+- La función `migrateTripToFirestore` crea documentos en Firestore con un campo `localId` que guarda el ID original de SQLite
+- Los documentos en Firestore usan IDs autogenerados diferentes al `localId`
+
+**2. Sincronización Realtime** ([syncRealtimeReservations.ts:84-152](viatio-app/src/services/sync/syncRealtimeReservations.ts#L84-L152), [syncRealtimePlaces.ts:84-156](viatio-app/src/services/sync/syncRealtimePlaces.ts#L84-L156), [syncRealtimeEvents.ts:89-148](viatio-app/src/services/sync/syncRealtimeEvents.ts#L89-L148))
+- Los listeners de sincronización procesan el snapshot inicial de Firestore
+- **PROBLEMA CLAVE**: Usan `INSERT OR REPLACE` con el `localId` de Firestore como ID en SQLite:
+  ```typescript
+  const id = resData.localId || firestoreId;  // Línea 234
+  await db.runAsync(`INSERT OR REPLACE INTO reservas (id, ...) VALUES (?, ...)`, [id, ...])
+  ```
+- Cuando un segundo usuario descarga el viaje compartido:
+  - Ya tiene los datos originales en SQLite con IDs como `"abc123"`
+  - Recibe de Firestore documentos con `localId = "abc123"` pero `firestoreId = "xyz789"`
+  - El código intenta insertar con `id = "abc123"` (del `localId`)
+  - **PERO** la consulta de verificación busca por `firestoreId`:
+    ```typescript
+    const existing = await db.getFirstAsync('SELECT id FROM reservas WHERE firestoreId = ?', [firestoreReservationId])
+    ```
+  - Como no encuentra ningún registro con `firestoreId = "xyz789"`, cree que es nuevo
+  - Inserta un nuevo registro con `id = "abc123"` y `firestoreId = "xyz789"`
+  - El registro original con `id = "abc123"` y `firestoreId = NULL` queda intacto
+  - **RESULTADO: Duplicación**
+
+### Causa Raíz
+La lógica de sincronización tiene una **inconsistencia entre el criterio de verificación y el criterio de inserción**:
+- Verifica existencia por `firestoreId`
+- Inserta usando `localId` como `id`
+
+Esto causa que cuando un usuario descarga un viaje compartido que él mismo creó (o que contiene datos que ya existen localmente), los datos se dupliquen.
+
+### Solución Propuesta
+
+**Opción 1: Verificar por ID local primero (RECOMENDADA)**
+En los listeners de sincronización, verificar primero si existe un registro con el `localId` antes de verificar por `firestoreId`:
+
+```typescript
+// En createLocalReserva, createLocalPlace, createLocalEvent
+const id = resData.localId || firestoreId;
+
+// Verificar primero por localId
+const existingByLocalId = await db.getFirstAsync(
+  'SELECT id, firestoreId FROM reservas WHERE id = ?',
+  [id]
+);
+
+if (existingByLocalId) {
+  // Ya existe con este ID local
+  if (!existingByLocalId.firestoreId) {
+    // Es un registro local sin firestoreId, actualizarlo
+    await db.runAsync(
+      'UPDATE reservas SET firestoreId = ?, updatedAt = ? WHERE id = ?',
+      [firestoreId, now, id]
+    );
+  }
+  // Luego actualizar el resto de campos
+  await updateLocalReserva(id, resData, viajeId, diasMap, placeIdMap);
+} else {
+  // No existe, verificar por firestoreId (por si fue creado por otro usuario)
+  const existingByFirestore = await db.getFirstAsync(
+    'SELECT id FROM reservas WHERE firestoreId = ?',
+    [firestoreId]
+  );
+
+  if (existingByFirestore) {
+    await updateLocalReserva(existingByFirestore.id, resData, viajeId, diasMap, placeIdMap);
+  } else {
+    // Realmente nuevo, insertar
+    await db.runAsync('INSERT INTO reservas (...) VALUES (...)', [...]);
+  }
+}
+```
+
+**Opción 2: Limpiar registros sin firestoreId antes de sincronizar**
+Antes de iniciar la sincronización, eliminar todos los registros locales que no tengan `firestoreId` para ese viaje.
+
+**Opción 3: Usar UPSERT con clave compuesta**
+Modificar la lógica para usar una clave única compuesta que considere tanto el `id` como el `firestoreId`.
+
+### Plan de Implementación
+
+- [ ] **Paso 1**: Modificar `syncRealtimeReservations.ts` - Implementar verificación por `localId` primero
+- [ ] **Paso 2**: Modificar `syncRealtimePlaces.ts` - Implementar verificación por `localId` primero
+- [ ] **Paso 3**: Modificar `syncRealtimeEvents.ts` - Implementar verificación por `localId` primero
+- [ ] **Paso 4**: Probar flujo completo:
+  - Crear viaje con 2 reservas, 2 lugares, 2 eventos
+  - Compartir viaje
+  - Entrar con otra cuenta
+  - Descargar viaje compartido
+  - Verificar que NO se duplican los datos
+- [ ] **Paso 5**: Probar caso de usuario que ya tiene datos locales y descarga el viaje compartido
+- [ ] **Paso 6**: Crear migración de limpieza para usuarios que ya tienen duplicados
+
+### Archivos a Modificar
+- `viatio-app/src/services/sync/syncRealtimeReservations.ts` - Función `subscribeToReservations`, líneas 84-152
+- `viatio-app/src/services/sync/syncRealtimePlaces.ts` - Función `subscribeToPlaces`, líneas 84-156
+- `viatio-app/src/services/sync/syncRealtimeEvents.ts` - Función `subscribeToEvents`, líneas 89-148
+
+### Riesgos
+- **Bajo**: La lógica de verificación doble (por `localId` y `firestoreId`) es compatible con datos existentes
+- **Medio**: Si hay datos ya duplicados, seguirán duplicados (necesitaría limpieza manual o migración)
+
+### Notas Adicionales
+- Este bug afecta solo a viajes compartidos
+- Los viajes locales no compartidos funcionan correctamente
+- El problema se manifiesta solo cuando el usuario que descarga el viaje compartido ya tiene datos locales con los mismos IDs
