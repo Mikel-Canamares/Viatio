@@ -469,6 +469,7 @@ async function buildDiasMap(viajeId: string): Promise<Map<string, string>> {
 
 /**
  * Crea un lugar en SQLite a partir de datos de Firestore
+ * Usa el localId si existe para evitar duplicados
  */
 async function createLocalLugar(
   placeData: FirestorePlace,
@@ -477,9 +478,55 @@ async function createLocalLugar(
   diasMap: Map<string, string>
 ): Promise<string> {
   const db = await getDatabase();
-  const id = generateId();
+  // Usar el localId de Firestore si existe, si no generar uno nuevo
+  const id = placeData.localId || generateId();
   const now = getCurrentTimestamp();
 
+  // Verificar si ya existe un registro con este localId
+  const existing = await db.getFirstAsync<{ id: string; firestoreId: string | null }>(
+    'SELECT id, firestoreId FROM lugares WHERE id = ?',
+    [id]
+  );
+
+  if (existing) {
+    console.log(`[SyncDownload] Lugar ya existe con localId: ${id}, actualizando en lugar de insertar`);
+
+    // Si existe pero no tiene firestoreId, vincularlo
+    if (!existing.firestoreId) {
+      await db.runAsync(
+        'UPDATE lugares SET firestoreId = ?, updatedAt = ? WHERE id = ?',
+        [firestoreId, now, id]
+      );
+    }
+
+    // Actualizar campos
+    await db.runAsync(
+      `UPDATE lugares SET
+        viajeId = ?, diaId = ?, nombre = ?, descripcion = ?, categoria = ?,
+        direccion = ?, latitud = ?, longitud = ?, googlePlaceId = ?,
+        orden = ?, visitado = ?, updatedAt = ?
+      WHERE id = ?`,
+      [
+        viajeId,
+        placeData.diaId ? diasMap.get(placeData.diaId) || null : null,
+        placeData.nombre,
+        placeData.descripcion,
+        placeData.categoria,
+        placeData.direccion,
+        placeData.latitud,
+        placeData.longitud,
+        placeData.googlePlaceId,
+        placeData.orden || 0,
+        placeData.visitado ? 1 : 0,
+        now,
+        id,
+      ]
+    );
+
+    return id;
+  }
+
+  // No existe, insertar nuevo
   await db.runAsync(
     `INSERT INTO lugares (
       id, viajeId, diaId, nombre, descripcion, categoria, direccion,
@@ -510,6 +557,7 @@ async function createLocalLugar(
 
 /**
  * Crea una reserva en SQLite a partir de datos de Firestore
+ * Usa el localId si existe para evitar duplicados
  */
 async function createLocalReserva(
   resData: FirestoreReservation,
@@ -519,7 +567,8 @@ async function createLocalReserva(
   placeIdMap: Map<string, string>
 ): Promise<string> {
   const db = await getDatabase();
-  const id = generateId();
+  // Usar el localId de Firestore si existe, si no generar uno nuevo
+  const id = resData.localId || generateId();
   const now = getCurrentTimestamp();
 
   // Determinar el diaId basado en fechaInicio
@@ -534,6 +583,62 @@ async function createLocalReserva(
     lugarId = placeIdMap.get(resData.lugarId) || null;
   }
 
+  // Verificar si ya existe un registro con este localId
+  const existing = await db.getFirstAsync<{ id: string; firestoreId: string | null }>(
+    'SELECT id, firestoreId FROM reservas WHERE id = ?',
+    [id]
+  );
+
+  if (existing) {
+    console.log(`[SyncDownload] Reserva ya existe con localId: ${id}, actualizando en lugar de insertar`);
+
+    // Si existe pero no tiene firestoreId, vincularlo
+    if (!existing.firestoreId) {
+      await db.runAsync(
+        'UPDATE reservas SET firestoreId = ?, updatedAt = ? WHERE id = ?',
+        [firestoreId, now, id]
+      );
+    }
+
+    // Actualizar campos
+    await db.runAsync(
+      `UPDATE reservas SET
+        viajeId = ?, diaId = ?, categoria = ?, nombre = ?, proveedor = ?,
+        numeroConfirmacion = ?, fechaInicio = ?, horaInicio = ?, fechaFin = ?,
+        horaFin = ?, ubicacion = ?, direccion = ?, latitud = ?, longitud = ?,
+        precio = ?, moneda = ?, estadoPago = ?, notas = ?, metadatos = ?,
+        lugarId = ?, updatedAt = ?
+      WHERE id = ?`,
+      [
+        viajeId,
+        diaId,
+        resData.categoria,
+        resData.nombre,
+        resData.proveedor,
+        resData.numeroConfirmacion,
+        resData.fechaInicio,
+        resData.horaInicio,
+        resData.fechaFin,
+        resData.horaFin,
+        resData.ubicacion,
+        resData.direccion,
+        resData.latitud,
+        resData.longitud,
+        resData.precio,
+        resData.moneda || 'EUR',
+        resData.estadoPago || 'pending',
+        resData.notas,
+        resData.metadatos,
+        lugarId,
+        now,
+        id,
+      ]
+    );
+
+    return id;
+  }
+
+  // No existe, insertar nuevo
   await db.runAsync(
     `INSERT INTO reservas (
       id, viajeId, diaId, categoria, nombre, proveedor, numeroConfirmacion,
@@ -698,6 +803,7 @@ async function createLocalDocumento(
 
 /**
  * Crea un evento personalizado en SQLite a partir de datos de Firestore
+ * Usa el localId si existe para evitar duplicados
  */
 async function createLocalEvento(
   eventData: FirestoreEvent,
@@ -707,13 +813,65 @@ async function createLocalEvento(
   placeIdMap: Map<string, string>
 ): Promise<string> {
   const db = await getDatabase();
-  const id = generateId();
+  // Usar el localId de Firestore si existe, si no generar uno nuevo
+  const id = eventData.localId || generateId();
   const now = getCurrentTimestamp();
 
   // Mapear diaId y lugarId si existen
   const localDiaId = eventData.diaId ? diasMap.get(eventData.diaId) || null : null;
   const localLugarId = eventData.lugarId ? placeIdMap.get(eventData.lugarId) || null : null;
 
+  // Verificar si ya existe un registro con este localId
+  const existing = await db.getFirstAsync<{ id: string; firestoreId: string | null }>(
+    'SELECT id, firestoreId FROM eventos_personalizados WHERE id = ?',
+    [id]
+  );
+
+  if (existing) {
+    console.log(`[SyncDownload] Evento ya existe con localId: ${id}, actualizando en lugar de insertar`);
+
+    // Si existe pero no tiene firestoreId, vincularlo
+    if (!existing.firestoreId) {
+      await db.runAsync(
+        'UPDATE eventos_personalizados SET firestoreId = ?, updatedAt = ? WHERE id = ?',
+        [firestoreId, now, id]
+      );
+    }
+
+    // Actualizar campos
+    await db.runAsync(
+      `UPDATE eventos_personalizados SET
+        viajeId = ?, diaId = ?, nombre = ?, descripcion = ?, categoria = ?,
+        horaInicio = ?, horaFin = ?, duracionMinutos = ?, ubicacion = ?,
+        direccion = ?, latitud = ?, longitud = ?, lugarId = ?, notas = ?,
+        completado = ?, prioridad = ?, updatedAt = ?
+      WHERE id = ?`,
+      [
+        viajeId,
+        localDiaId,
+        eventData.nombre,
+        eventData.descripcion,
+        eventData.categoria,
+        eventData.horaInicio,
+        eventData.horaFin,
+        eventData.duracionMinutos,
+        eventData.ubicacion,
+        eventData.direccion,
+        eventData.latitud,
+        eventData.longitud,
+        localLugarId,
+        eventData.notas,
+        eventData.completado ? 1 : 0,
+        eventData.prioridad || 'media',
+        now,
+        id,
+      ]
+    );
+
+    return id;
+  }
+
+  // No existe, insertar nuevo
   await db.runAsync(
     `INSERT INTO eventos_personalizados (
       id, viajeId, diaId, nombre, descripcion, categoria,

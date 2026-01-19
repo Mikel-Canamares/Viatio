@@ -18,6 +18,7 @@ import {
   onSnapshot,
   Timestamp,
 } from 'firebase/firestore';
+import * as SQLite from 'expo-sqlite';
 import { db as firestoreDb } from '@/config/firebase';
 import { getDatabase, generateId, getCurrentTimestamp } from '@/database';
 import { getDiasByViajeId } from '@/services/diasViajeService';
@@ -94,21 +95,8 @@ export function subscribeToEvents(
             const eventData = doc.data() as FirestoreEvent;
             const firestoreEventId = doc.id;
 
-            // Verificar si ya existe en SQLite
-            const existing = await db.getFirstAsync<{ id: string }>(
-              'SELECT id FROM eventos_personalizados WHERE firestoreId = ?',
-              [firestoreEventId]
-            );
-
-            if (!existing) {
-              // Insertar nuevo evento
-              await createLocalEvent(eventData, viajeId, firestoreEventId, diasMap, lugaresMap);
-              console.log('[Sync⬇️ Events] ✓ Evento creado (inicial):', eventData.nombre);
-            } else {
-              // Actualizar evento existente
-              await updateLocalEvent(existing.id, eventData, viajeId, diasMap, lugaresMap);
-              console.log('[Sync⬇️ Events] ✓ Evento actualizado (inicial):', eventData.nombre);
-            }
+            // Sincronizar con verificación doble (localId primero, luego firestoreId)
+            await syncEvent(db, eventData, viajeId, firestoreEventId, diasMap, lugaresMap, '(inicial)');
           }
 
           isFirstSnapshot = false;
@@ -121,21 +109,8 @@ export function subscribeToEvents(
             const firestoreEventId = change.doc.id;
 
             if (change.type === 'added' || change.type === 'modified') {
-              // Verificar si ya existe en SQLite
-              const existing = await db.getFirstAsync<{ id: string }>(
-                'SELECT id FROM eventos_personalizados WHERE firestoreId = ?',
-                [firestoreEventId]
-              );
-
-              if (!existing) {
-                // Insertar nuevo evento
-                await createLocalEvent(eventData, viajeId, firestoreEventId, diasMap, lugaresMap);
-                console.log('[Sync⬇️ Events] ✓ Evento creado:', eventData.nombre);
-              } else {
-                // Actualizar evento existente
-                await updateLocalEvent(existing.id, eventData, viajeId, diasMap, lugaresMap);
-                console.log('[Sync⬇️ Events] ✓ Evento actualizado:', eventData.nombre);
-              }
+              // Sincronizar con verificación doble (localId primero, luego firestoreId)
+              await syncEvent(db, eventData, viajeId, firestoreEventId, diasMap, lugaresMap);
             } else if (change.type === 'removed') {
               // Eliminar de SQLite
               await db.runAsync(
@@ -169,16 +144,74 @@ export function subscribeToEvents(
 // ============================================
 
 /**
- * Construye un mapa de fecha -> diaId local para asignar correctamente los eventos
+ * Sincroniza un evento de Firestore a SQLite con verificación doble
+ * para evitar duplicados
+ */
+async function syncEvent(
+  db: SQLite.SQLiteDatabase,
+  eventData: FirestoreEvent,
+  viajeId: string,
+  firestoreEventId: string,
+  diasMap: Map<string, string>,
+  lugaresMap: Map<string, string>,
+  logSuffix: string = ''
+): Promise<void> {
+  const localId = eventData.localId || generateId();
+  const now = getCurrentTimestamp();
+
+  // PASO 1: Verificar si ya existe un registro con este ID local
+  const existingByLocalId = await db.getFirstAsync<{ id: string; firestoreId: string | null }>(
+    'SELECT id, firestoreId FROM eventos_personalizados WHERE id = ?',
+    [localId]
+  );
+
+  if (existingByLocalId) {
+    // Ya existe con este ID local
+    console.log(`[Sync⬇️ Events] Registro encontrado por localId: ${localId}, firestoreId actual: ${existingByLocalId.firestoreId}`);
+
+    if (!existingByLocalId.firestoreId) {
+      // Es un registro local sin firestoreId, vincularlo con Firestore
+      await db.runAsync(
+        'UPDATE eventos_personalizados SET firestoreId = ?, updatedAt = ? WHERE id = ?',
+        [firestoreEventId, now, localId]
+      );
+      console.log(`[Sync⬇️ Events] ✓ Registro vinculado con Firestore: ${eventData.nombre}`);
+    }
+
+    // Actualizar el resto de campos
+    await updateLocalEvent(localId, eventData, viajeId, diasMap, lugaresMap);
+    console.log(`[Sync⬇️ Events] ✓ Evento actualizado ${logSuffix}:`, eventData.nombre);
+  } else {
+    // PASO 2: No existe por localId, verificar por firestoreId
+    const existingByFirestoreId = await db.getFirstAsync<{ id: string }>(
+      'SELECT id FROM eventos_personalizados WHERE firestoreId = ?',
+      [firestoreEventId]
+    );
+
+    if (existingByFirestoreId) {
+      // Existe con este firestoreId pero con otro ID local (creado por otro usuario)
+      await updateLocalEvent(existingByFirestoreId.id, eventData, viajeId, diasMap, lugaresMap);
+      console.log(`[Sync⬇️ Events] ✓ Evento actualizado ${logSuffix}:`, eventData.nombre);
+    } else {
+      // PASO 3: No existe de ninguna manera, crear nuevo
+      await createLocalEvent(eventData, viajeId, firestoreEventId, diasMap, lugaresMap);
+      console.log(`[Sync⬇️ Events] ✓ Evento creado ${logSuffix}:`, eventData.nombre);
+    }
+  }
+}
+
+/**
+ * Construye un mapa de fecha/ID -> diaId local para asignar correctamente los eventos
  */
 async function buildDiasMap(viajeId: string): Promise<Map<string, string>> {
   try {
     const dias = await getDiasByViajeId(viajeId);
     const map = new Map<string, string>();
 
-    // Mapear por fecha (ya que Firestore guarda la fecha del día)
+    // Mapear por fecha Y por ID (Firestore puede guardar cualquiera de los dos)
     for (const dia of dias) {
-      map.set(dia.fecha, dia.id);
+      map.set(dia.fecha, dia.id);  // Mapeo por fecha
+      map.set(dia.id, dia.id);      // Mapeo por ID (para registros que guarden el ID directamente)
     }
 
     return map;

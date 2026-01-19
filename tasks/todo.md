@@ -822,22 +822,87 @@ Modificar la lógica para usar una clave única compuesta que considere tanto el
 
 ### Plan de Implementación
 
-- [ ] **Paso 1**: Modificar `syncRealtimeReservations.ts` - Implementar verificación por `localId` primero
-- [ ] **Paso 2**: Modificar `syncRealtimePlaces.ts` - Implementar verificación por `localId` primero
-- [ ] **Paso 3**: Modificar `syncRealtimeEvents.ts` - Implementar verificación por `localId` primero
-- [ ] **Paso 4**: Probar flujo completo:
+- [x] **Paso 1**: Modificar `syncRealtimeReservations.ts` - Implementar verificación por `localId` primero ✅
+- [x] **Paso 2**: Modificar `syncRealtimePlaces.ts` - Implementar verificación por `localId` primero ✅
+- [x] **Paso 3**: Modificar `syncRealtimeEvents.ts` - Implementar verificación por `localId` primero ✅
+- [x] **Paso 4**: Compilación TypeScript sin errores ✅
+- [ ] **Paso 5**: Probar flujo completo:
   - Crear viaje con 2 reservas, 2 lugares, 2 eventos
   - Compartir viaje
   - Entrar con otra cuenta
   - Descargar viaje compartido
   - Verificar que NO se duplican los datos
-- [ ] **Paso 5**: Probar caso de usuario que ya tiene datos locales y descarga el viaje compartido
-- [ ] **Paso 6**: Crear migración de limpieza para usuarios que ya tienen duplicados
+- [ ] **Paso 6**: Probar caso de usuario que ya tiene datos locales y descarga el viaje compartido
+- [ ] **Paso 7**: (Opcional) Crear migración de limpieza para usuarios que ya tienen duplicados
 
-### Archivos a Modificar
-- `viatio-app/src/services/sync/syncRealtimeReservations.ts` - Función `subscribeToReservations`, líneas 84-152
-- `viatio-app/src/services/sync/syncRealtimePlaces.ts` - Función `subscribeToPlaces`, líneas 84-156
-- `viatio-app/src/services/sync/syncRealtimeEvents.ts` - Función `subscribeToEvents`, líneas 89-148
+### Cambios Implementados (17/01/2026)
+
+**1. syncRealtimeReservations.ts**
+- Añadido import de `SQLite` de `expo-sqlite`
+- Creada función `syncReserva()` con verificación doble:
+  - Paso 1: Busca por `localId`, si existe y no tiene `firestoreId`, lo vincula
+  - Paso 2: Si no existe por `localId`, busca por `firestoreId`
+  - Paso 3: Si no existe de ninguna manera, crea nuevo registro
+- Reemplazada lógica de verificación en snapshots inicial y posteriores
+
+**2. syncRealtimePlaces.ts**
+- Añadido import de `SQLite` de `expo-sqlite`
+- Creada función `syncPlace()` con verificación doble (misma lógica que reservas)
+- Retorna el `localId` para actualizar referencias en reservas
+- Reemplazada lógica de verificación en snapshots inicial y posteriores
+
+**3. syncRealtimeEvents.ts**
+- Añadido import de `SQLite` de `expo-sqlite`
+- Creada función `syncEvent()` con verificación doble (misma lógica que reservas)
+- Reemplazada lógica de verificación en snapshots inicial y posteriores
+
+### Corrección Adicional (17/01/2026 - 2da iteración)
+
+**Problema encontrado**: La solución inicial arreglaba la sincronización en tiempo real, pero **el problema también estaba en la descarga inicial** (`syncDownload.ts`).
+
+**4. syncDownload.ts**
+- Modificadas funciones `createLocalLugar`, `createLocalReserva`, `createLocalEvento`
+- Ahora usan el `localId` de Firestore en lugar de generar un ID nuevo
+- Verifican si ya existe un registro con ese `localId` antes de insertar
+- Si existe, actualizan en lugar de duplicar
+- Si no existe, insertan normalmente
+
+### Corrección Adicional (17/01/2026 - 3ra iteración)
+
+**Problema encontrado**: Los eventos personalizados **no se estaban migrando a Firestore** durante el proceso de compartir viaje.
+
+**5. migrateTripToFirestore.ts**
+- Añadido import de `getEventosByViajeId` y tipo `EventoPersonalizado`
+- Añadida fase `'events'` al tipo `MigrationProgress`
+- Añadido `events` a las estadísticas de `MigrationResult`
+- Modificada función principal para cargar y migrar eventos
+- Creada función `migrateEvento()` para migrar eventos a Firestore
+- Ajustados contadores de progreso (de 4 a 5 fases totales)
+
+### Corrección Adicional (19/01/2026 - 4ta iteración)
+
+**Problema encontrado**: Los eventos se migraban correctamente pero **no se vinculaban al día correcto** al descargar el viaje compartido. El `diaId` quedaba en `null`.
+
+**Causa raíz**: Cada usuario tiene sus propios IDs de días en SQLite. Cuando User1 migraba el viaje, guardaba el ID del día de su SQLite en Firestore. Cuando User2 descargaba, tenía IDs de días completamente diferentes, por lo que el mapeo fallaba.
+
+**Primera solución intentada**: Mapear por fecha Y por ID
+- Modificada función `buildDiasMap()` en `syncRealtimeEvents.ts` y `syncRealtimePlaces.ts`
+- El mapa tenía entradas por fecha y por ID
+- **PROBLEMA**: No funciona porque User2 tiene IDs diferentes para sus días
+
+**Solución definitiva (19/01/2026)**: Guardar **fecha** en lugar de **ID** en Firestore
+- Modificada `migrateTripToFirestore.ts` para convertir `diaId` (ID del día) a `fecha` antes de guardar en Firestore
+- Añadido `getDiasByViajeId` para construir mapa de conversión `diaId → fecha`
+- Las funciones `migrateLugar()` y `migrateEvento()` ahora reciben el mapa y convierten el ID a fecha
+- Los lugares y eventos se guardan con `diaId: "2026-01-22"` (fecha) en lugar de `diaId: "abc123"` (ID)
+- Esto asegura que `buildDiasMap()` en User2 pueda mapear correctamente por fecha (que es consistente entre usuarios)
+
+### Archivos Modificados
+- [syncRealtimeReservations.ts](viatio-app/src/services/sync/syncRealtimeReservations.ts) - +68 líneas (verificación doble)
+- [syncRealtimePlaces.ts](viatio-app/src/services/sync/syncRealtimePlaces.ts) - +73 líneas (verificación doble + mapeo dual)
+- [syncRealtimeEvents.ts](viatio-app/src/services/sync/syncRealtimeEvents.ts) - +70 líneas (verificación doble + mapeo dual)
+- [syncDownload.ts](viatio-app/src/services/sync/syncDownload.ts) - +138 líneas (3 funciones modificadas)
+- [migrateTripToFirestore.ts](viatio-app/src/services/migration/migrateTripToFirestore.ts) - +50 líneas (migración de eventos + conversión ID→fecha)
 
 ### Riesgos
 - **Bajo**: La lógica de verificación doble (por `localId` y `firestoreId`) es compatible con datos existentes

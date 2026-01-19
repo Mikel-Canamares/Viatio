@@ -18,6 +18,7 @@ import {
   onSnapshot,
   Timestamp,
 } from 'firebase/firestore';
+import * as SQLite from 'expo-sqlite';
 import { db as firestoreDb } from '@/config/firebase';
 import { getDatabase, getCurrentTimestamp } from '@/database';
 import { getDiasByViajeId } from '@/services/diasViajeService';
@@ -88,25 +89,8 @@ export function subscribeToPlaces(
             const placeData = doc.data() as FirestorePlace;
             const firestorePlaceId = doc.id;
 
-            // Verificar si ya existe en SQLite
-            const existing = await db.getFirstAsync<{ id: string }>(
-              'SELECT id FROM lugares WHERE firestoreId = ?',
-              [firestorePlaceId]
-            );
-
-            let localPlaceId: string;
-
-            if (!existing) {
-              // Insertar nuevo lugar
-              await createLocalPlace(placeData, viajeId, firestorePlaceId, diasMap);
-              localPlaceId = placeData.localId || firestorePlaceId;
-              console.log('[Sync⬇️ Places] ✓ Lugar creado (inicial):', placeData.nombre);
-            } else {
-              // Actualizar lugar existente
-              await updateLocalPlace(existing.id, placeData, viajeId, diasMap);
-              localPlaceId = existing.id;
-              console.log('[Sync⬇️ Places] ✓ Lugar actualizado (inicial):', placeData.nombre);
-            }
+            // Sincronizar con verificación doble (localId primero, luego firestoreId)
+            const localPlaceId = await syncPlace(db, placeData, viajeId, firestorePlaceId, diasMap, '(inicial)');
 
             // Después de crear/actualizar el lugar, actualizar las reservas que lo referencian
             await updateReservationPlaceReferences(viajeId, firestorePlaceId, localPlaceId);
@@ -122,25 +106,8 @@ export function subscribeToPlaces(
             const firestorePlaceId = change.doc.id;
 
             if (change.type === 'added' || change.type === 'modified') {
-              // Verificar si ya existe en SQLite
-              const existing = await db.getFirstAsync<{ id: string }>(
-                'SELECT id FROM lugares WHERE firestoreId = ?',
-                [firestorePlaceId]
-              );
-
-              let localPlaceId: string;
-
-              if (!existing) {
-                // Insertar nuevo lugar
-                await createLocalPlace(placeData, viajeId, firestorePlaceId, diasMap);
-                localPlaceId = placeData.localId || firestorePlaceId;
-                console.log('[Sync⬇️ Places] ✓ Lugar creado:', placeData.nombre);
-              } else {
-                // Actualizar lugar existente
-                await updateLocalPlace(existing.id, placeData, viajeId, diasMap);
-                localPlaceId = existing.id;
-                console.log('[Sync⬇️ Places] ✓ Lugar actualizado:', placeData.nombre);
-              }
+              // Sincronizar con verificación doble (localId primero, luego firestoreId)
+              const localPlaceId = await syncPlace(db, placeData, viajeId, firestorePlaceId, diasMap);
 
               // Después de crear/actualizar el lugar, actualizar las reservas que lo referencian
               await updateReservationPlaceReferences(viajeId, firestorePlaceId, localPlaceId);
@@ -177,15 +144,77 @@ export function subscribeToPlaces(
 // ============================================
 
 /**
- * Construye un mapa de fecha -> diaId para asignar correctamente los lugares
+ * Sincroniza un lugar de Firestore a SQLite con verificación doble
+ * para evitar duplicados
+ * @returns El ID local del lugar (para actualizar referencias)
+ */
+async function syncPlace(
+  db: SQLite.SQLiteDatabase,
+  placeData: FirestorePlace,
+  viajeId: string,
+  firestorePlaceId: string,
+  diasMap: Map<string, string>,
+  logSuffix: string = ''
+): Promise<string> {
+  const localId = placeData.localId || firestorePlaceId;
+  const now = getCurrentTimestamp();
+
+  // PASO 1: Verificar si ya existe un registro con este ID local
+  const existingByLocalId = await db.getFirstAsync<{ id: string; firestoreId: string | null }>(
+    'SELECT id, firestoreId FROM lugares WHERE id = ?',
+    [localId]
+  );
+
+  if (existingByLocalId) {
+    // Ya existe con este ID local
+    console.log(`[Sync⬇️ Places] Registro encontrado por localId: ${localId}, firestoreId actual: ${existingByLocalId.firestoreId}`);
+
+    if (!existingByLocalId.firestoreId) {
+      // Es un registro local sin firestoreId, vincularlo con Firestore
+      await db.runAsync(
+        'UPDATE lugares SET firestoreId = ?, updatedAt = ? WHERE id = ?',
+        [firestorePlaceId, now, localId]
+      );
+      console.log(`[Sync⬇️ Places] ✓ Registro vinculado con Firestore: ${placeData.nombre}`);
+    }
+
+    // Actualizar el resto de campos
+    await updateLocalPlace(localId, placeData, viajeId, diasMap);
+    console.log(`[Sync⬇️ Places] ✓ Lugar actualizado ${logSuffix}:`, placeData.nombre);
+    return localId;
+  } else {
+    // PASO 2: No existe por localId, verificar por firestoreId
+    const existingByFirestoreId = await db.getFirstAsync<{ id: string }>(
+      'SELECT id FROM lugares WHERE firestoreId = ?',
+      [firestorePlaceId]
+    );
+
+    if (existingByFirestoreId) {
+      // Existe con este firestoreId pero con otro ID local (creado por otro usuario)
+      await updateLocalPlace(existingByFirestoreId.id, placeData, viajeId, diasMap);
+      console.log(`[Sync⬇️ Places] ✓ Lugar actualizado ${logSuffix}:`, placeData.nombre);
+      return existingByFirestoreId.id;
+    } else {
+      // PASO 3: No existe de ninguna manera, crear nuevo
+      await createLocalPlace(placeData, viajeId, firestorePlaceId, diasMap);
+      console.log(`[Sync⬇️ Places] ✓ Lugar creado ${logSuffix}:`, placeData.nombre);
+      return localId;
+    }
+  }
+}
+
+/**
+ * Construye un mapa de fecha/ID -> diaId para asignar correctamente los lugares
  */
 async function buildDiasMap(viajeId: string): Promise<Map<string, string>> {
   try {
     const dias = await getDiasByViajeId(viajeId);
     const map = new Map<string, string>();
 
+    // Mapear por fecha Y por ID (Firestore puede guardar cualquiera de los dos)
     for (const dia of dias) {
-      map.set(dia.fecha, dia.id);
+      map.set(dia.fecha, dia.id);  // Mapeo por fecha
+      map.set(dia.id, dia.id);      // Mapeo por ID (para registros que guarden el ID directamente)
     }
 
     return map;
