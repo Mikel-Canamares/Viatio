@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Input, PrimaryButton, GoogleSignInButton, LinkAccountModal, LoadingOverlay } from '@/components';
+import { Input, PrimaryButton, GoogleSignInButton, LinkAccountModal, LoadingOverlay, ScreenContainer } from '@/components';
 import { useAuth } from '@/context';
 import { theme } from '@/config';
 import type { AuthStackParamList } from '@/navigation/AuthStackNavigator';
@@ -72,7 +72,7 @@ export default function LoginScreen({ navigation }: Props) {
   };
 
   return (
-    <View style={styles.container}>
+    <ScreenContainer edges={['top', 'left', 'right']}>
       {/* Header con imagen de fondo - posición absoluta */}
       <View style={styles.headerContainer}>
         <ImageBackground
@@ -222,15 +222,11 @@ export default function LoginScreen({ navigation }: Props) {
           }}
         />
       </KeyboardAvoidingView>
-    </View>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
   headerContainer: {
     position: 'absolute',
     top: 0,

@@ -20,7 +20,7 @@ interface ScreenContainerProps {
   /** Estilos adicionales para el contenedor */
   style?: ViewStyle;
 
-  /** Bordes del SafeArea a aplicar (por defecto: top, left, right) */
+  /** Bordes del SafeArea a aplicar (por defecto: top, left, right, bottom) */
   edges?: Edge[];
 }
 
@@ -28,7 +28,7 @@ export function ScreenContainer({
   children,
   scroll = false,
   style,
-  edges = ['top', 'left', 'right'],
+  edges = ['top', 'left', 'right', 'bottom'],
 }: ScreenContainerProps) {
   return (
     <SafeAreaView style={styles.container} edges={edges}>

@@ -24,6 +24,7 @@ import {
   PrimaryButton,
   LoadingOverlay,
   PlaceAutocompleteInput,
+  ScreenContainer,
 } from '@/components';
 import { CurrencyPicker } from '@/components/CurrencyPicker';
 import { useViajesStore } from '@/store';
@@ -121,7 +122,7 @@ export default function CreateTripScreen({ navigation }: Props) {
 
   return (
     <>
-      <View style={styles.container}>
+      <ScreenContainer>
         <PageHeader title="Nuevo viaje" onBack={() => navigation.goBack()} />
         <KeyboardAvoidingView
           style={{ flex: 1 }}
@@ -178,7 +179,7 @@ export default function CreateTripScreen({ navigation }: Props) {
           </View>
           </ScrollView>
         </KeyboardAvoidingView>
-      </View>
+      </ScreenContainer>
 
       <LoadingOverlay visible={loading} message="Creando viaje..." />
     </>
@@ -186,10 +187,6 @@ export default function CreateTripScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
   scroll: {
     flex: 1,
   },

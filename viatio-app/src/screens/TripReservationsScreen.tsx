@@ -24,6 +24,7 @@ import {
   PageHeader,
   ReservationCard,
   PrimaryButton,
+  ScreenContainer,
 } from '@/components';
 import { theme } from '@/config';
 import { useReservasStore } from '@/store/reservasStore';
@@ -148,18 +149,18 @@ export default function TripReservationsScreen({ route, navigation }: Props) {
 
   if (loading && reservas.length === 0) {
     return (
-      <View style={styles.container}>
+      <ScreenContainer>
         <PageHeader title="Reservas" onBack={() => navigation.goBack()} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primaryLight} />
           <Text style={styles.loadingText}>Cargando reservas...</Text>
         </View>
-      </View>
+      </ScreenContainer>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <ScreenContainer>
       <PageHeader title="Reservas" onBack={() => navigation.goBack()} />
       <View style={styles.contentWrapper}>
         <View style={styles.header}>
@@ -227,15 +228,11 @@ export default function TripReservationsScreen({ route, navigation }: Props) {
           </PrimaryButton>
         </View>
       </View>
-    </View>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
   contentWrapper: {
     flex: 1,
     paddingHorizontal: 20,

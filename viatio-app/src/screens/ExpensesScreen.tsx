@@ -8,7 +8,7 @@
  * Detecta automáticamente el modo según viaje.isShared.
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, LayoutAnimation, Platform, UIManager, Animated } from 'react-native';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -239,7 +239,7 @@ export function ExpensesScreen() {
   const currency = viaje?.moneda || 'EUR';
 
   // Mapeo de categorías inglés a español para gastos compartidos
-  const categoryToSpanish: Record<string, CategoriaGasto> = {
+  const categoryToSpanish: Record<string, CategoriaGasto> = useMemo(() => ({
     transport: 'transporte',
     accommodation: 'alojamiento',
     food: 'comida',
@@ -252,155 +252,163 @@ export function ExpensesScreen() {
     actividades: 'actividades',
     compras: 'compras',
     otros: 'otros',
-  };
+  }), []);
 
-  // Agrupar gastos compartidos por categoría
-  const sharedExpensesPorCategoria = sharedExpenses.reduce((acc, expense) => {
-    const spanishCat = categoryToSpanish[expense.category] || 'otros';
-    if (!acc[spanishCat]) {
-      acc[spanishCat] = [];
-    }
-    acc[spanishCat].push(expense);
-    return acc;
-  }, {} as Record<CategoriaGasto, SharedExpense[]>);
+  // Agrupar gastos compartidos por categoría (memoizado)
+  const sharedExpensesPorCategoria = useMemo(() => {
+    return sharedExpenses.reduce((acc, expense) => {
+      const spanishCat = categoryToSpanish[expense.category] || 'otros';
+      if (!acc[spanishCat]) {
+        acc[spanishCat] = [];
+      }
+      acc[spanishCat].push(expense);
+      return acc;
+    }, {} as Record<CategoriaGasto, SharedExpense[]>);
+  }, [sharedExpenses, categoryToSpanish]);
 
-  const sharedCategoriasOrdenadas = Object.keys(sharedExpensesPorCategoria)
-    .map((cat) => cat as CategoriaGasto)
-    .sort((a, b) => {
-      const totalA = sharedExpensesPorCategoria[a].reduce((sum, e) => sum + e.amount, 0);
-      const totalB = sharedExpensesPorCategoria[b].reduce((sum, e) => sum + e.amount, 0);
-      return totalB - totalA;
-    });
+  const sharedCategoriasOrdenadas = useMemo(() => {
+    return Object.keys(sharedExpensesPorCategoria)
+      .map((cat) => cat as CategoriaGasto)
+      .sort((a, b) => {
+        const totalA = sharedExpensesPorCategoria[a].reduce((sum, e) => sum + e.amount, 0);
+        const totalB = sharedExpensesPorCategoria[b].reduce((sum, e) => sum + e.amount, 0);
+        return totalB - totalA;
+      });
+  }, [sharedExpensesPorCategoria]);
 
   // ============================================
   // CONVERSIONES DE MONEDA
   // ============================================
 
-  // Convertir totales cuando cambien los gastos o la moneda
+  // Memoizar la función de conversión para evitar re-renders
+  const performConvert = useCallback(
+    (amount: number, from: string, to: string) => convert(amount, from, to),
+    [] // convert es una función del store, no cambia
+  );
+
+  // Efecto unificado para todas las conversiones de moneda
   useEffect(() => {
-    const convertTotals = async () => {
-      if (!isShared || !viaje) return;
+    // Solo ejecutar si es viaje compartido
+    if (!isShared || !viaje) return;
 
-      const tripCurrency = viaje.moneda || 'EUR';
+    const tripCurrency = viaje.moneda || 'EUR';
+    let isCancelled = false;
 
-      // Si la moneda del viaje es la misma que la del perfil, no hay conversión
-      if (tripCurrency === userCurrency) {
-        setConvertedMyExpenses(myExpenses);
-        setConvertedSharedTotal(sharedTotal);
-        return;
-      }
-
-      // Convertir "Mis Gastos" (en centavos)
-      const myExpensesInUnits = myExpenses / 100;
-      const convertedMy = await convert(myExpensesInUnits, tripCurrency, userCurrency);
-      setConvertedMyExpenses(convertedMy ? convertedMy.converted * 100 : myExpenses);
-
-      // Convertir "Gastos Totales" (en centavos)
-      const sharedTotalInUnits = sharedTotal / 100;
-      const convertedTotal = await convert(sharedTotalInUnits, tripCurrency, userCurrency);
-      setConvertedSharedTotal(convertedTotal ? convertedTotal.converted * 100 : sharedTotal);
-    };
-
-    convertTotals();
-  }, [isShared, viaje, myExpenses, sharedTotal, userCurrency, convert]);
-
-  // Convertir totales de categorías
-  useEffect(() => {
-    const convertCategoryTotals = async () => {
-      if (!isShared || !viaje) return;
-
-      const tripCurrency = viaje.moneda || 'EUR';
-      const conversions: Record<string, number | null> = {};
-
+    const performAllConversions = async () => {
       // Si la moneda del viaje es la misma que la del perfil, usar valores originales
       if (tripCurrency === userCurrency) {
+        if (!isCancelled) {
+          setConvertedMyExpenses(myExpenses);
+          setConvertedSharedTotal(sharedTotal);
+
+          // Totales por categoría
+          const categoryConversions: Record<string, number | null> = {};
+          for (const categoria of sharedCategoriasOrdenadas) {
+            const totalCategoria = sharedExpensesPorCategoria[categoria].reduce((sum, e) => sum + e.amount, 0);
+            categoryConversions[categoria] = totalCategoria;
+          }
+          setConvertedCategoryTotals(categoryConversions);
+
+          // Limpiar conversiones individuales
+          setExpenseAmountConversions({});
+
+          // Balances sin conversión
+          setConvertedBalances(balances);
+        }
+        return;
+      }
+
+      // Realizar todas las conversiones
+      try {
+        // 1. Convertir "Mis Gastos" y "Gastos Totales"
+        const myExpensesInUnits = myExpenses / 100;
+        const sharedTotalInUnits = sharedTotal / 100;
+
+        const [convertedMy, convertedTotal] = await Promise.all([
+          performConvert(myExpensesInUnits, tripCurrency, userCurrency),
+          performConvert(sharedTotalInUnits, tripCurrency, userCurrency),
+        ]);
+
+        if (!isCancelled) {
+          setConvertedMyExpenses(convertedMy ? convertedMy.converted * 100 : myExpenses);
+          setConvertedSharedTotal(convertedTotal ? convertedTotal.converted * 100 : sharedTotal);
+        }
+
+        // 2. Convertir totales por categoría
+        const categoryConversions: Record<string, number | null> = {};
         for (const categoria of sharedCategoriasOrdenadas) {
           const totalCategoria = sharedExpensesPorCategoria[categoria].reduce((sum, e) => sum + e.amount, 0);
-          conversions[categoria] = totalCategoria;
+          const totalInUnits = totalCategoria / 100;
+          const converted = await performConvert(totalInUnits, tripCurrency, userCurrency);
+          categoryConversions[categoria] = converted ? converted.converted * 100 : totalCategoria;
         }
-        setConvertedCategoryTotals(conversions);
-        return;
-      }
 
-      // Convertir cada total de categoría
-      for (const categoria of sharedCategoriasOrdenadas) {
-        const totalCategoria = sharedExpensesPorCategoria[categoria].reduce((sum, e) => sum + e.amount, 0);
-        const totalInUnits = totalCategoria / 100;
-        const converted = await convert(totalInUnits, tripCurrency, userCurrency);
-        conversions[categoria] = converted ? converted.converted * 100 : totalCategoria;
-      }
+        if (!isCancelled) {
+          setConvertedCategoryTotals(categoryConversions);
+        }
 
-      setConvertedCategoryTotals(conversions);
+        // 3. Convertir montos individuales de gastos
+        const expenseConversions: Record<string, number | null> = {};
+        for (const expense of sharedExpenses) {
+          const amountInUnits = expense.amount / 100;
+          const converted = await performConvert(amountInUnits, expense.currency, userCurrency);
+          expenseConversions[expense.id] = converted?.converted || null;
+        }
+
+        if (!isCancelled) {
+          setExpenseAmountConversions(expenseConversions);
+        }
+
+        // 4. Convertir balances
+        if (balances.length > 0) {
+          const convertedBalancesData = await Promise.all(
+            balances.map(async (balance) => {
+              const totalPaidInUnits = balance.totalPaid / 100;
+              const totalOwedInUnits = balance.totalOwed / 100;
+              const netBalanceInUnits = balance.netBalance / 100;
+
+              const [convertedPaid, convertedOwed, convertedNet] = await Promise.all([
+                performConvert(totalPaidInUnits, tripCurrency, userCurrency),
+                performConvert(totalOwedInUnits, tripCurrency, userCurrency),
+                performConvert(netBalanceInUnits, tripCurrency, userCurrency),
+              ]);
+
+              return {
+                ...balance,
+                totalPaid: convertedPaid ? convertedPaid.converted * 100 : balance.totalPaid,
+                totalOwed: convertedOwed ? convertedOwed.converted * 100 : balance.totalOwed,
+                netBalance: convertedNet ? convertedNet.converted * 100 : balance.netBalance,
+              };
+            })
+          );
+
+          if (!isCancelled) {
+            setConvertedBalances(convertedBalancesData);
+          }
+        }
+      } catch (error) {
+        console.error('Error en conversiones de moneda:', error);
+      }
     };
 
-    convertCategoryTotals();
-  }, [isShared, viaje, sharedExpensesPorCategoria, sharedCategoriasOrdenadas, userCurrency, convert]);
+    performAllConversions();
 
-  // Convertir montos individuales de gastos (para mostrar debajo del monto original)
-  useEffect(() => {
-    const convertExpenseAmounts = async () => {
-      if (!isShared || !viaje) return;
-
-      const tripCurrency = viaje.moneda || 'EUR';
-
-      // Si la moneda del viaje es la misma que la del perfil, limpiar conversiones
-      if (tripCurrency === userCurrency) {
-        setExpenseAmountConversions({});
-        return;
-      }
-
-      const conversions: Record<string, number | null> = {};
-
-      for (const expense of sharedExpenses) {
-        const amountInUnits = expense.amount / 100;
-        const converted = await convert(amountInUnits, expense.currency, userCurrency);
-        conversions[expense.id] = converted?.converted || null;
-      }
-
-      setExpenseAmountConversions(conversions);
+    // Cleanup function para cancelar actualizaciones si el componente se desmonta
+    return () => {
+      isCancelled = true;
     };
-
-    convertExpenseAmounts();
-  }, [isShared, viaje, sharedExpenses, userCurrency, convert]);
-
-  // Convertir balances a la moneda del perfil
-  useEffect(() => {
-    const convertBalancesData = async () => {
-      if (!isShared || !viaje || balances.length === 0) return;
-
-      const tripCurrency = viaje.moneda || 'EUR';
-
-      // Si la moneda del viaje es la misma que la del perfil, usar balances originales
-      if (tripCurrency === userCurrency) {
-        setConvertedBalances(balances);
-        return;
-      }
-
-      // Convertir cada balance
-      const converted = await Promise.all(
-        balances.map(async (balance) => {
-          const totalPaidInUnits = balance.totalPaid / 100;
-          const totalOwedInUnits = balance.totalOwed / 100;
-          const netBalanceInUnits = balance.netBalance / 100;
-
-          const convertedPaid = await convert(totalPaidInUnits, tripCurrency, userCurrency);
-          const convertedOwed = await convert(totalOwedInUnits, tripCurrency, userCurrency);
-          const convertedNet = await convert(netBalanceInUnits, tripCurrency, userCurrency);
-
-          return {
-            ...balance,
-            totalPaid: convertedPaid ? convertedPaid.converted * 100 : balance.totalPaid,
-            totalOwed: convertedOwed ? convertedOwed.converted * 100 : balance.totalOwed,
-            netBalance: convertedNet ? convertedNet.converted * 100 : balance.netBalance,
-          };
-        })
-      );
-
-      setConvertedBalances(converted);
-    };
-
-    convertBalancesData();
-  }, [isShared, viaje, balances, userCurrency, convert]);
+    // Solo disparar cuando cambien valores relevantes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isShared,
+    viaje?.moneda,
+    userCurrency,
+    myExpenses,
+    sharedTotal,
+    sharedExpenses.length, // Usar length en vez de todo el array
+    balances.length,
+    sharedCategoriasOrdenadas.length,
+  ]);
 
   // ============================================
   // HANDLERS

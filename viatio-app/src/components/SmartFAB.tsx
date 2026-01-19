@@ -20,6 +20,7 @@ import {
   Animated,
   Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '@/config/theme';
 import type { AssistantContext } from '@/hooks/useAssistantContext';
@@ -39,6 +40,7 @@ interface SmartFABProps {
 // ============================================
 
 export function SmartFAB({ context, onPress, showTooltip = true }: SmartFABProps) {
+  const insets = useSafeAreaInsets();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const [tooltipVisible, setTooltipVisible] = useState(false);
 
@@ -77,7 +79,7 @@ export function SmartFAB({ context, onPress, showTooltip = true }: SmartFABProps
   }, [context.suggestion, showTooltip]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { bottom: 20 + insets.bottom }]}>
       {/* Tooltip contextual */}
       {tooltipVisible && context.suggestion && (
         <View style={styles.tooltip}>
@@ -123,7 +125,7 @@ const styles = StyleSheet.create({
   container: {
     position: 'absolute',
     right: 20,
-    bottom: 20,
+    // bottom calculado dinámicamente con insets
     zIndex: 1000,
   },
   fabContainer: {
