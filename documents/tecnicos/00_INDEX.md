@@ -1,14 +1,21 @@
-# Índice maestro de documentación (Viatio)
+# Índice de documentación técnica — Viatio
 
-## Cómo navegar la documentación
-1. **Resumen ejecutivo y visión general** para entender el alcance y estado actual.
-2. **Arquitectura y flujos de datos** para comprender cómo funciona la app y el backend.
-3. **Operación y SRE/DevOps** para instalar, ejecutar y desplegar.
-4. **Seguridad y compliance** para riesgos y controles.
-5. **Base de datos e integraciones** para datos, sync y servicios externos.
-6. **Calidad** para testing, estándares y contribución.
-7. **Producto** para requisitos, flujos de usuario y roadmap.
-8. **Diagramas centralizados** para visión rápida.
+**Audiencia**: Desarrolladores, arquitectos, DevOps/SRE, QA
+
+➡️ **¿Buscas documentación de usuarios o marketing?** [Índice maestro global](../00_INDEX.md)
+
+---
+
+## Cómo navegar esta documentación técnica
+
+1. **Resumen ejecutivo y visión general** → entender el alcance y estado actual
+2. **Arquitectura y flujos de datos** → cómo funciona la app y el backend
+3. **Operación y SRE/DevOps** → instalar, ejecutar y desplegar
+4. **Seguridad y compliance** → riesgos y controles
+5. **Base de datos e integraciones** → datos, sync y servicios externos
+6. **Calidad** → testing, estándares y contribución
+7. **Producto** → requisitos, flujos de usuario y roadmap (referencia a `/marketing`)
+8. **Diagramas centralizados** → visión rápida
 
 ## Convenciones
 - **PENDIENTE / TODO**: información incompleta en el código actual.
@@ -61,10 +68,10 @@
 - [53_CONTRIBUTING.md](./53_CONTRIBUTING.md)
 - [54_KNOWN_ISSUES_AND_TECH_DEBT.md](./54_KNOWN_ISSUES_AND_TECH_DEBT.md)
 
-### G) Producto (Enterprise)
-- [60_PRODUCT_REQUIREMENTS.md](./60_PRODUCT_REQUIREMENTS.md)
-- [61_USER_FLOWS.md](./61_USER_FLOWS.md)
-- [62_ROADMAP.md](./62_ROADMAP.md)
+### G) Producto (referencia a docs de marketing)
+- [60_PRODUCT_REQUIREMENTS.md](../marketing/60_PRODUCT_REQUIREMENTS.md) — Requisitos de producto
+- [61_USER_FLOWS.md](../marketing/61_USER_FLOWS.md) — Flujos de usuario
+- [62_ROADMAP.md](../marketing/62_ROADMAP.md) — Roadmap propuesto
 
 ### H) Diagramas centralizados
 - [90_DIAGRAMS.md](./90_DIAGRAMS.md)
