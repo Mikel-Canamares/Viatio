@@ -417,34 +417,33 @@ export function calculateBalances(
         memberBalance.totalOwed += share.calculatedAmount;
       }
     });
+
   });
-
-  // Procesar settlements completados
-  // Los settlements son PAGOS REALES que liquidan deudas
-  // Cuando A paga X€ a B:
-  //  - A reduce su deuda (aumenta totalPaid)
-  //  - B reduce lo que le deben (aumenta totalOwed)
-  // Esto hace que ambos balances se acerquen a 0
-  settlements
-    .filter(s => s.status === 'completed')
-    .forEach(settlement => {
-      const fromBalance = balances.get(settlement.fromUid);
-      if (fromBalance) {
-        // El que paga salda parte de su deuda
-        fromBalance.totalPaid += settlement.amount;
-      }
-
-      const toBalance = balances.get(settlement.toUid);
-      if (toBalance) {
-        // El que recibe ya no se le debe tanto
-        toBalance.totalOwed += settlement.amount;
-      }
-    });
 
   // Calcular balance neto
   balances.forEach(balance => {
     balance.netBalance = balance.totalPaid - balance.totalOwed;
   });
+
+  // Ajustar balances por settlements completados
+  // Cuando alguien paga un settlement, su deuda disminuye (o su crédito aumenta)
+  // Cuando alguien recibe un settlement, lo que le deben disminuye
+  settlements
+    .filter(s => s.status === 'completed')
+    .forEach(settlement => {
+      const fromBalance = balances.get(settlement.fromUid);
+      const toBalance = balances.get(settlement.toUid);
+
+      if (fromBalance) {
+        // La persona que pagó aumenta su balance (reduce su deuda o aumenta su crédito)
+        fromBalance.netBalance += settlement.amount;
+      }
+
+      if (toBalance) {
+        // La persona que recibió disminuye su balance (reduce lo que le deben)
+        toBalance.netBalance -= settlement.amount;
+      }
+    });
 
   return Array.from(balances.values());
 }
@@ -452,11 +451,29 @@ export function calculateBalances(
 /**
  * Calcular sugerencias de liquidación (minimizar transferencias)
  * Algoritmo: emparejar deudores con acreedores
+ *
+ * IMPORTANTE: Considera settlements completados para no sugerir pagos ya realizados
  */
 export function calculateSettlementSuggestions(
-  balances: MemberBalance[]
+  balances: MemberBalance[],
+  settlements: Settlement[] = []
 ): SettlementSuggestion[] {
   const suggestions: SettlementSuggestion[] = [];
+
+  // DEBUG: Loguear settlements completados
+  const completedSettlements = settlements.filter(s => s.status === 'completed');
+  console.log('[DEBUG calculateSettlementSuggestions] Completed settlements:', completedSettlements.map(s => ({
+    fromName: s.fromName,
+    toName: s.toName,
+    amount: s.amount,
+  })));
+  console.log('[DEBUG calculateSettlementSuggestions] Balances received:', balances.map(b => ({
+    name: b.displayName,
+    netBalance: b.netBalance,
+  })));
+
+  // Los balances ya vienen ajustados por settlements completados desde calculateBalances
+  // No necesitamos re-ajustar aquí
 
   // Separar en deudores (balance negativo) y acreedores (balance positivo)
   const debtors = balances

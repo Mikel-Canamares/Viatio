@@ -84,7 +84,12 @@ export default function App() {
         <ErrorBoundary>
           <AuthProvider>
             <GlobalModalProvider>
-              <NavigationContainer>
+              <NavigationContainer
+                onStateChange={(state) => {
+                  // No persistir el estado de navegación
+                  // Esto asegura que siempre se inicie desde la pantalla inicial
+                }}
+              >
                 <RootNavigator />
                 <StatusBar style="auto" />
               </NavigationContainer>

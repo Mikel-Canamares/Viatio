@@ -21,10 +21,10 @@ import {
   Switch,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { ProfileStackParamList } from '@/navigation/types';
+import { ScreenContainer } from '@/components';
 import {
   getAllScheduledNotificationsInfo,
   getNotificationStats,
@@ -164,7 +164,7 @@ export default function NotificationsManagementScreen({ navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <ScreenContainer>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -326,15 +326,11 @@ export default function NotificationsManagementScreen({ navigation }: Props) {
           )}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

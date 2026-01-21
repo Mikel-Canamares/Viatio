@@ -11,10 +11,12 @@ import type {
   CreateGastoInput,
   CategoriaGasto,
   ResumenGastos,
+  ConvertedAmount,
 } from '@/types/gasto';
 import { logError } from '@/utils';
 import { getViajeById } from './viajesService';
 import { syncGastoIfShared, syncDeleteIfShared } from './sync/syncUpload';
+import { convertBatch } from './currencyService';
 
 // ============================================
 // CREAR
@@ -373,5 +375,163 @@ export async function getResumenGastos(viajeId: string): Promise<ResumenGastos> 
   } catch (error) {
     logError(error, 'getResumenGastos');
     throw new Error('Error al calcular resumen de gastos');
+  }
+}
+
+/**
+ * Calcula el resumen de gastos con conversión a divisa del viaje
+ * Si hay gastos en múltiples divisas, convierte todo a la divisa base
+ */
+export async function getResumenGastosConvertido(viajeId: string): Promise<ResumenGastos> {
+  try {
+    const db = await getDatabase();
+
+    // Obtener el viaje para presupuesto y moneda
+    const viaje = await getViajeById(viajeId);
+    if (!viaje) {
+      throw new Error('Viaje no encontrado');
+    }
+
+    const baseCurrency = viaje.moneda || 'EUR';
+
+    // Obtener todos los gastos
+    const gastos = await getGastosByViajeId(viajeId);
+
+    // Verificar si hay gastos en múltiples divisas
+    const divisas = new Set(gastos.map(g => g.moneda));
+
+    if (divisas.size <= 1) {
+      // Solo una divisa o sin gastos, retornar resumen normal
+      return await getResumenGastos(viajeId);
+    }
+
+    // Hay múltiples divisas: convertir todos a divisa base
+    console.log(
+      `[GastosService] Convirtiendo ${gastos.length} gastos en ${divisas.size} divisas a ${baseCurrency}`
+    );
+
+    // Preparar conversiones en batch
+    const conversions = gastos.map(gasto => ({
+      amount: gasto.monto,
+      from: gasto.moneda,
+      to: baseCurrency,
+    }));
+
+    // Realizar conversiones en batch
+    const converted = await convertBatch(conversions);
+
+    // Calcular totales convertidos
+    let totalConverted = 0;
+    const porCategoriaConverted: Record<CategoriaGasto, number> = {
+      transporte: 0,
+      alojamiento: 0,
+      comida: 0,
+      actividades: 0,
+      compras: 0,
+      otros: 0,
+    };
+    const porDiaMap = new Map<string, number>();
+
+    gastos.forEach((gasto, index) => {
+      const conversion = converted[index];
+      if (!conversion) {
+        console.warn(
+          `[GastosService] No se pudo convertir gasto ${gasto.id}, usando monto original`
+        );
+        // Si falla conversión, usar monto original (asumiendo misma divisa)
+        totalConverted += gasto.monto;
+        porCategoriaConverted[gasto.categoria] += gasto.monto;
+        porDiaMap.set(gasto.fecha, (porDiaMap.get(gasto.fecha) || 0) + gasto.monto);
+      } else {
+        const montoConvertido = conversion.converted;
+        totalConverted += montoConvertido;
+        porCategoriaConverted[gasto.categoria] += montoConvertido;
+        porDiaMap.set(gasto.fecha, (porDiaMap.get(gasto.fecha) || 0) + montoConvertido);
+      }
+    });
+
+    // Convertir mapa de días a array ordenado
+    const porDiaConverted = Array.from(porDiaMap.entries())
+      .map(([fecha, total]) => ({ fecha, total }))
+      .sort((a, b) => a.fecha.localeCompare(b.fecha));
+
+    // Calcular restante si hay presupuesto
+    let restanteConverted: number | undefined;
+    if (viaje.presupuesto !== undefined && viaje.presupuesto !== null) {
+      restanteConverted = viaje.presupuesto - totalConverted;
+    }
+
+    // Obtener también resumen normal (sin conversión) para comparación
+    const resumenNormal = await getResumenGastos(viajeId);
+
+    return {
+      ...resumenNormal,
+      // Añadir datos convertidos
+      totalConverted,
+      convertedBreakdown: {
+        porCategoria: porCategoriaConverted,
+        porDia: porDiaConverted,
+      },
+      restante: restanteConverted,
+    };
+  } catch (error) {
+    logError(error, 'getResumenGastosConvertido');
+    console.warn('[GastosService] Error en conversión, retornando resumen normal');
+    // Si falla la conversión, retornar resumen normal
+    return await getResumenGastos(viajeId);
+  }
+}
+
+/**
+ * Obtiene un gasto con información de conversión
+ * @param gastoId ID del gasto
+ * @param targetCurrency Divisa objetivo para conversión (opcional)
+ * @returns Gasto con información de conversión si aplica
+ */
+export async function getGastoConvertido(
+  gastoId: string,
+  targetCurrency?: string
+): Promise<Gasto & { converted?: ConvertedAmount }> {
+  try {
+    const gasto = await getGastoById(gastoId);
+
+    if (!gasto) {
+      throw new Error('Gasto no encontrado');
+    }
+
+    // Si no se especifica divisa objetivo, usar divisa del viaje
+    if (!targetCurrency) {
+      const viaje = await getViajeById(gasto.viajeId);
+      targetCurrency = viaje?.moneda || 'EUR';
+    }
+
+    // Si es la misma divisa, no hay conversión
+    if (gasto.moneda === targetCurrency) {
+      return gasto;
+    }
+
+    // Convertir
+    const conversions = await convertBatch([
+      {
+        amount: gasto.monto,
+        from: gasto.moneda,
+        to: targetCurrency,
+      },
+    ]);
+
+    const converted = conversions[0];
+
+    if (converted) {
+      return {
+        ...gasto,
+        converted,
+      };
+    } else {
+      console.warn(`[GastosService] No se pudo convertir gasto ${gastoId}`);
+      return gasto;
+    }
+  } catch (error) {
+    logError(error, 'getGastoConvertido');
+    throw new Error('Error al obtener gasto convertido');
   }
 }

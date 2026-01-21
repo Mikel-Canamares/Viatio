@@ -18,7 +18,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Input, PrimaryButton, GoogleSignInButton, LinkAccountModal, LoadingOverlay } from '@/components';
+import { Input, PrimaryButton, GoogleSignInButton, LinkAccountModal, LoadingOverlay, ScreenContainer } from '@/components';
 import { useAuth } from '@/context';
 import { theme } from '@/config';
 import type { AuthStackParamList } from '@/navigation/AuthStackNavigator';
@@ -98,15 +98,16 @@ export default function RegisterScreen({ navigation }: Props) {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+    <ScreenContainer edges={['top', 'left', 'right']}>
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
         {/* Header con gradiente */}
         <LinearGradient
           colors={[theme.colors.primary, theme.colors.primaryLight, theme.colors.primaryDark]}
@@ -272,12 +273,13 @@ export default function RegisterScreen({ navigation }: Props) {
           setLinkingModal({ visible: false, email: '', idToken: '' });
         }}
       />
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  keyboardView: {
     flex: 1,
     backgroundColor: theme.colors.background,
   },

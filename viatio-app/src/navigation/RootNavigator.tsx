@@ -9,9 +9,17 @@ import { useAuth } from '@/context';
 import { AuthStackNavigator } from './AuthStackNavigator';
 import { RootTabs } from './RootTabs';
 import { SplashScreen, VerifyEmailScreen } from '@/screens';
+import { useNotifications } from '@/hooks/useNotifications';
+import { useNotificationToast } from '@/hooks/useNotificationToast';
 
 export function RootNavigator() {
   const { user, loading } = useAuth();
+
+  // Activar listeners de notificaciones
+  useNotifications();
+
+  // Activar toast para nuevas notificaciones
+  useNotificationToast();
 
   // Mostrar splash mientras carga el estado de autenticación
   if (loading) {

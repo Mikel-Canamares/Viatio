@@ -28,6 +28,9 @@ import {
   shouldSuggestRegister,
   shouldSuggestLogin,
 } from '@/utils/errorHandler';
+import { upsertUser } from '@/services/firestore/usersService';
+import { processPendingInvitations } from '@/services/firestore/invitesService';
+import { useConfiguracionStore } from '@/store/useConfiguracionStore';
 
 /**
  * Tipo para errores de autenticación con sugerencias
@@ -65,11 +68,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<AuthError | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        console.log('[AuthContext] Usuario autenticado, creando documento en Firestore...', {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+        });
+
+        // Crear/actualizar documento en Firestore
+        try {
+          const result = await upsertUser(firebaseUser.uid, {
+            email: firebaseUser.email || '',
+            displayName: firebaseUser.displayName || undefined,
+            photoURL: firebaseUser.photoURL || null,
+          });
+
+          if (result) {
+            console.log('[AuthContext] ✅ Documento creado/actualizado en Firestore:', result.uid);
+
+            // Procesar invitaciones pendientes para este email
+            if (firebaseUser.email) {
+              console.log('[AuthContext] Verificando invitaciones pendientes...');
+              const notificationsCreated = await processPendingInvitations(
+                firebaseUser.email,
+                firebaseUser.uid
+              );
+
+              if (notificationsCreated > 0) {
+                console.log(`[AuthContext] ✅ ${notificationsCreated} notificaciones creadas desde invitaciones pendientes`);
+              }
+            }
+          } else {
+            console.warn('[AuthContext] ⚠️ upsertUser devolvió null');
+          }
+        } catch (error) {
+          console.error('[AuthContext] ❌ Error al crear documento en Firestore:', error);
+        }
+
         setUser(mapFirebaseUser(firebaseUser));
+
+        // Cargar configuración del usuario autenticado
+        useConfiguracionStore.getState().loadConfig(firebaseUser.uid);
       } else {
         setUser(null);
+
+        // Limpiar configuración al hacer logout
+        useConfiguracionStore.getState().clearLocalConfig();
       }
       setLoading(false);
     });

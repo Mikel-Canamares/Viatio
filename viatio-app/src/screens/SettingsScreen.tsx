@@ -7,22 +7,26 @@
 
 import { useEffect, useState } from 'react';
 import {View, Text, StyleSheet, ScrollView,
-  Alert} from 'react-native';
+  Alert, Pressable} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { ProfileStackParamList } from '@/navigation/types';
+import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { PageHeader } from '@/components/PageHeader';
 import { Card } from '@/components/Card';
 import { SectionTitle } from '@/components/SectionTitle';
 import { SelectItem, SelectOption } from '@/components/SelectItem';
 import { ProfileMenuItem } from '@/components/ProfileMenuItem';
+import { CurrencyPicker } from '@/components/CurrencyPicker';
 import { useConfiguracionStore } from '@/store/useConfiguracionStore';
-import { IDIOMAS_DISPONIBLES, MONEDAS_DISPONIBLES } from '@/types/perfil';
+import { IDIOMAS_DISPONIBLES } from '@/types/perfil';
+import { ALL_CURRENCIES } from '@/config/currencies';
 import { theme } from '@/config';
 import { showToast } from '@/utils/toast';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { deepCleanDatabase } from '@/database';
+import { useAuth } from '@/context/AuthContext';
 
 // Opciones de configuración
 const TEMAS_DISPONIBLES: SelectOption[] = [
@@ -46,14 +50,15 @@ type NavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'Settings
 
 export default function SettingsScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { config, isLoading, loadConfig, updateConfig, resetConfig } = useConfiguracionStore();
+  const { user } = useAuth();
+  const { config, isLoading, loadConfig, updateConfig } = useConfiguracionStore();
   const [cacheSize, setCacheSize] = useState<string>('Calculando...');
 
-  // Cargar configuración al montar
+  // Cargar configuración al montar (sincroniza con Firebase si hay usuario)
   useEffect(() => {
-    loadConfig();
+    loadConfig(user?.uid);
     calculateCacheSize();
-  }, []);
+  }, [user?.uid]);
 
   // Calcular tamaño de caché aproximado
   const calculateCacheSize = async () => {
@@ -81,10 +86,10 @@ export default function SettingsScreen() {
     }
   };
 
-  // Handlers de cambio
+  // Handlers de cambio (sincronizan con Firebase si hay usuario autenticado)
   const handleTemaChange = async (tema: string) => {
     try {
-      await updateConfig({ tema: tema as 'light' | 'dark' | 'system' });
+      await updateConfig({ tema: tema as 'light' | 'dark' | 'system' }, user?.uid);
     } catch (error) {
       showToast.error('Error', 'No se pudo cambiar el tema');
     }
@@ -92,7 +97,7 @@ export default function SettingsScreen() {
 
   const handleIdiomaChange = async (idioma: string) => {
     try {
-      await updateConfig({ idioma });
+      await updateConfig({ idioma }, user?.uid);
     } catch (error) {
       showToast.error('Error', 'No se pudo cambiar el idioma');
     }
@@ -100,7 +105,7 @@ export default function SettingsScreen() {
 
   const handleMonedaChange = async (monedaDefault: string) => {
     try {
-      await updateConfig({ monedaDefault });
+      await updateConfig({ monedaDefault }, user?.uid);
     } catch (error) {
       showToast.error('Error', 'No se pudo cambiar la moneda');
     }
@@ -108,7 +113,7 @@ export default function SettingsScreen() {
 
   const handleUnidadDistanciaChange = async (unidad: string) => {
     try {
-      await updateConfig({ unidadDistancia: unidad as 'km' | 'mi' });
+      await updateConfig({ unidadDistancia: unidad as 'km' | 'mi' }, user?.uid);
     } catch (error) {
       showToast.error('Error', 'No se pudo cambiar la unidad de distancia');
     }
@@ -116,7 +121,7 @@ export default function SettingsScreen() {
 
   const handleFormatoFechaChange = async (formato: string) => {
     try {
-      await updateConfig({ formatoFecha: formato as 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD' });
+      await updateConfig({ formatoFecha: formato as 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD' }, user?.uid);
     } catch (error) {
       showToast.error('Error', 'No se pudo cambiar el formato de fecha');
     }
@@ -236,16 +241,20 @@ export default function SettingsScreen() {
     );
   };
 
-  // Convertir opciones de idioma y moneda al formato SelectOption
+  // Convertir opciones de idioma al formato SelectOption
   const idiomasOptions: SelectOption[] = IDIOMAS_DISPONIBLES.map((idioma) => ({
     value: idioma.code,
     label: idioma.label,
   }));
 
-  const monedasOptions: SelectOption[] = MONEDAS_DISPONIBLES.map((moneda) => ({
-    value: moneda.code,
-    label: `${moneda.label} (${moneda.symbol})`,
-  }));
+  // Obtener información de la moneda seleccionada para mostrar en el item
+  const selectedCurrency = ALL_CURRENCIES.find(c => c.code === config.monedaDefault);
+  const currencyLabel = selectedCurrency
+    ? `${selectedCurrency.flag || ''} ${selectedCurrency.code} - ${selectedCurrency.name}`
+    : config.monedaDefault;
+
+  // Estado para controlar el modal del CurrencyPicker
+  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
 
   if (isLoading) {
     return (
@@ -296,13 +305,24 @@ export default function SettingsScreen() {
         {/* PREFERENCIAS */}
         <SectionTitle title="Preferencias" />
         <Card padding={0} style={styles.card}>
-          <SelectItem
-            label="Moneda predeterminada"
-            value={config.monedaDefault}
-            options={monedasOptions}
-            onSelect={handleMonedaChange}
-            icon="cash-outline"
-          />
+          {/* Selector de moneda con CurrencyPicker (Frankfurter API) */}
+          <Pressable
+            onPress={() => setShowCurrencyPicker(true)}
+            style={({ pressed }) => [
+              styles.currencyItem,
+              pressed && styles.currencyItemPressed,
+            ]}
+          >
+            <View style={styles.currencyIconContainer}>
+              <Ionicons name="cash-outline" size={20} color={theme.colors.primaryLight} />
+            </View>
+            <View style={styles.currencyContent}>
+              <Text style={styles.currencyLabel}>Moneda predeterminada</Text>
+              <Text style={styles.currencyValue}>{currencyLabel}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+          </Pressable>
+
           <SelectItem
             label="Unidad de distancia"
             value={config.unidadDistancia}
@@ -318,6 +338,16 @@ export default function SettingsScreen() {
             icon="calendar-outline"
           />
         </Card>
+
+        {/* Modal CurrencyPicker - se activa con showCurrencyPicker */}
+        {showCurrencyPicker && (
+          <CurrencyPicker
+            value={config.monedaDefault}
+            onChange={handleMonedaChange}
+            modalOnly
+            onClose={() => setShowCurrencyPicker(false)}
+          />
+        )}
 
         {/* DATOS */}
         <SectionTitle title="Datos" />
@@ -385,5 +415,40 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: theme.spacing.xl,
+  },
+  // Estilos para el item de moneda (consistente con SelectItem)
+  currencyItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  currencyItemPressed: {
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+  },
+  currencyIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 102, 204, 0.1)',
+    marginRight: theme.spacing.md,
+  },
+  currencyContent: {
+    flex: 1,
+  },
+  currencyLabel: {
+    fontSize: 16,
+    fontWeight: '400',
+    color: theme.colors.text,
+    marginBottom: 2,
+  },
+  currencyValue: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: theme.colors.textSecondary,
   },
 });

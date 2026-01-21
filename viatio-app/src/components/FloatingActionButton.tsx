@@ -6,6 +6,7 @@
  */
 
 import { Pressable, StyleSheet, ViewStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '@/config';
 
@@ -25,11 +26,14 @@ export function FloatingActionButton({
   icon = 'add',
   style,
 }: FloatingActionButtonProps) {
+  const insets = useSafeAreaInsets();
+
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.fab,
+        { bottom: 96 + insets.bottom }, // 96px sobre el bottom navigation + safe area
         pressed && styles.fabPressed,
         style,
       ]}
@@ -42,7 +46,7 @@ export function FloatingActionButton({
 const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
-    bottom: 96, // Sobre el bottom navigation
+    // bottom calculado dinámicamente con insets
     right: 24,
     minWidth: 120,
     paddingHorizontal: 24,

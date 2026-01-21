@@ -22,9 +22,10 @@ import {
   normalizeEmail,
 } from '@/types/shared';
 import { generateId } from '@/database';
-import { findUserByEmail } from './usersService';
+import { findUserByEmail, getUser } from './usersService';
 import { addMemberToTrip, getSharedTrip } from './tripsService';
 import { logError } from '@/utils/errorHandler';
+import { createNotification } from './notificationsService';
 
 // ============================================
 // TIPOS INTERNOS
@@ -156,6 +157,23 @@ export async function inviteUserToTrip(
     }
 
     await batch.commit();
+
+    // Crear notificación si el usuario existe
+    if (existingUser) {
+      await createNotification(existingUser.uid, {
+        type: 'trip_invite',
+        title: 'Nueva invitación a viaje',
+        body: `${user.displayName || user.email?.split('@')[0] || 'Un usuario'} te invitó a "${trip.name}"`,
+        data: {
+          tripId,
+          inviteId,
+          invitedBy: user.uid,
+          invitedByName: user.displayName || user.email?.split('@')[0] || 'Usuario',
+          tripName: trip.name,
+        },
+        expiresInDays: 7,
+      });
+    }
 
     return {
       id: inviteId,
@@ -353,6 +371,20 @@ export async function acceptInvitation(
       acceptedBy: user.uid,
     });
 
+    // Notificar al invitador
+    await createNotification(inviteData.invitedBy, {
+      type: 'invite_accepted',
+      title: 'Invitación aceptada',
+      body: `${user.displayName || user.email?.split('@')[0] || 'Un usuario'} aceptó tu invitación a "${inviteData.tripName}"`,
+      data: {
+        tripId,
+        acceptedBy: user.uid,
+        acceptedByName: user.displayName || user.email?.split('@')[0] || 'Usuario',
+        tripName: inviteData.tripName,
+      },
+      expiresInDays: 7,
+    });
+
     // Limpiar de pendingInvites
     await removePendingInvite(normalizedEmail, tripId, inviteId);
 
@@ -377,9 +409,30 @@ export async function rejectInvitation(
     const normalizedEmail = normalizeEmail(user.email);
 
     const inviteRef = doc(db, 'trips', tripId, 'invitations', inviteId);
+    const inviteSnap = await getDoc(inviteRef);
+
+    if (!inviteSnap.exists()) {
+      throw new Error('Invitación no encontrada');
+    }
+
+    const inviteData = inviteSnap.data() as InviteDoc;
 
     await updateDoc(inviteRef, {
       status: 'rejected',
+      rejectedAt: serverTimestamp(),
+    });
+
+    // Notificar al invitador
+    await createNotification(inviteData.invitedBy, {
+      type: 'invite_rejected',
+      title: 'Invitación rechazada',
+      body: `${user.displayName || user.email?.split('@')[0] || 'Un usuario'} rechazó tu invitación a "${inviteData.tripName}"`,
+      data: {
+        tripId,
+        rejectedBy: user.uid,
+        tripName: inviteData.tripName,
+      },
+      expiresInDays: 3,
     });
 
     // Limpiar de pendingInvites
@@ -487,7 +540,8 @@ export async function processPendingInvitesOnLogin(): Promise<number> {
  * Buscar invitación por código
  */
 export async function findInviteByCode(
-  code: string
+  code: string,
+  userEmail?: string
 ): Promise<{ tripId: string; invite: TripInvitation } | null> {
   try {
     const { collectionGroup } = await import('firebase/firestore');
@@ -504,6 +558,16 @@ export async function findInviteByCode(
 
     const docSnap = snapshot.docs[0];
     const data = docSnap.data() as InviteDoc;
+
+    // Validar que el email coincida (si se proporciona)
+    if (userEmail) {
+      const normalizedUserEmail = normalizeEmail(userEmail);
+      const normalizedInviteEmail = normalizeEmail(data.email);
+
+      if (normalizedUserEmail !== normalizedInviteEmail) {
+        throw new Error('Este código no está vinculado a tu email');
+      }
+    }
 
     // Extraer tripId del path: trips/{tripId}/invitations/{inviteId}
     const pathParts = docSnap.ref.path.split('/');
@@ -529,6 +593,76 @@ export async function findInviteByCode(
     };
   } catch (error) {
     logError(error, 'invitesService.findInviteByCode');
-    return null;
+    throw error; // Propagar error para que UI lo maneje
+  }
+}
+
+/**
+ * Procesar invitaciones pendientes cuando un usuario se registra
+ * Crea notificaciones para todas las invitaciones que estaban esperando
+ */
+export async function processPendingInvitations(
+  email: string,
+  uid: string
+): Promise<number> {
+  try {
+    console.log('[Invites] Procesando invitaciones pendientes para:', email);
+
+    const normalizedEmail = normalizeEmail(email);
+    const pendingInvitesRef = doc(db, 'pendingInvites', normalizedEmail);
+    const pendingSnap = await getDoc(pendingInvitesRef);
+
+    if (!pendingSnap.exists()) {
+      console.log('[Invites] No hay invitaciones pendientes');
+      return 0;
+    }
+
+    const pendingData = pendingSnap.data();
+    const invites = pendingData?.invites || [];
+
+    if (invites.length === 0) {
+      console.log('[Invites] Array de invitaciones vacío');
+      return 0;
+    }
+
+    console.log(`[Invites] Encontradas ${invites.length} invitaciones pendientes`);
+
+    // Crear notificaciones para cada invitación pendiente
+    let notificationsCreated = 0;
+
+    for (const invite of invites) {
+      try {
+        // Obtener información del invitador
+        const inviterUser = await getUser(invite.invitedBy);
+
+        await createNotification(uid, {
+          type: 'trip_invite',
+          title: 'Nueva invitación a viaje',
+          body: `${inviterUser?.displayName || invite.invitedByName || 'Un usuario'} te invitó a "${invite.tripName}"`,
+          data: {
+            tripId: invite.tripId,
+            inviteId: invite.inviteId, // CORREGIDO: usar inviteId en lugar de id
+            invitedBy: invite.invitedBy,
+            invitedByName: inviterUser?.displayName || invite.invitedByName || 'Usuario',
+            tripName: invite.tripName,
+          },
+          expiresInDays: 7,
+        });
+
+        notificationsCreated++;
+        console.log(`[Invites] ✅ Notificación creada para invitación de viaje: ${invite.tripName}`);
+      } catch (error) {
+        console.error('[Invites] Error al crear notificación:', error);
+        // Continuar con las demás invitaciones
+      }
+    }
+
+    console.log(`[Invites] ✅ ${notificationsCreated} notificaciones creadas de ${invites.length} invitaciones pendientes`);
+
+    return notificationsCreated;
+  } catch (error) {
+    console.error('[Invites] ❌ Error al procesar invitaciones pendientes:', error);
+    logError(error, 'invitesService.processPendingInvitations');
+    return 0;
   }
 }

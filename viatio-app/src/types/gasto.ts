@@ -45,6 +45,34 @@ export interface ResumenGastos {
   presupuesto?: number;
   restante?: number;
   moneda: string;
+
+  // NUEVO: Totales convertidos cuando hay gastos en múltiples divisas
+  totalConverted?: number;
+  convertedBreakdown?: {
+    porCategoria: Record<CategoriaGasto, number>;
+    porDia: Array<{ fecha: string; total: number }>;
+  };
+}
+
+/**
+ * Información de conversión de divisa para un monto
+ */
+export interface ConvertedAmount {
+  original: number;
+  originalCurrency: string;
+  converted: number;
+  convertedCurrency: string;
+  rate: number;
+}
+
+/**
+ * Tasas de cambio de divisas
+ * Respuesta de Frankfurter API
+ */
+export interface ExchangeRates {
+  base: string;
+  date: string;
+  rates: Record<string, number>;
 }
 
 /**

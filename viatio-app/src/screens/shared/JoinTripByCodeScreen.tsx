@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -21,20 +21,35 @@ export default function JoinTripByCodeScreen() {
   const { fetchViajes } = useViajesStore();
 
   const [code, setCode] = useState('');
+  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Prellenar email si usuario está logueado
+  useEffect(() => {
+    if (user?.email) {
+      setEmail(user.email);
+    }
+  }, [user]);
 
   const handleJoin = async () => {
     const cleanCode = code.trim().toUpperCase();
+    const cleanEmail = email.trim().toLowerCase();
 
     if (cleanCode.length < 6) {
       showToast.error('Error', 'Introduce un código válido');
       return;
     }
 
+    if (!cleanEmail) {
+      showToast.error('Error', 'Introduce tu email');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const result = await findInviteByCode(cleanCode);
+      // PASAR EMAIL como segundo parámetro para validación
+      const result = await findInviteByCode(cleanCode, cleanEmail);
 
       if (!result) {
         showToast.error('No encontrado', 'No existe una invitación con este código');
@@ -87,6 +102,23 @@ export default function JoinTripByCodeScreen() {
         </Text>
 
         <Card style={styles.card}>
+          <Text style={styles.inputLabel}>Tu email</Text>
+          <TextInput
+            style={styles.emailInput}
+            value={email}
+            onChangeText={setEmail}
+            placeholder="ejemplo@email.com"
+            placeholderTextColor={theme.colors.textTertiary}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="email"
+            editable={!user?.email}
+          />
+          {user?.email && (
+            <Text style={styles.hint}>Email de tu cuenta actual</Text>
+          )}
+
+          <Text style={[styles.inputLabel, { marginTop: 16 }]}>Código</Text>
           <TextInput
             style={styles.codeInput}
             value={code}
@@ -98,11 +130,18 @@ export default function JoinTripByCodeScreen() {
           />
         </Card>
 
+        <View style={styles.infoBox}>
+          <Ionicons name="shield-checkmark" size={20} color={theme.colors.success} />
+          <Text style={styles.infoText}>
+            El código solo funciona si fue generado para tu email
+          </Text>
+        </View>
+
         <PrimaryButton
           title="Unirme al viaje"
           onPress={handleJoin}
           loading={loading}
-          disabled={code.trim().length < 6}
+          disabled={code.trim().length < 6 || !email.trim()}
         />
       </View>
     </ScreenContainer>
@@ -134,8 +173,28 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   card: {
-    marginBottom: 24,
-    padding: 8,
+    marginBottom: 16,
+    padding: 16,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.textSecondary,
+    marginBottom: 8,
+  },
+  emailInput: {
+    fontSize: 16,
+    color: theme.colors.textPrimary,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  hint: {
+    fontSize: 12,
+    color: theme.colors.textTertiary,
+    marginTop: 4,
   },
   codeInput: {
     fontSize: 28,
@@ -144,5 +203,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     letterSpacing: 4,
     paddingVertical: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 8,
+  },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 12,
+    backgroundColor: theme.colors.success + '10',
+    borderRadius: 8,
+    marginBottom: 24,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    lineHeight: 18,
   },
 });

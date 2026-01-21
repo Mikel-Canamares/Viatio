@@ -11,6 +11,8 @@ import { getViajeById, markViajeAsShared } from '@/services/viajesService';
 import { getReservasByViajeId } from '@/services/reservasService';
 import { getLugaresByViajeId } from '@/services/lugaresService';
 import { getGastosByViajeId } from '@/services/gastosService';
+import { getEventosByViajeId } from '@/services/eventosService';
+import { getDiasByViajeId } from '@/services/diasViajeService';
 import { createSharedTrip, getSharedTrip, addMemberToTrip } from '@/services/firestore/tripsService';
 import { generateId } from '@/database';
 import { logError } from '@/utils/errorHandler';
@@ -18,6 +20,7 @@ import type { Viaje } from '@/types/viaje';
 import type { Reserva } from '@/types/reserva';
 import type { Lugar } from '@/types/lugar';
 import type { Gasto } from '@/types/gasto';
+import type { EventoPersonalizado } from '@/types/evento';
 import type { SharedTrip, TripMember, CreateExpenseInput, displayToCents } from '@/types/shared';
 
 // ============================================
@@ -25,7 +28,7 @@ import type { SharedTrip, TripMember, CreateExpenseInput, displayToCents } from 
 // ============================================
 
 export interface MigrationProgress {
-  phase: 'preparing' | 'trip' | 'reservations' | 'places' | 'expenses' | 'finalizing' | 'completed' | 'error';
+  phase: 'preparing' | 'trip' | 'reservations' | 'places' | 'events' | 'expenses' | 'finalizing' | 'completed' | 'error';
   current: number;
   total: number;
   message: string;
@@ -37,6 +40,7 @@ export interface MigrationResult {
   stats: {
     reservations: { migrated: number; total: number };
     places: { migrated: number; total: number };
+    events: { migrated: number; total: number };
     expenses: { migrated: number; total: number };
   };
   errors: string[];
@@ -60,6 +64,7 @@ export async function migrateTripToFirestore(
     stats: {
       reservations: { migrated: 0, total: 0 },
       places: { migrated: 0, total: 0 },
+      events: { migrated: 0, total: 0 },
       expenses: { migrated: 0, total: 0 },
     },
     errors: [],
@@ -74,7 +79,7 @@ export async function migrateTripToFirestore(
       return result;
     }
 
-    onProgress?.({ phase: 'preparing', current: 0, total: 4, message: 'Preparando migración...' });
+    onProgress?.({ phase: 'preparing', current: 0, total: 5, message: 'Preparando migración...' });
 
     // 2. Obtener viaje local
     const viaje = await getViajeById(viajeId);
@@ -93,18 +98,20 @@ export async function migrateTripToFirestore(
     }
 
     // 4. Cargar datos locales
-    const [reservas, lugares, gastos] = await Promise.all([
+    const [reservas, lugares, eventos, gastos] = await Promise.all([
       getReservasByViajeId(viajeId),
       getLugaresByViajeId(viajeId),
+      getEventosByViajeId(viajeId),
       getGastosByViajeId(viajeId),
     ]);
 
     result.stats.reservations.total = reservas.length;
     result.stats.places.total = lugares.length;
+    result.stats.events.total = eventos.length;
     result.stats.expenses.total = gastos.length;
 
     // 5. Crear viaje en Firestore
-    onProgress?.({ phase: 'trip', current: 1, total: 4, message: 'Creando viaje compartido...' });
+    onProgress?.({ phase: 'trip', current: 1, total: 5, message: 'Creando viaje compartido...' });
 
     const sharedTrip = await createSharedTrip({
       name: viaje.destino,
@@ -134,7 +141,7 @@ export async function migrateTripToFirestore(
     }
 
     // 7. Migrar reservas
-    onProgress?.({ phase: 'reservations', current: 2, total: 4, message: `Migrando reservas (0/${reservas.length})...` });
+    onProgress?.({ phase: 'reservations', current: 2, total: 5, message: `Migrando reservas (0/${reservas.length})...` });
 
     for (let i = 0; i < reservas.length; i++) {
       try {
@@ -143,7 +150,7 @@ export async function migrateTripToFirestore(
         onProgress?.({
           phase: 'reservations',
           current: 2,
-          total: 4,
+          total: 5,
           message: `Migrando reservas (${i + 1}/${reservas.length})...`,
         });
       } catch (e: any) {
@@ -152,17 +159,24 @@ export async function migrateTripToFirestore(
       }
     }
 
+    // Cargar días para mapear diaId -> fecha (se usa tanto para lugares como para eventos)
+    const dias = await getDiasByViajeId(viajeId);
+    const diaIdToFechaMap = new Map<string, string>();
+    for (const dia of dias) {
+      diaIdToFechaMap.set(dia.id, dia.fecha);
+    }
+
     // 8. Migrar lugares
-    onProgress?.({ phase: 'places', current: 3, total: 4, message: `Migrando lugares (0/${lugares.length})...` });
+    onProgress?.({ phase: 'places', current: 3, total: 5, message: `Migrando lugares (0/${lugares.length})...` });
 
     for (let i = 0; i < lugares.length; i++) {
       try {
-        await migrateLugar(sharedTrip.id, lugares[i]);
+        await migrateLugar(sharedTrip.id, lugares[i], diaIdToFechaMap);
         result.stats.places.migrated++;
         onProgress?.({
           phase: 'places',
           current: 3,
-          total: 4,
+          total: 5,
           message: `Migrando lugares (${i + 1}/${lugares.length})...`,
         });
       } catch (e: any) {
@@ -170,8 +184,26 @@ export async function migrateTripToFirestore(
       }
     }
 
-    // 9. Migrar gastos
-    onProgress?.({ phase: 'expenses', current: 3, total: 4, message: `Migrando gastos (0/${gastos.length})...` });
+    // 9. Migrar eventos personalizados
+    onProgress?.({ phase: 'events', current: 4, total: 5, message: `Migrando eventos (0/${eventos.length})...` })
+
+    for (let i = 0; i < eventos.length; i++) {
+      try {
+        await migrateEvento(sharedTrip.id, eventos[i], diaIdToFechaMap);
+        result.stats.events.migrated++;
+        onProgress?.({
+          phase: 'events',
+          current: 4,
+          total: 5,
+          message: `Migrando eventos (${i + 1}/${eventos.length})...`,
+        });
+      } catch (e: any) {
+        result.errors.push(`Evento "${eventos[i].nombre}": ${e.message}`);
+      }
+    }
+
+    // 10. Migrar gastos
+    onProgress?.({ phase: 'expenses', current: 4, total: 5, message: `Migrando gastos (0/${gastos.length})...` });
 
     const currentMember: TripMember = {
       uid: user.uid,
@@ -191,8 +223,8 @@ export async function migrateTripToFirestore(
         result.stats.expenses.migrated++;
         onProgress?.({
           phase: 'expenses',
-          current: 3,
-          total: 4,
+          current: 4,
+          total: 5,
           message: `Migrando gastos (${i + 1}/${gastos.length})...`,
         });
       } catch (e: any) {
@@ -200,13 +232,13 @@ export async function migrateTripToFirestore(
       }
     }
 
-    // 10. Marcar viaje local como compartido
-    onProgress?.({ phase: 'finalizing', current: 4, total: 4, message: 'Finalizando...' });
+    // 11. Marcar viaje local como compartido
+    onProgress?.({ phase: 'finalizing', current: 5, total: 5, message: 'Finalizando...' });
 
     await markViajeAsShared(viajeId, sharedTrip.id);
 
     result.success = true;
-    onProgress?.({ phase: 'completed', current: 4, total: 4, message: 'Migración completada' });
+    onProgress?.({ phase: 'completed', current: 5, total: 5, message: 'Migración completada' });
 
     console.log('[Migration] Viaje migrado exitosamente:', {
       localId: viajeId,
@@ -276,8 +308,18 @@ async function migrateReserva(tripId: string, reserva: Reserva): Promise<void> {
 /**
  * Migra un lugar a Firestore
  */
-async function migrateLugar(tripId: string, lugar: Lugar): Promise<void> {
+async function migrateLugar(
+  tripId: string,
+  lugar: Lugar,
+  diaIdToFechaMap: Map<string, string>
+): Promise<void> {
   const lugarRef = doc(firestoreDb, 'trips', tripId, 'places', lugar.id);
+
+  // Convertir diaId (ID del día) a fecha para que sea compatible entre usuarios
+  let diaId: string | null = null;
+  if (lugar.diaId) {
+    diaId = diaIdToFechaMap.get(lugar.diaId) || null;
+  }
 
   await setDoc(lugarRef, {
     nombre: lugar.nombre,
@@ -292,9 +334,59 @@ async function migrateLugar(tripId: string, lugar: Lugar): Promise<void> {
 
     // Referencias
     localId: lugar.id,
-    diaId: lugar.diaId || null,
+    diaId: diaId,  // Guardamos la FECHA del día, no el ID
 
     // Timestamps
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    deletedAt: null,
+  });
+}
+
+/**
+ * Migra un evento personalizado a Firestore
+ */
+async function migrateEvento(
+  tripId: string,
+  evento: EventoPersonalizado,
+  diaIdToFechaMap: Map<string, string>
+): Promise<void> {
+  const eventoRef = doc(firestoreDb, 'trips', tripId, 'events', evento.id);
+
+  // Convertir diaId (ID del día) a fecha para que sea compatible entre usuarios
+  let diaId: string | null = null;
+  if (evento.diaId) {
+    diaId = diaIdToFechaMap.get(evento.diaId) || null;
+    console.log('[Migration] Mapeando diaId de evento:', {
+      eventoNombre: evento.nombre,
+      diaIdOriginal: evento.diaId,
+      fechaMapeada: diaId,
+    });
+  }
+
+  await setDoc(eventoRef, {
+    nombre: evento.nombre,
+    descripcion: evento.descripcion || null,
+    categoria: evento.categoria,
+    horaInicio: evento.horaInicio || null,
+    horaFin: evento.horaFin || null,
+    duracionMinutos: evento.duracionMinutos || null,
+    ubicacion: evento.ubicacion || null,
+    direccion: evento.direccion || null,
+    latitud: evento.latitud || null,
+    longitud: evento.longitud || null,
+    completado: Boolean(evento.completado),
+    prioridad: evento.prioridad || 'media',
+    notas: evento.notas || null,
+
+    // Referencias
+    localId: evento.id,
+    diaId: diaId,  // Guardamos la FECHA del día, no el ID
+    lugarId: evento.lugarId || null,
+
+    // Auditoría
+    createdBy: auth.currentUser?.uid || '',
+    updatedBy: auth.currentUser?.uid || '',
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     deletedAt: null,

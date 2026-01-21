@@ -12,10 +12,13 @@ import { ScreenContainer, PageHeader } from '@/components';
 import { SettlementSuggestions, SettlementsList } from '@/components/shared';
 import { useSharedTripsStore } from '@/store/sharedTripsStore';
 import { useExpensesV2Store } from '@/store/expensesV2Store';
+import { useConfiguracionStore } from '@/store/useConfiguracionStore';
+import { useCurrencyStore } from '@/store/currencyStore';
 import { useAuth } from '@/context/AuthContext';
 import { Settlement, SettlementSuggestion } from '@/types/shared';
 import { theme } from '@/theme';
 import { showToast } from '@/utils/toast';
+import { getViajeById } from '@/services/viajesService';
 
 type RouteParams = {
   TripSettlements: { viajeId: string; firestoreId: string };
@@ -24,7 +27,7 @@ type RouteParams = {
 export default function TripSettlementsScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'TripSettlements'>>();
-  const { firestoreId } = route.params;
+  const { viajeId, firestoreId } = route.params;
   // Usamos firestoreId como tripId para las operaciones de Firestore
   const tripId = firestoreId;
   const { user } = useAuth();
@@ -37,15 +40,93 @@ export default function TripSettlementsScreen() {
     markSettlementComplete,
   } = useExpensesV2Store();
 
+  const { config } = useConfiguracionStore();
+  const { convert } = useCurrencyStore();
+  const userCurrency = config.monedaDefault || 'EUR';
+
   const [refreshing, setRefreshing] = useState(false);
+  const [viaje, setViaje] = useState<any>(null);
+  const [convertedSuggestions, setConvertedSuggestions] = useState<SettlementSuggestion[]>([]);
+  const [convertedSettlements, setConvertedSettlements] = useState<Settlement[]>([]);
 
   useEffect(() => {
     fetchSettlements(tripId);
+    loadViaje();
   }, [tripId]);
+
+  const loadViaje = async () => {
+    try {
+      const viajeData = await getViajeById(viajeId);
+      setViaje(viajeData);
+    } catch (error) {
+      console.error('Error cargando viaje:', error);
+    }
+  };
+
+  // Convertir sugerencias de liquidación
+  useEffect(() => {
+    const convertSuggestions = async () => {
+      if (!viaje || settlementSuggestions.length === 0) return;
+
+      const tripCurrency = viaje.moneda || 'EUR';
+
+      if (tripCurrency === userCurrency) {
+        setConvertedSuggestions(settlementSuggestions);
+        return;
+      }
+
+      const converted = await Promise.all(
+        settlementSuggestions.map(async (suggestion) => {
+          const amountInUnits = suggestion.amount / 100;
+          const convertedAmount = await convert(amountInUnits, tripCurrency, userCurrency);
+
+          return {
+            ...suggestion,
+            amount: convertedAmount ? convertedAmount.converted * 100 : suggestion.amount,
+          };
+        })
+      );
+
+      setConvertedSuggestions(converted);
+    };
+
+    convertSuggestions();
+  }, [viaje, settlementSuggestions, userCurrency, convert]);
+
+  // Convertir settlements
+  useEffect(() => {
+    const convertSettlementsData = async () => {
+      if (!viaje || settlements.length === 0) return;
+
+      const tripCurrency = viaje.moneda || 'EUR';
+
+      if (tripCurrency === userCurrency) {
+        setConvertedSettlements(settlements);
+        return;
+      }
+
+      const converted = await Promise.all(
+        settlements.map(async (settlement) => {
+          const amountInUnits = settlement.amount / 100;
+          const convertedAmount = await convert(amountInUnits, tripCurrency, userCurrency);
+
+          return {
+            ...settlement,
+            amount: convertedAmount ? convertedAmount.converted * 100 : settlement.amount,
+          };
+        })
+      );
+
+      setConvertedSettlements(converted);
+    };
+
+    convertSettlementsData();
+  }, [viaje, settlements, userCurrency, convert]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchSettlements(tripId);
+    await loadViaje();
     setRefreshing(false);
   };
 
@@ -78,8 +159,8 @@ export default function TripSettlementsScreen() {
     );
   };
 
-  const pendingSettlements = settlements.filter(s => s.status === 'pending');
-  const completedSettlements = settlements.filter(s => s.status === 'completed');
+  const pendingSettlements = convertedSettlements.filter(s => s.status === 'pending');
+  const completedSettlements = convertedSettlements.filter(s => s.status === 'completed');
 
   return (
     <ScreenContainer edges={['top']}>
@@ -93,8 +174,8 @@ export default function TripSettlementsScreen() {
             {/* Sugerencias de liquidación */}
             <View style={styles.section}>
               <SettlementSuggestions
-                suggestions={settlementSuggestions}
-                currency={currentTrip?.currency}
+                suggestions={convertedSuggestions}
+                currency={userCurrency}
                 currentUserId={user?.uid}
                 onSettlePress={handleSettlePress}
               />
@@ -106,7 +187,7 @@ export default function TripSettlementsScreen() {
                 <Text style={styles.sectionTitle}>Pagos pendientes</Text>
                 <SettlementsList
                   settlements={pendingSettlements}
-                  currency={currentTrip?.currency}
+                  currency={userCurrency}
                   currentUserId={user?.uid}
                   onMarkComplete={handleMarkComplete}
                 />
@@ -119,7 +200,7 @@ export default function TripSettlementsScreen() {
                 <Text style={styles.sectionTitle}>Historial de pagos</Text>
                 <SettlementsList
                   settlements={completedSettlements}
-                  currency={currentTrip?.currency}
+                  currency={userCurrency}
                   currentUserId={user?.uid}
                 />
               </View>

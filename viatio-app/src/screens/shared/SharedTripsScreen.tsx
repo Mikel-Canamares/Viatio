@@ -200,11 +200,6 @@ export default function SharedTripsScreen() {
     <ScreenContainer edges={['top']}>
       <PageHeader
         title="Viajes compartidos"
-        rightElement={
-          <Pressable onPress={() => navigation.navigate('JoinTripByCode')}>
-            <Ionicons name="qr-code-outline" size={24} color="#FFFFFF" />
-          </Pressable>
-        }
       />
 
       <FlatList

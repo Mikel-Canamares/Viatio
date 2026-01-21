@@ -11,9 +11,11 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CommonActions } from '@react-navigation/native';
 import { TripCalendarScreen } from '@/screens';
 import { HomeStackNavigator } from './HomeStackNavigator';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
+import { useNotificationsStore } from '@/store/notificationsStore';
 import type { RootTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -24,6 +26,7 @@ const Tab = createBottomTabNavigator<RootTabParamList>();
 
 export function RootTabs() {
   const insets = useSafeAreaInsets();
+  const unreadCount = useNotificationsStore((state) => state.unreadCount);
 
   return (
     <Tab.Navigator
@@ -54,6 +57,20 @@ export function RootTabs() {
             <Ionicons name="home" size={size} color={color} />
           ),
         }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            // Prevenir el comportamiento por defecto
+            e.preventDefault();
+
+            // Resetear el stack de Home a TripList siempre
+            navigation.dispatch(
+              CommonActions.reset({
+                index: 0,
+                routes: [{ name: 'Home', state: { routes: [{ name: 'TripList' }] } }],
+              })
+            );
+          },
+        })}
       />
 
       <Tab.Screen
@@ -90,6 +107,7 @@ export function RootTabs() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" size={size} color={color} />
           ),
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
         }}
       />
     </Tab.Navigator>

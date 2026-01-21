@@ -18,6 +18,7 @@ import {
   onSnapshot,
   Timestamp,
 } from 'firebase/firestore';
+import * as SQLite from 'expo-sqlite';
 import { db as firestoreDb } from '@/config/firebase';
 import { getDatabase, getCurrentTimestamp } from '@/database';
 import { getDiasByViajeId } from '@/services/diasViajeService';
@@ -98,21 +99,8 @@ export function subscribeToReservations(
             const resData = doc.data() as FirestoreReservation;
             const firestoreReservationId = doc.id;
 
-            // Verificar si ya existe en SQLite
-            const existing = await db.getFirstAsync<{ id: string }>(
-              'SELECT id FROM reservas WHERE firestoreId = ?',
-              [firestoreReservationId]
-            );
-
-            if (!existing) {
-              // Insertar nueva reserva
-              await createLocalReserva(resData, viajeId, firestoreReservationId, diasMap, placeIdMap);
-              console.log('[Sync⬇️ Reservations] ✓ Reserva creada (inicial):', resData.nombre);
-            } else {
-              // Actualizar reserva existente
-              await updateLocalReserva(existing.id, resData, viajeId, diasMap, placeIdMap);
-              console.log('[Sync⬇️ Reservations] ✓ Reserva actualizada (inicial):', resData.nombre);
-            }
+            // Sincronizar con verificación doble (localId primero, luego firestoreId)
+            await syncReserva(db, resData, viajeId, firestoreReservationId, diasMap, placeIdMap, '(inicial)');
           }
 
           isFirstSnapshot = false;
@@ -125,21 +113,8 @@ export function subscribeToReservations(
             const firestoreReservationId = change.doc.id;
 
             if (change.type === 'added' || change.type === 'modified') {
-              // Verificar si ya existe en SQLite
-              const existing = await db.getFirstAsync<{ id: string }>(
-                'SELECT id FROM reservas WHERE firestoreId = ?',
-                [firestoreReservationId]
-              );
-
-              if (!existing) {
-                // Insertar nueva reserva
-                await createLocalReserva(resData, viajeId, firestoreReservationId, diasMap, placeIdMap);
-                console.log('[Sync⬇️ Reservations] ✓ Reserva creada:', resData.nombre);
-              } else {
-                // Actualizar reserva existente
-                await updateLocalReserva(existing.id, resData, viajeId, diasMap, placeIdMap);
-                console.log('[Sync⬇️ Reservations] ✓ Reserva actualizada:', resData.nombre);
-              }
+              // Sincronizar con verificación doble (localId primero, luego firestoreId)
+              await syncReserva(db, resData, viajeId, firestoreReservationId, diasMap, placeIdMap);
             } else if (change.type === 'removed') {
               // Eliminar de SQLite
               await db.runAsync(
@@ -171,6 +146,63 @@ export function subscribeToReservations(
 // ============================================
 // FUNCIONES AUXILIARES
 // ============================================
+
+/**
+ * Sincroniza una reserva de Firestore a SQLite con verificación doble
+ * para evitar duplicados
+ */
+async function syncReserva(
+  db: SQLite.SQLiteDatabase,
+  resData: FirestoreReservation,
+  viajeId: string,
+  firestoreReservationId: string,
+  diasMap: Map<string, string>,
+  placeIdMap: Map<string, string>,
+  logSuffix: string = ''
+): Promise<void> {
+  const localId = resData.localId || firestoreReservationId;
+  const now = getCurrentTimestamp();
+
+  // PASO 1: Verificar si ya existe un registro con este ID local
+  const existingByLocalId = await db.getFirstAsync<{ id: string; firestoreId: string | null }>(
+    'SELECT id, firestoreId FROM reservas WHERE id = ?',
+    [localId]
+  );
+
+  if (existingByLocalId) {
+    // Ya existe con este ID local
+    console.log(`[Sync⬇️ Reservations] Registro encontrado por localId: ${localId}, firestoreId actual: ${existingByLocalId.firestoreId}`);
+
+    if (!existingByLocalId.firestoreId) {
+      // Es un registro local sin firestoreId, vincularlo con Firestore
+      await db.runAsync(
+        'UPDATE reservas SET firestoreId = ?, updatedAt = ? WHERE id = ?',
+        [firestoreReservationId, now, localId]
+      );
+      console.log(`[Sync⬇️ Reservations] ✓ Registro vinculado con Firestore: ${resData.nombre}`);
+    }
+
+    // Actualizar el resto de campos
+    await updateLocalReserva(localId, resData, viajeId, diasMap, placeIdMap);
+    console.log(`[Sync⬇️ Reservations] ✓ Reserva actualizada ${logSuffix}:`, resData.nombre);
+  } else {
+    // PASO 2: No existe por localId, verificar por firestoreId
+    const existingByFirestoreId = await db.getFirstAsync<{ id: string }>(
+      'SELECT id FROM reservas WHERE firestoreId = ?',
+      [firestoreReservationId]
+    );
+
+    if (existingByFirestoreId) {
+      // Existe con este firestoreId pero con otro ID local (creado por otro usuario)
+      await updateLocalReserva(existingByFirestoreId.id, resData, viajeId, diasMap, placeIdMap);
+      console.log(`[Sync⬇️ Reservations] ✓ Reserva actualizada ${logSuffix}:`, resData.nombre);
+    } else {
+      // PASO 3: No existe de ninguna manera, crear nueva
+      await createLocalReserva(resData, viajeId, firestoreReservationId, diasMap, placeIdMap);
+      console.log(`[Sync⬇️ Reservations] ✓ Reserva creada ${logSuffix}:`, resData.nombre);
+    }
+  }
+}
 
 /**
  * Construye un mapa de fecha -> diaId para asignar correctamente las reservas

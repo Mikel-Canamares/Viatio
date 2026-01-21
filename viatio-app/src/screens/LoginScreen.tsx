@@ -14,11 +14,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ImageBackground,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Input, PrimaryButton, GoogleSignInButton, LinkAccountModal, LoadingOverlay } from '@/components';
+import { Input, PrimaryButton, GoogleSignInButton, LinkAccountModal, LoadingOverlay, ScreenContainer } from '@/components';
 import { useAuth } from '@/context';
 import { theme } from '@/config';
 import type { AuthStackParamList } from '@/navigation/AuthStackNavigator';
@@ -72,29 +72,27 @@ export default function LoginScreen({ navigation }: Props) {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+    <ScreenContainer edges={['top', 'left', 'right']}>
+      {/* Header con imagen de fondo - posición absoluta */}
+      <View style={styles.headerContainer}>
+        <ImageBackground
+          source={require('../../assets/headerViatio.png')}
+          style={styles.headerImage}
+          resizeMode="cover"
+        />
+      </View>
+
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* Header con gradiente */}
-        <LinearGradient
-          colors={[theme.colors.primary, theme.colors.primaryLight, theme.colors.primaryDark]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.header}
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
         >
-          {/* Logo o texto */}
-          <View style={styles.logoContainer}>
-            <Ionicons name="airplane" size={80} color="#FFFFFF" />
-          </View>
-          <Text style={styles.appName}>Viatio</Text>
-          <Text style={styles.tagline}>Organiza tus viajes de forma inteligente</Text>
-        </LinearGradient>
+          {/* Espaciador para el header */}
+          <View style={styles.headerSpacer} />
 
         {/* Card de login */}
         <View style={styles.card}>
@@ -208,29 +206,43 @@ export default function LoginScreen({ navigation }: Props) {
             </View>
           </View>
         </View>
-      </ScrollView>
+        </ScrollView>
 
-      <LoadingOverlay visible={loading} message="Iniciando sesión..." />
+        <LoadingOverlay visible={loading} message="Iniciando sesión..." />
 
-      <LinkAccountModal
-        visible={linkingModal.visible}
-        email={linkingModal.email}
-        idToken={linkingModal.idToken}
-        onSuccess={() => {
-          setLinkingModal({ visible: false, email: '', idToken: '' });
-        }}
-        onCancel={() => {
-          setLinkingModal({ visible: false, email: '', idToken: '' });
-        }}
-      />
-    </KeyboardAvoidingView>
+        <LinkAccountModal
+          visible={linkingModal.visible}
+          email={linkingModal.email}
+          idToken={linkingModal.idToken}
+          onSuccess={() => {
+            setLinkingModal({ visible: false, email: '', idToken: '' });
+          }}
+          onCancel={() => {
+            setLinkingModal({ visible: false, email: '', idToken: '' });
+          }}
+        />
+      </KeyboardAvoidingView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  headerContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 480,
+    overflow: 'hidden',
+    zIndex: 0,
+  },
+  headerImage: {
+    width: '100%',
+    height: 500,
+    marginTop: 50,
+  },
+  keyboardView: {
     flex: 1,
-    backgroundColor: theme.colors.background,
   },
   scroll: {
     flex: 1,
@@ -238,47 +250,25 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
   },
-  header: {
-    paddingTop: 48,
-    paddingBottom: 48,
-    paddingHorizontal: theme.spacing.xl,
-    alignItems: 'center',
-  },
-  logoContainer: {
-    width: 160,
-    height: 160,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: theme.spacing.lg,
-  },
-  appName: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: theme.spacing.sm,
-    letterSpacing: -1,
-  },
-  tagline: {
-    fontSize: 16,
-    color: '#DBEAFE',
-    opacity: 0.9,
+  headerSpacer: {
+    height: 450,
   },
   card: {
     flex: 1,
     backgroundColor: theme.colors.background,
-    borderTopLeftRadius: 40,
-    borderTopRightRadius: 40,
-    marginTop: -20,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    marginTop: 0,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 12,
   },
   cardContent: {
     paddingHorizontal: theme.spacing.xl,
     paddingTop: 40,
-    paddingBottom: 32,
+    paddingBottom: 48,
   },
   titleContainer: {
     marginBottom: 32,
@@ -329,6 +319,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: theme.spacing.lg,
+    marginBottom: theme.spacing.xl,
   },
   footerText: {
     fontSize: 14,

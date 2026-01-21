@@ -122,6 +122,13 @@ export default function InviteToTripScreen() {
             ))}
           </View>
 
+          <View style={styles.infoBox}>
+            <Ionicons name="information-circle" size={20} color={theme.colors.primary} />
+            <Text style={styles.infoText}>
+              El usuario recibirá una notificación automática en su app
+            </Text>
+          </View>
+
           <PrimaryButton
             title="Enviar invitación"
             onPress={handleSendInvite}
@@ -133,9 +140,9 @@ export default function InviteToTripScreen() {
         {/* Compartir código */}
         {existingCode && (
           <Card style={styles.card}>
-            <Text style={styles.cardTitle}>Compartir código</Text>
+            <Text style={styles.cardTitle}>Código manual (opcional)</Text>
             <Text style={styles.codeDescription}>
-              Comparte este código para que otros se unan al viaje
+              Solo comparte este código si el invitado no recibe la notificación automática
             </Text>
 
             <Pressable style={styles.codeContainer} onPress={handleCopyCode}>
@@ -244,6 +251,21 @@ const styles = StyleSheet.create({
   roleOptionTextSelected: {
     color: theme.colors.primary,
     fontWeight: '600',
+  },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 12,
+    backgroundColor: theme.colors.primary + '10',
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    lineHeight: 18,
   },
   codeDescription: {
     fontSize: 14,

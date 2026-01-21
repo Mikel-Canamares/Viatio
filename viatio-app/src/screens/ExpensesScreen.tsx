@@ -8,11 +8,12 @@
  * Detecta automáticamente el modo según viaje.isShared.
  */
 
-import { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, LayoutAnimation, Platform, UIManager, Animated } from 'react-native';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { PageHeader } from '@/components/PageHeader';
 import { PrimaryButton } from '@/components/PrimaryButton';
@@ -23,7 +24,10 @@ import { BalancesList, SettlementSuggestions } from '@/components/shared';
 import { useGastosStore } from '@/store/gastosStore';
 import { useExpensesV2Store } from '@/store/expensesV2Store';
 import { useSharedTripsStore } from '@/store/sharedTripsStore';
+import { useCurrencyStore } from '@/store/currencyStore';
+import { useConfiguracionStore } from '@/store/useConfiguracionStore';
 import { useAuth } from '@/context/AuthContext';
+import { formatCurrency } from '@/utils/currencyFormatter';
 import { Gasto, CategoriaGasto, GASTO_CATEGORIAS } from '@/types/gasto';
 import { Reserva } from '@/types/reserva';
 import { Viaje } from '@/types/viaje';
@@ -62,15 +66,31 @@ export function ExpensesScreen() {
   const [loadingViaje, setLoadingViaje] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<Record<CategoriaGasto, boolean>>({} as Record<CategoriaGasto, boolean>);
   const [balancesExpanded, setBalancesExpanded] = useState(true);
+  const [activeTab, setActiveTab] = useState<'gastos' | 'saldos'>('gastos');
 
   // Stores para gastos individuales (SQLite)
   const { gastos, resumen, loading: loadingGastos, fetchGastos, fetchResumen } = useGastosStore();
+
+  // Currency store para conversiones
+  const { loadRates, convert } = useCurrencyStore();
+
+  // Configuración del usuario (moneda del perfil)
+  const { config } = useConfiguracionStore();
+  const userCurrency = config.monedaDefault || 'EUR';
+
+  // Estados para conversiones de moneda
+  const [convertedMyExpenses, setConvertedMyExpenses] = useState<number | null>(null);
+  const [convertedSharedTotal, setConvertedSharedTotal] = useState<number | null>(null);
+  const [convertedCategoryTotals, setConvertedCategoryTotals] = useState<Record<string, number | null>>({});
+  const [expenseAmountConversions, setExpenseAmountConversions] = useState<Record<string, number | null>>({});
+  const [convertedBalances, setConvertedBalances] = useState<any[]>([]);
 
   // Stores para gastos compartidos (Firestore)
   const {
     expenses: sharedExpenses,
     balances,
     settlementSuggestions,
+    settlements,
     subscribeExpenses,
     subscribeSettlementsRealtime,
   } = useExpensesV2Store();
@@ -94,6 +114,11 @@ export function ExpensesScreen() {
       setLoadingViaje(true);
       const viajeData = await getViajeById(viajeId);
       setViaje(viajeData);
+
+      // Cargar tasas de cambio para la divisa del perfil del usuario (para conversiones)
+      if (userCurrency) {
+        loadRates(userCurrency);
+      }
     } catch (error) {
       console.error('Error cargando viaje:', error);
     } finally {
@@ -184,12 +209,37 @@ export function ExpensesScreen() {
       return totalB - totalA;
     });
 
-  // Para viajes compartidos - calcular total
+  // Para viajes compartidos - calcular total y mis gastos
   const sharedTotal = sharedExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+  // "Mis Gastos" representa el dinero REAL que salió de mi bolsillo
+  // = Lo que pagué - lo que me han devuelto (settlements completados recibidos) + lo que he pagado a otros (settlements completados pagados)
+  // Esto se calcula como: totalPaid - (settlements recibidos) + (settlements pagados)
+  // O más simple: totalPaid - (settlements recibidos - settlements pagados)
+  // Que es equivalente a: totalPaid - (lo que me deben - lo que debo)
+  // Y dado que netBalance = totalPaid - totalOwed, podemos calcular:
+  // myExpenses = totalPaid - (totalPaid - totalOwed - netBalanceAdjustedBySettlements)
+  const myBalance = balances.find(b => b.uid === user?.uid);
+
+  // Calcular cuánto he recibido/pagado en settlements completados
+  const completedSettlementsImpact = settlements
+    .filter(s => s.status === 'completed')
+    .reduce((sum, s) => {
+      if (s.toUid === user?.uid) {
+        // He recibido dinero, reduce mi gasto real
+        return sum - s.amount;
+      } else if (s.fromUid === user?.uid) {
+        // He pagado dinero, aumenta mi gasto real
+        return sum + s.amount;
+      }
+      return sum;
+    }, 0);
+
+  const myExpenses = myBalance ? myBalance.totalPaid + completedSettlementsImpact : 0;
   const currency = viaje?.moneda || 'EUR';
 
   // Mapeo de categorías inglés a español para gastos compartidos
-  const categoryToSpanish: Record<string, CategoriaGasto> = {
+  const categoryToSpanish: Record<string, CategoriaGasto> = useMemo(() => ({
     transport: 'transporte',
     accommodation: 'alojamiento',
     food: 'comida',
@@ -202,25 +252,163 @@ export function ExpensesScreen() {
     actividades: 'actividades',
     compras: 'compras',
     otros: 'otros',
-  };
+  }), []);
 
-  // Agrupar gastos compartidos por categoría
-  const sharedExpensesPorCategoria = sharedExpenses.reduce((acc, expense) => {
-    const spanishCat = categoryToSpanish[expense.category] || 'otros';
-    if (!acc[spanishCat]) {
-      acc[spanishCat] = [];
-    }
-    acc[spanishCat].push(expense);
-    return acc;
-  }, {} as Record<CategoriaGasto, SharedExpense[]>);
+  // Agrupar gastos compartidos por categoría (memoizado)
+  const sharedExpensesPorCategoria = useMemo(() => {
+    return sharedExpenses.reduce((acc, expense) => {
+      const spanishCat = categoryToSpanish[expense.category] || 'otros';
+      if (!acc[spanishCat]) {
+        acc[spanishCat] = [];
+      }
+      acc[spanishCat].push(expense);
+      return acc;
+    }, {} as Record<CategoriaGasto, SharedExpense[]>);
+  }, [sharedExpenses, categoryToSpanish]);
 
-  const sharedCategoriasOrdenadas = Object.keys(sharedExpensesPorCategoria)
-    .map((cat) => cat as CategoriaGasto)
-    .sort((a, b) => {
-      const totalA = sharedExpensesPorCategoria[a].reduce((sum, e) => sum + e.amount, 0);
-      const totalB = sharedExpensesPorCategoria[b].reduce((sum, e) => sum + e.amount, 0);
-      return totalB - totalA;
-    });
+  const sharedCategoriasOrdenadas = useMemo(() => {
+    return Object.keys(sharedExpensesPorCategoria)
+      .map((cat) => cat as CategoriaGasto)
+      .sort((a, b) => {
+        const totalA = sharedExpensesPorCategoria[a].reduce((sum, e) => sum + e.amount, 0);
+        const totalB = sharedExpensesPorCategoria[b].reduce((sum, e) => sum + e.amount, 0);
+        return totalB - totalA;
+      });
+  }, [sharedExpensesPorCategoria]);
+
+  // ============================================
+  // CONVERSIONES DE MONEDA
+  // ============================================
+
+  // Memoizar la función de conversión para evitar re-renders
+  const performConvert = useCallback(
+    (amount: number, from: string, to: string) => convert(amount, from, to),
+    [] // convert es una función del store, no cambia
+  );
+
+  // Efecto unificado para todas las conversiones de moneda
+  useEffect(() => {
+    // Solo ejecutar si es viaje compartido
+    if (!isShared || !viaje) return;
+
+    const tripCurrency = viaje.moneda || 'EUR';
+    let isCancelled = false;
+
+    const performAllConversions = async () => {
+      // Si la moneda del viaje es la misma que la del perfil, usar valores originales
+      if (tripCurrency === userCurrency) {
+        if (!isCancelled) {
+          setConvertedMyExpenses(myExpenses);
+          setConvertedSharedTotal(sharedTotal);
+
+          // Totales por categoría
+          const categoryConversions: Record<string, number | null> = {};
+          for (const categoria of sharedCategoriasOrdenadas) {
+            const totalCategoria = sharedExpensesPorCategoria[categoria].reduce((sum, e) => sum + e.amount, 0);
+            categoryConversions[categoria] = totalCategoria;
+          }
+          setConvertedCategoryTotals(categoryConversions);
+
+          // Limpiar conversiones individuales
+          setExpenseAmountConversions({});
+
+          // Balances sin conversión
+          setConvertedBalances(balances);
+        }
+        return;
+      }
+
+      // Realizar todas las conversiones
+      try {
+        // 1. Convertir "Mis Gastos" y "Gastos Totales"
+        const myExpensesInUnits = myExpenses / 100;
+        const sharedTotalInUnits = sharedTotal / 100;
+
+        const [convertedMy, convertedTotal] = await Promise.all([
+          performConvert(myExpensesInUnits, tripCurrency, userCurrency),
+          performConvert(sharedTotalInUnits, tripCurrency, userCurrency),
+        ]);
+
+        if (!isCancelled) {
+          setConvertedMyExpenses(convertedMy ? convertedMy.converted * 100 : myExpenses);
+          setConvertedSharedTotal(convertedTotal ? convertedTotal.converted * 100 : sharedTotal);
+        }
+
+        // 2. Convertir totales por categoría
+        const categoryConversions: Record<string, number | null> = {};
+        for (const categoria of sharedCategoriasOrdenadas) {
+          const totalCategoria = sharedExpensesPorCategoria[categoria].reduce((sum, e) => sum + e.amount, 0);
+          const totalInUnits = totalCategoria / 100;
+          const converted = await performConvert(totalInUnits, tripCurrency, userCurrency);
+          categoryConversions[categoria] = converted ? converted.converted * 100 : totalCategoria;
+        }
+
+        if (!isCancelled) {
+          setConvertedCategoryTotals(categoryConversions);
+        }
+
+        // 3. Convertir montos individuales de gastos
+        const expenseConversions: Record<string, number | null> = {};
+        for (const expense of sharedExpenses) {
+          const amountInUnits = expense.amount / 100;
+          const converted = await performConvert(amountInUnits, expense.currency, userCurrency);
+          expenseConversions[expense.id] = converted?.converted || null;
+        }
+
+        if (!isCancelled) {
+          setExpenseAmountConversions(expenseConversions);
+        }
+
+        // 4. Convertir balances
+        if (balances.length > 0) {
+          const convertedBalancesData = await Promise.all(
+            balances.map(async (balance) => {
+              const totalPaidInUnits = balance.totalPaid / 100;
+              const totalOwedInUnits = balance.totalOwed / 100;
+              const netBalanceInUnits = balance.netBalance / 100;
+
+              const [convertedPaid, convertedOwed, convertedNet] = await Promise.all([
+                performConvert(totalPaidInUnits, tripCurrency, userCurrency),
+                performConvert(totalOwedInUnits, tripCurrency, userCurrency),
+                performConvert(netBalanceInUnits, tripCurrency, userCurrency),
+              ]);
+
+              return {
+                ...balance,
+                totalPaid: convertedPaid ? convertedPaid.converted * 100 : balance.totalPaid,
+                totalOwed: convertedOwed ? convertedOwed.converted * 100 : balance.totalOwed,
+                netBalance: convertedNet ? convertedNet.converted * 100 : balance.netBalance,
+              };
+            })
+          );
+
+          if (!isCancelled) {
+            setConvertedBalances(convertedBalancesData);
+          }
+        }
+      } catch (error) {
+        console.error('Error en conversiones de moneda:', error);
+      }
+    };
+
+    performAllConversions();
+
+    // Cleanup function para cancelar actualizaciones si el componente se desmonta
+    return () => {
+      isCancelled = true;
+    };
+    // Solo disparar cuando cambien valores relevantes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isShared,
+    viaje?.moneda,
+    userCurrency,
+    myExpenses,
+    sharedTotal,
+    sharedExpenses.length, // Usar length en vez de todo el array
+    balances.length,
+    sharedCategoriasOrdenadas.length,
+  ]);
 
   // ============================================
   // HANDLERS
@@ -247,6 +435,11 @@ export function ExpensesScreen() {
     if (firestoreId) {
       navigation.navigate('TripSettlements', { viajeId, firestoreId });
     }
+  };
+
+  const handleSettlePress = () => {
+    // Por ahora, redirigir a la pantalla de liquidaciones
+    handleViewSettlements();
   };
 
   const toggleCategory = (categoria: CategoriaGasto) => {
@@ -323,25 +516,70 @@ export function ExpensesScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
           }
         >
-          {/* Resumen Total */}
-          <View style={styles.card}>
-            <Text style={styles.totalLabel}>Total del grupo</Text>
-            <Text style={styles.totalAmount}>
-              {centsToDisplay(sharedTotal, currency)}
-            </Text>
-            <Text style={styles.memberCount}>
-              {members.length} {members.length === 1 ? 'persona' : 'personas'}
-            </Text>
+          {/* Resumen con Mis Gastos y Gastos Totales */}
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryRow}>
+              <View style={styles.summaryColumn}>
+                <View style={styles.summaryIconContainer}>
+                  <Ionicons name="wallet" size={26} color={theme.colors.primary} />
+                </View>
+                <Text style={styles.summaryLabel}>Mis Gastos</Text>
+                <Text style={styles.summaryAmount}>
+                  {centsToDisplay(convertedMyExpenses !== null ? convertedMyExpenses : myExpenses, userCurrency)}
+                </Text>
+              </View>
+
+              <View style={styles.summaryDivider} />
+
+              <View style={styles.summaryColumn}>
+                <View style={styles.summaryIconContainer}>
+                  <Ionicons name="receipt" size={26} color={theme.colors.primary} />
+                </View>
+                <Text style={styles.summaryLabel}>Gastos Totales</Text>
+                <Text style={styles.summaryAmount}>
+                  {centsToDisplay(convertedSharedTotal !== null ? convertedSharedTotal : sharedTotal, userCurrency)}
+                </Text>
+              </View>
+            </View>
           </View>
 
-          {/* Historial de gastos agrupados por categoría */}
-          <View style={styles.historialHeader}>
-            <Text style={styles.historialTitle}>Historial</Text>
+          {/* Tabs */}
+          <View style={styles.tabsContainer}>
+            <Pressable
+              style={[styles.tab, activeTab === 'gastos' && styles.tabActive]}
+              onPress={() => setActiveTab('gastos')}
+            >
+              <Text style={[styles.tabText, activeTab === 'gastos' && styles.tabTextActive]}>
+                Gastos
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.tab, activeTab === 'saldos' && styles.tabActive]}
+              onPress={() => setActiveTab('saldos')}
+            >
+              <Text style={[styles.tabText, activeTab === 'saldos' && styles.tabTextActive]}>
+                Saldos
+              </Text>
+            </Pressable>
           </View>
 
-          {sharedCategoriasOrdenadas.map((categoria) => {
+          {/* Tab Content: Gastos */}
+          {activeTab === 'gastos' && (
+            <>
+              <View style={styles.historialHeader}>
+                <Text style={styles.historialTitle}>Historial</Text>
+                <View style={styles.historialBadge}>
+                  <Text style={styles.historialBadgeText}>
+                    {sharedExpenses.length}
+                  </Text>
+                </View>
+              </View>
+
+              {sharedCategoriasOrdenadas.map((categoria) => {
             const gastosDeCategoria = sharedExpensesPorCategoria[categoria];
-            const totalCategoria = gastosDeCategoria.reduce((sum, e) => sum + e.amount, 0);
+            const totalCategoriaConverted = convertedCategoryTotals[categoria] !== undefined
+              ? convertedCategoryTotals[categoria]!
+              : gastosDeCategoria.reduce((sum, e) => sum + e.amount, 0);
             const categoriaInfo = GASTO_CATEGORIAS[categoria];
             const isExpanded = expandedCategories[categoria];
 
@@ -355,22 +593,26 @@ export function ExpensesScreen() {
                   ]}
                   onPress={() => toggleCategory(categoria)}
                 >
-                  <View style={[styles.categoryIcon, { backgroundColor: categoriaInfo.color + '20' }]}>
+                  <View style={[styles.categoryIcon, { backgroundColor: categoriaInfo.color + '15' }]}>
                     <Ionicons
                       name={categoriaInfo.icon as keyof typeof Ionicons.glyphMap}
-                      size={20}
+                      size={22}
                       color={categoriaInfo.color}
                     />
                   </View>
                   <View style={styles.categoryInfo}>
-                    <Text style={styles.categoryName}>{categoriaInfo.label}</Text>
-                    <Text style={styles.categoryCount}>
-                      {gastosDeCategoria.length} {gastosDeCategoria.length === 1 ? 'gasto' : 'gastos'}
+                    <View style={styles.categoryNameRow}>
+                      <Text style={styles.categoryName}>{categoriaInfo.label}</Text>
+                      <View style={[styles.categoryCountBadge, { backgroundColor: categoriaInfo.color + '20' }]}>
+                        <Text style={[styles.categoryCountBadgeText, { color: categoriaInfo.color }]}>
+                          {gastosDeCategoria.length}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.categoryTotal}>
+                      {centsToDisplay(totalCategoriaConverted, userCurrency)}
                     </Text>
                   </View>
-                  <Text style={styles.categoryTotal}>
-                    {centsToDisplay(totalCategoria, currency)}
-                  </Text>
                   <Ionicons
                     name={isExpanded ? 'chevron-up' : 'chevron-down'}
                     size={20}
@@ -382,36 +624,32 @@ export function ExpensesScreen() {
                 {/* Lista de gastos de esta categoría - Solo visible cuando está expandido */}
                 {isExpanded && gastosDeCategoria.map((expense) => {
                   const isPayer = expense.paidByUid === user?.uid;
-                  const myShare = expense.shares.find(s => s.uid === user?.uid);
-                  let myImpact = 0;
-                  if (myShare) {
-                    myImpact = isPayer
-                      ? expense.amount - myShare.calculatedAmount
-                      : -myShare.calculatedAmount;
-                  }
 
                   return (
                     <Pressable
                       key={expense.id}
-                      style={styles.expenseItem}
+                      style={({ pressed }) => [
+                        styles.expenseItem,
+                        pressed && styles.expenseItemPressed,
+                      ]}
                       onPress={() => handleExpensePress(expense)}
                     >
-                      <View style={styles.expenseInfo}>
-                        <Text style={styles.expenseDescription}>{expense.description}</Text>
-                        <Text style={styles.expensePaidBy}>
-                          {isPayer ? 'Pagaste tú' : `Pagó ${expense.paidByName}`}
-                        </Text>
+                      <View style={styles.expenseLeftContent}>
+                        <View style={[styles.expenseDot, { backgroundColor: categoriaInfo.color }]} />
+                        <View style={styles.expenseInfo}>
+                          <Text style={styles.expenseDescription}>{expense.description}</Text>
+                          <Text style={styles.expensePaidBy}>
+                            {isPayer ? 'Pagaste tú' : `Pagó ${expense.paidByName}`}
+                          </Text>
+                        </View>
                       </View>
                       <View style={styles.expenseAmounts}>
                         <Text style={styles.expenseAmount}>
                           {centsToDisplay(expense.amount, expense.currency)}
                         </Text>
-                        {myShare && myImpact !== 0 && (
-                          <Text style={[
-                            styles.expenseImpact,
-                            myImpact > 0 ? styles.impactPositive : styles.impactNegative,
-                          ]}>
-                            {myImpact > 0 ? '+' : ''}{centsToDisplay(myImpact, expense.currency)}
+                        {expenseAmountConversions[expense.id] !== undefined && expenseAmountConversions[expense.id] !== null && (
+                          <Text style={styles.expenseConversion}>
+                            ≈ {formatCurrency(expenseAmountConversions[expense.id]!, userCurrency, { decimals: 3 })}
                           </Text>
                         )}
                       </View>
@@ -422,38 +660,49 @@ export function ExpensesScreen() {
               </View>
             );
           })}
-
-          {/* Balances - Desplegable */}
-          {balances.length > 0 && (
-            <View style={styles.balancesSection}>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.balancesHeader,
-                  pressed && styles.balancesHeaderPressed,
-                ]}
-                onPress={toggleBalances}
-              >
-                <Text style={styles.sectionTitle}>Balances</Text>
-                <Ionicons
-                  name={balancesExpanded ? 'chevron-up' : 'chevron-down'}
-                  size={20}
-                  color={theme.colors.textSecondary}
-                />
-              </Pressable>
-              {balancesExpanded && (
-                <BalancesList
-                  balances={balances}
-                  currency={currency}
-                />
-              )}
-            </View>
+            </>
           )}
 
-          {/* Botón para ver todas las liquidaciones */}
-          <Pressable style={styles.settlementsLink} onPress={handleViewSettlements}>
-            <Text style={styles.settlementsLinkText}>Ver liquidaciones</Text>
-            <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} />
-          </Pressable>
+          {/* Tab Content: Saldos */}
+          {activeTab === 'saldos' && (
+            <>
+              {/* Balances */}
+              {convertedBalances.length > 0 && (
+                <View style={styles.balancesSection}>
+                  <View style={styles.balancesHeader}>
+                    <View style={styles.balancesHeaderContent}>
+                      <Ionicons
+                        name="stats-chart"
+                        size={18}
+                        color={theme.colors.primary}
+                        style={styles.balancesIcon}
+                      />
+                      <Text style={styles.sectionTitle}>Balances</Text>
+                    </View>
+                  </View>
+                  <View style={styles.balancesContent}>
+                    <BalancesList
+                      balances={convertedBalances}
+                      currency={userCurrency}
+                    />
+                  </View>
+                </View>
+              )}
+
+              {/* Botón para ver todas las liquidaciones */}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.settlementsLink,
+                  pressed && styles.settlementsLinkPressed,
+                ]}
+                onPress={handleViewSettlements}
+              >
+                <Ionicons name="wallet-outline" size={18} color={theme.colors.primary} />
+                <Text style={styles.settlementsLinkText}>Ver liquidaciones</Text>
+                <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} />
+              </Pressable>
+            </>
+          )}
 
           <View style={styles.bottomSpacer} />
         </ScrollView>
@@ -562,21 +811,94 @@ const styles = StyleSheet.create({
     ...theme.shadows.card,
   },
 
-  // Resumen total
+  // Resumen unificado
+  summaryCard: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
+    marginBottom: theme.spacing.lg,
+    ...theme.shadows.card,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  summaryColumn: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  summaryIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: theme.colors.primary + '15',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  summaryDivider: {
+    width: 1,
+    height: 80,
+    backgroundColor: theme.colors.border,
+    marginHorizontal: theme.spacing.md,
+  },
+  summaryLabel: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.xs,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  summaryAmount: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    letterSpacing: -0.5,
+    textAlign: 'center',
+  },
+
+  // Tabs
+  tabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius.lg,
+    padding: 4,
+    marginBottom: theme.spacing.lg,
+    ...theme.shadows.card,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabActive: {
+    backgroundColor: theme.colors.primary,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.textSecondary,
+  },
+  tabTextActive: {
+    color: '#FFFFFF',
+  },
+
+  // Estilos antiguos (mantener para viajes individuales)
   totalLabel: {
     fontSize: 14,
     color: theme.colors.textSecondary,
     marginBottom: theme.spacing.xs,
+    fontWeight: '500',
   },
   totalAmount: {
-    fontSize: 36,
+    fontSize: 32,
     fontWeight: 'bold',
     color: theme.colors.text,
     marginBottom: theme.spacing.md,
-  },
-  memberCount: {
-    fontSize: 14,
-    color: theme.colors.textSecondary,
+    letterSpacing: -0.5,
   },
   presupuestoContainer: {
     marginTop: theme.spacing.sm,
@@ -613,29 +935,80 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
 
-  // Balances desplegable
+  // Balances y Settlements sections
   balancesSection: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius.lg,
     marginBottom: theme.spacing.lg,
+    overflow: 'hidden',
+    ...theme.shadows.card,
+  },
+  settlementsSection: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius.lg,
+    marginBottom: theme.spacing.lg,
+    overflow: 'hidden',
+    ...theme.shadows.card,
   },
   balancesHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: theme.spacing.sm,
-    marginBottom: theme.spacing.md,
+    padding: theme.spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  settlementsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: theme.spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
   balancesHeaderPressed: {
-    opacity: 0.7,
+    backgroundColor: theme.colors.secondary + '80',
+  },
+  balancesHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  balancesIcon: {
+    marginRight: theme.spacing.xs,
+  },
+  balancesContent: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingBottom: theme.spacing.lg,
+  },
+  settlementsContent: {
+    padding: theme.spacing.lg,
   },
 
   // Historial
   historialHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: theme.spacing.md,
   },
   historialTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
     color: theme.colors.text,
+  },
+  historialBadge: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 4,
+    borderRadius: theme.radius.full,
+    minWidth: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  historialBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 
   // Gastos compartidos - Agrupación por categoría
@@ -649,81 +1022,103 @@ const styles = StyleSheet.create({
   categoryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: theme.spacing.md,
+    padding: theme.spacing.lg,
   },
   categoryHeaderPressed: {
-    backgroundColor: theme.colors.secondary,
+    backgroundColor: theme.colors.secondary + '80',
   },
   categoryIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: theme.spacing.sm,
+    marginRight: theme.spacing.md,
   },
   categoryInfo: {
     flex: 1,
   },
+  categoryNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.xs,
+    gap: theme.spacing.xs,
+  },
   categoryName: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     color: theme.colors.text,
   },
-  categoryCount: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
-    marginTop: 2,
+  categoryCountBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: theme.radius.full,
+    minWidth: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryCountBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   categoryTotal: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     color: theme.colors.text,
-    marginRight: theme.spacing.xs,
   },
   categoryChevron: {
-    marginLeft: theme.spacing.xs,
+    marginLeft: theme.spacing.md,
   },
   expenseItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
   },
+  expenseItemPressed: {
+    backgroundColor: theme.colors.secondary + '60',
+  },
+  expenseLeftContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: theme.spacing.sm,
+  },
+  expenseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: theme.spacing.sm,
+  },
   expenseInfo: {
     flex: 1,
-    marginRight: theme.spacing.sm,
   },
   expenseDescription: {
     fontSize: 14,
     fontWeight: '500',
     color: theme.colors.text,
+    marginBottom: 3,
   },
   expensePaidBy: {
     fontSize: 12,
     color: theme.colors.textSecondary,
-    marginTop: 2,
   },
   expenseAmounts: {
     alignItems: 'flex-end',
-    marginRight: theme.spacing.xs,
+    marginRight: theme.spacing.sm,
   },
   expenseAmount: {
     fontSize: 15,
     fontWeight: '600',
     color: theme.colors.text,
   },
-  expenseImpact: {
+  expenseConversion: {
     fontSize: 11,
+    color: theme.colors.textSecondary,
     marginTop: 2,
-  },
-  impactPositive: {
-    color: theme.colors.success,
-  },
-  impactNegative: {
-    color: theme.colors.error,
+    fontStyle: 'italic',
   },
 
   // Link a liquidaciones
@@ -731,14 +1126,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: theme.colors.card,
     paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
     marginBottom: theme.spacing.md,
+    borderRadius: theme.radius.lg,
+    gap: theme.spacing.xs,
+    ...theme.shadows.card,
+  },
+  settlementsLinkPressed: {
+    backgroundColor: theme.colors.secondary,
   },
   settlementsLinkText: {
     fontSize: 14,
     fontWeight: '600',
     color: theme.colors.primary,
-    marginRight: 4,
   },
 
   // Espaciador para el botón

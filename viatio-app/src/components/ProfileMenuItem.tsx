@@ -27,6 +27,12 @@ interface ProfileMenuItemProps {
 
   /** Si es acción destructiva (logout, eliminar cuenta) */
   isDestructive?: boolean;
+
+  /** Color personalizado del icono (hex) */
+  iconColor?: string;
+
+  /** Badge numérico (contador) */
+  badge?: number;
 }
 
 export function ProfileMenuItem({
@@ -36,6 +42,8 @@ export function ProfileMenuItem({
   onPress,
   showChevron = true,
   isDestructive = false,
+  iconColor,
+  badge,
 }: ProfileMenuItemProps) {
   return (
     <Pressable
@@ -49,26 +57,36 @@ export function ProfileMenuItem({
       <View
         style={[
           styles.iconContainer,
-          isDestructive ? styles.iconContainerDestructive : styles.iconContainerNormal,
+          isDestructive && styles.iconContainerDestructive,
+          iconColor && { backgroundColor: `${iconColor}15` }, // Color con 15% opacidad
         ]}
       >
         <Ionicons
           name={icon}
           size={20}
-          color={isDestructive ? theme.colors.error : theme.colors.primaryLight}
+          color={isDestructive ? theme.colors.error : iconColor || theme.colors.primaryLight}
         />
       </View>
 
       {/* Contenido */}
       <View style={styles.content}>
-        <Text
-          style={[
-            styles.label,
-            isDestructive && styles.labelDestructive,
-          ]}
-        >
-          {label}
-        </Text>
+        <View style={styles.labelContainer}>
+          <Text
+            style={[
+              styles.label,
+              isDestructive && styles.labelDestructive,
+            ]}
+          >
+            {label}
+          </Text>
+          {badge !== undefined && badge > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {badge > 99 ? '99+' : badge}
+              </Text>
+            </View>
+          )}
+        </View>
         {value && <Text style={styles.value}>{value}</Text>}
       </View>
 
@@ -113,6 +131,11 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: theme.spacing.md,
   },
+  labelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   label: {
     fontSize: 16,
     fontWeight: '400',
@@ -126,5 +149,19 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: theme.colors.textSecondary,
     marginTop: 2,
+  },
+  badge: {
+    backgroundColor: theme.colors.error,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
 });
