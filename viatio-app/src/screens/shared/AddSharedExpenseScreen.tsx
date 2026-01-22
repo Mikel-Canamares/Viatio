@@ -45,7 +45,7 @@ export default function AddSharedExpenseScreen() {
 
   const { currentTrip, members, fetchMembers, selectTrip } = useSharedTripsStore();
   const { addExpense, editExpense, getExpenseById } = useExpensesV2Store();
-  const { loadRates } = useCurrencyStore();
+  const { loadRates, convert } = useCurrencyStore();
   const { config } = useConfiguracionStore();
 
   // Estado del formulario
@@ -92,11 +92,27 @@ export default function AddSharedExpenseScreen() {
 
   // Cargar divisa del viaje y tasas de cambio
   useEffect(() => {
-    if (currentTrip?.currency) {
+    if (currentTrip?.currency && !isEditing) {
       setCurrency(currentTrip.currency);
       loadRates(currentTrip.currency);
     }
   }, [currentTrip]);
+
+  // Convertir amount cuando cambia la divisa
+  useEffect(() => {
+    const convertCurrency = async () => {
+      if (!currency || !currentTrip?.currency) return;
+
+      // No convertir si no hay amount o es la primera carga
+      const currentAmount = parseFloat(amount.replace(',', '.'));
+      if (!amount || isNaN(currentAmount) || currentAmount <= 0) return;
+
+      // Cargar tasas para la nueva divisa
+      await loadRates(currency);
+    };
+
+    convertCurrency();
+  }, [currency]);
 
   // Cargar gasto existente si es edición
   useEffect(() => {
@@ -113,8 +129,11 @@ export default function AddSharedExpenseScreen() {
 
     if (expense) {
       setDescription(expense.description);
-      setAmount((expense.amount / 100).toFixed(2));
-      setCurrency(expense.currency);
+      // Usar monto y moneda original si existe, sino usar el normalizado
+      const displayAmount = expense.originalAmount ?? expense.amount;
+      const displayCurrency = expense.originalCurrency ?? expense.currency;
+      setAmount((displayAmount / 100).toFixed(2));
+      setCurrency(displayCurrency);
       setCategory(expense.category as CategoriaGasto);
       setDate(expense.date);
       setPaidByUid(expense.paidByUid);
@@ -256,10 +275,12 @@ export default function AddSharedExpenseScreen() {
 
       let success = false;
 
+      const tripCurrency = currentTrip?.currency || 'EUR';
+
       if (isEditing && expenseId) {
-        success = await editExpense(tripId, expenseId, input, activeMembers);
+        success = await editExpense(tripId, expenseId, input, activeMembers, tripCurrency);
       } else {
-        const expense = await addExpense(tripId, input, activeMembers);
+        const expense = await addExpense(tripId, input, activeMembers, tripCurrency);
         success = !!expense;
       }
 
@@ -330,12 +351,12 @@ export default function AddSharedExpenseScreen() {
             {errors.amount && <Text style={styles.errorText}>{errors.amount}</Text>}
 
             {/* Conversión en tiempo real */}
-            {amount && parseFloat(amount) > 0 && currency !== currentTrip?.currency && currentTrip?.currency && (
+            {amount && parseFloat(amount) > 0 && currency !== config.monedaDefault && config.monedaDefault && (
               <View style={styles.conversionContainer}>
                 <ConvertedAmount
                   amount={parseFloat(amount.replace(',', '.'))}
                   currency={currency}
-                  targetCurrency={currentTrip.currency}
+                  targetCurrency={config.monedaDefault}
                   showOriginal={false}
                 />
               </View>
@@ -423,7 +444,8 @@ export default function AddSharedExpenseScreen() {
               onToggle={handleToggleParticipant}
               showAmounts={true}
               amounts={calculateAmounts()}
-              currency={currentTrip?.currency}
+              currency={currency}
+              userCurrency={config.monedaDefault}
               editable={splitMethod === 'exact'}
               onAmountChange={handleAmountChange}
             />
@@ -440,11 +462,11 @@ export default function AddSharedExpenseScreen() {
                   styles.validationValue,
                   shares.reduce((sum, s) => sum + s.value, 0) !== amountInCents && styles.validationValueError
                 ]}>
-                  {(shares.reduce((sum, s) => sum + s.value, 0) / 100).toFixed(2)} {currentTrip?.currency || 'EUR'}
+                  {(shares.reduce((sum, s) => sum + s.value, 0) / 100).toFixed(2)} {currency}
                 </Text>
                 {shares.reduce((sum, s) => sum + s.value, 0) !== amountInCents && (
                   <Text style={styles.validationHint}>
-                    (debe ser {(amountInCents / 100).toFixed(2)} {currentTrip?.currency || 'EUR'})
+                    (debe ser {(amountInCents / 100).toFixed(2)} {currency})
                   </Text>
                 )}
               </View>
@@ -459,7 +481,7 @@ export default function AddSharedExpenseScreen() {
                 totalAmount={amountInCents}
                 shares={shares}
                 onChange={setShares}
-                currency={currentTrip?.currency}
+                currency={currency}
               />
             )}
             {errors.shares && <Text style={styles.errorText}>{errors.shares}</Text>}

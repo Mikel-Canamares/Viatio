@@ -63,12 +63,19 @@ export default function TripSettlementsScreen() {
     }
   };
 
-  // Convertir sugerencias de liquidación
+  // Convertir sugerencias de liquidación de moneda del viaje a moneda del perfil
   useEffect(() => {
     const convertSuggestions = async () => {
-      if (!viaje || settlementSuggestions.length === 0) return;
+      if (!viaje || settlementSuggestions.length === 0) {
+        setConvertedSuggestions([]);
+        return;
+      }
 
       const tripCurrency = viaje.moneda || 'EUR';
+
+      console.log('[TripSettlementsScreen] Raw suggestions:', settlementSuggestions);
+      console.log('[TripSettlementsScreen] Settlements count:', settlements.length);
+      console.log('[TripSettlementsScreen] Settlements details:', settlements);
 
       if (tripCurrency === userCurrency) {
         setConvertedSuggestions(settlementSuggestions);
@@ -82,7 +89,7 @@ export default function TripSettlementsScreen() {
 
           return {
             ...suggestion,
-            amount: convertedAmount ? convertedAmount.converted * 100 : suggestion.amount,
+            amount: convertedAmount ? Math.round(convertedAmount.converted * 100) : suggestion.amount,
           };
         })
       );

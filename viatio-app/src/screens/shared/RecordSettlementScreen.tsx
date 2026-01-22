@@ -41,7 +41,7 @@ export default function RecordSettlementScreen() {
   const { config } = useConfiguracionStore();
   const userCurrency = config.monedaDefault || 'EUR';
 
-  const [amount, setAmount] = useState((suggestedAmount / 100).toFixed(3));
+  const [amount, setAmount] = useState((suggestedAmount / 100).toFixed(2));
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
@@ -59,6 +59,8 @@ export default function RecordSettlementScreen() {
     setLoading(true);
 
     try {
+      const tripCurrency = currentTrip?.currency || 'EUR';
+
       const settlement = await addSettlement(
         tripId,
         {
@@ -69,7 +71,8 @@ export default function RecordSettlementScreen() {
           date,
           notes: notes.trim() || undefined,
         },
-        members
+        members,
+        tripCurrency
       );
 
       if (settlement) {

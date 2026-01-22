@@ -164,8 +164,10 @@ export interface SharedExpense {
   id: string;
   tripId: string;
   description: string;
-  amount: number; // En céntimos (evita problemas de decimales)
-  currency: string;
+  amount: number; // En céntimos - SIEMPRE en la moneda del viaje (normalizado)
+  currency: string; // Moneda del viaje (normalizada)
+  originalAmount?: number; // Monto original ingresado (céntimos) - si fue en otra moneda
+  originalCurrency?: string; // Moneda original del ticket - si fue diferente a la del viaje
   category: string;
   date: string;
   paidByUid: string;
@@ -206,8 +208,10 @@ export interface Settlement {
   fromName: string;
   toUid: string;
   toName: string;
-  amount: number; // céntimos
-  currency: string;
+  amount: number; // céntimos - SIEMPRE en la moneda del viaje (normalizado)
+  currency: string; // Moneda del viaje (normalizada)
+  originalAmount?: number; // Monto original ingresado (céntimos) - si fue en otra moneda
+  originalCurrency?: string; // Moneda original - si fue diferente a la del viaje
   date: string;
   notes: string | null;
   status: SettlementStatus;
@@ -280,6 +284,8 @@ export function centsToDisplay(cents: number, currency: string = 'EUR'): string 
   return new Intl.NumberFormat('es-ES', {
     style: 'currency',
     currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(cents / 100);
 }
 

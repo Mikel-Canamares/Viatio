@@ -2,6 +2,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '@/config/theme';
 import { NumericInput } from './NumericInput';
+import { ConvertedAmount } from './ConvertedAmount';
 
 interface Participant {
   uid: string;
@@ -15,6 +16,7 @@ interface ParticipantCheckboxListProps {
   showAmounts?: boolean;
   amounts?: Record<string, number>;  // uid -> amount en cents
   currency?: string;
+  userCurrency?: string;  // Moneda del perfil del usuario
   editable?: boolean;  // Si los montos son editables
   onAmountChange?: (uid: string, amount: number) => void;  // Callback para cambios
 }
@@ -26,6 +28,7 @@ export function ParticipantCheckboxList({
   showAmounts = false,
   amounts,
   currency = 'EUR',
+  userCurrency = 'EUR',
   editable = false,
   onAmountChange,
 }: ParticipantCheckboxListProps) {
@@ -65,7 +68,7 @@ export function ParticipantCheckboxList({
               onPress={() => onToggle(participant.uid)}
             >
               {isSelected && (
-                <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                <Ionicons name="checkmark" size={16} color={theme.colors.accentForeground} />
               )}
             </Pressable>
 
@@ -74,9 +77,20 @@ export function ParticipantCheckboxList({
 
             {/* Cantidad (opcional) */}
             {showAmounts && !editable && (
-              <Text style={styles.amount}>
-                {amountInEuros !== null ? amountInEuros.toFixed(2) : '0.00'} {currency === 'EUR' ? '€' : currency}
-              </Text>
+              <View style={styles.amountContainer}>
+                <Text style={styles.amount}>
+                  {amountInEuros !== null ? amountInEuros.toFixed(2) : '0.00'} {currency === 'EUR' ? '€' : currency}
+                </Text>
+                {amountInEuros !== null && amountInEuros > 0 && currency !== userCurrency && (
+                  <ConvertedAmount
+                    amount={amountInEuros}
+                    currency={currency}
+                    targetCurrency={userCurrency}
+                    showOriginal={false}
+                    convertedStyle={styles.conversion}
+                  />
+                )}
+              </View>
             )}
 
             {/* Input editable para montos exactos */}
@@ -131,8 +145,8 @@ const styles = StyleSheet.create({
     marginRight: theme.spacing.md,
   },
   checkboxSelected: {
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.accent,
+    backgroundColor: theme.colors.accent,
   },
   name: {
     flex: 1,
@@ -140,10 +154,18 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: theme.colors.text,
   },
+  amountContainer: {
+    alignItems: 'flex-end',
+  },
   amount: {
     fontSize: 16,
     fontWeight: '500',
     color: theme.colors.text,
+  },
+  conversion: {
+    fontSize: 11,
+    color: theme.colors.textSecondary,
+    marginTop: 2,
   },
   inputContainer: {
     flexDirection: 'row',

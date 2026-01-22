@@ -145,7 +145,8 @@ export async function createReserva(
           notes: reserva.notas,
         };
 
-        await createExpense(viaje.firestoreId, expenseInput, members);
+        const tripCurrency = viaje.moneda || 'EUR';
+        await createExpense(viaje.firestoreId, expenseInput, members, tripCurrency);
         console.log('[ReservasService] Gasto compartido auto-creado para reserva:', reserva.id);
       } else {
         // Viaje no compartido o sin datos de reparto: crear gasto local normal

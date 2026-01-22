@@ -14,8 +14,9 @@ import { DiaViaje } from '@/types/diaViaje';
 import { CategoriaLugar, LUGAR_CATEGORIAS } from '@/types/lugar';
 import { getDiasByViajeId } from '@/services/diasViajeService';
 import { theme } from '@/config/theme';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { parseLocalDate } from '@/utils/dateUtils';
 
 interface AddToTripModalProps {
   visible: boolean;
@@ -74,7 +75,8 @@ export function AddToTripModal({
 
   const formatDiaOption = (dia: DiaViaje): string => {
     try {
-      const fecha = parseISO(dia.fecha);
+      // FIX: Usar parseLocalDate para evitar problemas de zona horaria
+      const fecha = parseLocalDate(dia.fecha);
       return format(fecha, "EEEE d 'de' MMMM", { locale: es });
     } catch {
       return dia.fecha;

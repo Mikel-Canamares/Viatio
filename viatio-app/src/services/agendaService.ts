@@ -23,8 +23,9 @@ import {
 import { Lugar, LUGAR_CATEGORIAS } from '@/types/lugar';
 import { EventoPersonalizado, EVENTO_CATEGORIAS } from '@/types/evento';
 import { BASE_CATEGORIES, CategoryBase } from '@/config/categories';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { parseLocalDate } from '@/utils/dateUtils';
 
 /**
  * Mapeo de colores por categoría usando el sistema centralizado
@@ -91,7 +92,10 @@ export async function getAgendaByViajeId(viajeId: string): Promise<DiaAgenda[]> 
   ]);
 
   return dias.map((dia) => {
-    const fecha = parseISO(dia.fecha);
+    // FIX: Usar parseLocalDate en lugar de parseISO para evitar problemas de zona horaria
+    // parseISO interpreta la fecha como UTC, lo que causa que en dispositivos con zona horaria
+    // negativa (ej. UTC-5) se muestre el día anterior
+    const fecha = parseLocalDate(dia.fecha);
     const eventos = combinarEventos(
       reservas,
       lugares,

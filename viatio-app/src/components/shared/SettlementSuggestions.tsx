@@ -16,8 +16,13 @@ export function SettlementSuggestions({
   currentUserId,
   onSettlePress,
 }: SettlementSuggestionsProps) {
-  // Si no hay sugerencias, todo está cuadrado
-  if (suggestions.length === 0) {
+
+  // Filtrar sugerencias con importes insignificantes (< 0.10 en cualquier moneda)
+  const MINIMUM_AMOUNT = 10; // 10 céntimos
+  const validSuggestions = suggestions.filter(s => s.amount >= MINIMUM_AMOUNT);
+
+  // Si no hay sugerencias válidas, todo está cuadrado
+  if (validSuggestions.length === 0) {
     return (
       <View style={styles.emptyContainer}>
         <Ionicons name="checkmark-circle" size={48} color={theme.colors.success} />
@@ -31,10 +36,10 @@ export function SettlementSuggestions({
     <View style={styles.container}>
       <Text style={styles.title}>Quién debe a quién</Text>
       <Text style={styles.subtitle}>
-        {suggestions.length} {suggestions.length === 1 ? 'pago' : 'pagos'} para saldar cuentas
+        {validSuggestions.length} {validSuggestions.length === 1 ? 'pago' : 'pagos'} para saldar cuentas
       </Text>
 
-      {suggestions.map((suggestion, index) => {
+      {validSuggestions.map((suggestion, index) => {
         const isFromCurrentUser = suggestion.fromUid === currentUserId;
         const isToCurrentUser = suggestion.toUid === currentUserId;
 
@@ -187,17 +192,32 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: theme.colors.border,
   },
+  amountColumn: {
+    alignItems: 'center',
+    marginHorizontal: 8,
+  },
   amountBadge: {
     backgroundColor: theme.colors.primary,
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
-    marginHorizontal: 8,
   },
   amountText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
+  },
+  conversion: {
+    fontSize: 10,
+    color: theme.colors.textSecondary,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  tripCurrencyHint: {
+    fontSize: 10,
+    color: theme.colors.textSecondary,
+    marginTop: 4,
+    textAlign: 'center',
   },
   settleButton: {
     paddingVertical: 12,

@@ -38,6 +38,7 @@ import { DatePickerInput } from '@/components/DatePickerInput';
 import { ReservationCurrencyPicker } from '@/components/ReservationCurrencyPicker';
 import { SharesEditor } from '@/components/shared/SharesEditor';
 import { theme } from '@/config';
+import { getCategoryColor } from '@/config/categories';
 import { showToast } from '@/utils/toast';
 import { useReservasStore } from '@/store/reservasStore';
 import { useDocumentosStore } from '@/store/documentosStore';
@@ -644,25 +645,36 @@ export default function AddReservationScreen({ route, navigation }: Props) {
                     formData.categoria === cat.value && styles.categoriaOptionActive,
                   ]}
                 >
-                  <Ionicons
-                    name={
-                      cat.value === 'transport'
-                        ? 'airplane'
-                        : cat.value === 'accommodation'
-                        ? 'bed'
-                        : cat.value === 'food'
-                        ? 'restaurant'
-                        : cat.value === 'activity'
-                        ? 'ticket'
-                        : 'ellipsis-horizontal'
-                    }
-                    size={24}
-                    color={
-                      formData.categoria === cat.value
-                        ? theme.colors.primaryLight
-                        : theme.colors.textMuted
-                    }
-                  />
+                  <View
+                    style={[
+                      styles.categoriaIconCircle,
+                      {
+                        backgroundColor: formData.categoria === cat.value
+                          ? getCategoryColor(cat.value) + '20'
+                          : theme.colors.secondary
+                      }
+                    ]}
+                  >
+                    <Ionicons
+                      name={
+                        cat.value === 'transport'
+                          ? 'airplane'
+                          : cat.value === 'accommodation'
+                          ? 'bed'
+                          : cat.value === 'food'
+                          ? 'restaurant'
+                          : cat.value === 'activity'
+                          ? 'ticket'
+                          : 'ellipsis-horizontal'
+                      }
+                      size={32}
+                      color={
+                        formData.categoria === cat.value
+                          ? getCategoryColor(cat.value)
+                          : theme.colors.textMuted
+                      }
+                    />
+                  </View>
                   <Text
                     style={[
                       styles.categoriaOptionText,
@@ -959,6 +971,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
                         showAmounts={true}
                         amounts={calculateAmounts()}
                         currency={formData.moneda || 'EUR'}
+                        userCurrency={config.monedaDefault}
                         editable={splitMethod === 'exact'}
                         onAmountChange={handleAmountChange}
                       />
@@ -1219,27 +1232,34 @@ const styles = StyleSheet.create({
   },
   categoriaOption: {
     width: '30%',
-    aspectRatio: 1,
+    paddingVertical: theme.spacing.md,
     borderRadius: 12,
     backgroundColor: '#FFFFFF',
     borderWidth: 2,
     borderColor: '#E5E7EB',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: theme.spacing.xs,
+    gap: theme.spacing.sm,
   },
   categoriaOptionActive: {
-    backgroundColor: '#EFF6FF',
-    borderColor: theme.colors.primaryLight,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E5E7EB',
+  },
+  categoriaIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   categoriaOptionText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '500',
     color: theme.colors.textSecondary,
     textAlign: 'center',
   },
   categoriaOptionTextActive: {
-    color: theme.colors.primaryLight,
+    color: theme.colors.text,
     fontWeight: '600',
   },
   categoriaChip: {

@@ -18,8 +18,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { parseLocalDate } from '@/utils/dateUtils';
 import {
   PageHeader,
   ReservationCard,
@@ -94,7 +95,8 @@ export default function TripReservationsScreen({ route, navigation }: Props) {
   const formatFechaHeader = (fecha: string) => {
     if (fecha === 'Sin fecha') return 'Sin fecha';
     try {
-      return format(parseISO(fecha), "EEEE, d 'de' MMMM", { locale: es });
+      // FIX: Usar parseLocalDate para evitar problemas de zona horaria
+      return format(parseLocalDate(fecha), "EEEE, d 'de' MMMM", { locale: es });
     } catch {
       return fecha;
     }
