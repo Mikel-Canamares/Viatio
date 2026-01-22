@@ -14,6 +14,8 @@ import { getViajeById } from './viajesService';
 import {
   scheduleReservaNotification,
   cancelReservaNotifications,
+  schedulePaymentDeadlineNotification,
+  scheduleCancellationDeadlineNotification,
 } from './notificationsService';
 import { deleteLugar } from './lugaresService';
 import { deleteDocumento, getDocumentosByReservaId } from './documentosService';
@@ -213,6 +215,20 @@ export async function createReserva(
     });
   } catch (error) {
     console.warn('[ReservasService] Error al obtener viaje para notificación:', error);
+  }
+
+  // Programar notificación de fecha límite de pago (no bloqueante)
+  if (reserva.metadatos?.fechaLimitePago && reserva.estadoPago === 'pending') {
+    schedulePaymentDeadlineNotification(reserva, reserva.metadatos.fechaLimitePago).catch((error) => {
+      console.warn('[ReservasService] Error al programar notificación de pago:', error);
+    });
+  }
+
+  // Programar notificación de fecha límite de cancelación (no bloqueante)
+  if (reserva.metadatos?.cancelacionGratuita && reserva.metadatos?.fechaLimiteCancelacion) {
+    scheduleCancellationDeadlineNotification(reserva, reserva.metadatos.fechaLimiteCancelacion).catch((error) => {
+      console.warn('[ReservasService] Error al programar notificación de cancelación:', error);
+    });
   }
 
   // Sincronizar con Firestore si es viaje compartido (no bloqueante)
@@ -555,6 +571,28 @@ export async function updateReserva(
     } catch (error) {
       console.warn('[ReservasService] Error al reprogramar notificación:', error);
     }
+  }
+
+  // Reprogramar notificaciones de fechas límite si cambiaron
+  try {
+    const reservaActualizada = await getReservaById(id);
+    if (reservaActualizada) {
+      // Notificación de pago
+      if (reservaActualizada.metadatos?.fechaLimitePago && reservaActualizada.estadoPago === 'pending') {
+        schedulePaymentDeadlineNotification(reservaActualizada, reservaActualizada.metadatos.fechaLimitePago).catch((error) => {
+          console.warn('[ReservasService] Error al reprogramar notificación de pago:', error);
+        });
+      }
+
+      // Notificación de cancelación
+      if (reservaActualizada.metadatos?.cancelacionGratuita && reservaActualizada.metadatos?.fechaLimiteCancelacion) {
+        scheduleCancellationDeadlineNotification(reservaActualizada, reservaActualizada.metadatos.fechaLimiteCancelacion).catch((error) => {
+          console.warn('[ReservasService] Error al reprogramar notificación de cancelación:', error);
+        });
+      }
+    }
+  } catch (error) {
+    console.warn('[ReservasService] Error al reprogramar notificaciones de fechas límite:', error);
   }
 
   // Sincronizar con Firestore si es viaje compartido (no bloqueante)

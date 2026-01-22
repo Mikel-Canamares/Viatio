@@ -101,6 +101,26 @@ const DEFAULT_TEMPLATES: NotificationTemplate[] = [
     vibrate: true,
     priority: 'high',
   },
+  {
+    id: 'payment_deadline',
+    type: 'reserva',
+    enabled: true,
+    title: '💳 Pago pendiente: {nombre}',
+    body: 'El pago vence el {fecha}. No olvides completar tu reserva.',
+    sound: 'default',
+    vibrate: true,
+    priority: 'high',
+  },
+  {
+    id: 'cancellation_deadline',
+    type: 'reserva',
+    enabled: true,
+    title: '❌ Última oportunidad para cancelar: {nombre}',
+    body: 'Puedes cancelar gratis hasta el {fecha}. Después se aplicarán cargos.',
+    sound: 'default',
+    vibrate: true,
+    priority: 'high',
+  },
 ];
 
 // ============================================
@@ -741,6 +761,194 @@ export async function scheduleReservaNotification(
     return true;
   } catch (error) {
     log('error', 'Error scheduling reserva notification', error);
+    return false;
+  }
+}
+
+/**
+ * Programa una notificación para fecha límite de pago
+ */
+export async function schedulePaymentDeadlineNotification(
+  reserva: Reserva,
+  fechaLimite: string,
+  tiempoAntelacion: TiempoAntelacion = '3d'
+): Promise<boolean> {
+  try {
+    log('info', `Attempting to schedule payment deadline notification for reserva: ${reserva.id}`);
+    initializeNotificationHandler();
+
+    // Verificar permisos
+    const hasPermissions = await hasNotificationPermissions();
+    if (!hasPermissions) {
+      log('warn', 'No notification permissions');
+      return false;
+    }
+
+    // Obtener preferencias
+    const preferencias = await getPreferenciasNotificaciones();
+
+    if (!preferencias.actualizacionesReservas) {
+      log('info', 'Reserva reminders disabled in preferences');
+      return false;
+    }
+
+    // Parsear fecha límite
+    const fechaLimiteDate = new Date(fechaLimite);
+    const calculation = calculateNotificationDate(fechaLimiteDate, tiempoAntelacion);
+
+    if (!calculation.isValid) {
+      log('info', `Cannot schedule payment deadline notification: ${calculation.reason}`);
+      return false;
+    }
+
+    const { notificationDate } = calculation;
+
+    // Obtener template
+    const templates = await getNotificationTemplates();
+    const template = templates.find(t => t.id === 'payment_deadline') || DEFAULT_TEMPLATES[2];
+
+    // Renderizar contenido
+    const variables = {
+      nombre: reserva.nombre,
+      fecha: fechaLimiteDate.toLocaleDateString('es-ES', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }),
+    };
+
+    const title = renderTemplate(template.title, variables);
+    const body = renderTemplate(template.body, variables);
+
+    // Programar notificación
+    const notificationId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        sound: template.sound,
+        priority:
+          template.priority === 'max'
+            ? Notifications.AndroidNotificationPriority.MAX
+            : Notifications.AndroidNotificationPriority.HIGH,
+        data: {
+          type: 'reserva',
+          id: reserva.id,
+          viajeId: reserva.viajeId,
+          scheduledFor: notificationDate.toISOString(),
+        } as NotificationData,
+      },
+      trigger: {
+        date: notificationDate,
+        channelId: 'reservas',
+      },
+    });
+
+    // Guardar metadata
+    await saveNotificationId(notificationId, 'reserva', reserva.id, notificationDate, title, body);
+
+    log('info', `✅ Payment deadline notification scheduled successfully for reserva ${reserva.id}`, {
+      notificationId,
+      scheduledFor: notificationDate.toISOString(),
+      title,
+    });
+
+    return true;
+  } catch (error) {
+    log('error', 'Error scheduling payment deadline notification', error);
+    return false;
+  }
+}
+
+/**
+ * Programa una notificación para fecha límite de cancelación
+ */
+export async function scheduleCancellationDeadlineNotification(
+  reserva: Reserva,
+  fechaLimite: string,
+  tiempoAntelacion: TiempoAntelacion = '3d'
+): Promise<boolean> {
+  try {
+    log('info', `Attempting to schedule cancellation deadline notification for reserva: ${reserva.id}`);
+    initializeNotificationHandler();
+
+    // Verificar permisos
+    const hasPermissions = await hasNotificationPermissions();
+    if (!hasPermissions) {
+      log('warn', 'No notification permissions');
+      return false;
+    }
+
+    // Obtener preferencias
+    const preferencias = await getPreferenciasNotificaciones();
+
+    if (!preferencias.actualizacionesReservas) {
+      log('info', 'Reserva reminders disabled in preferences');
+      return false;
+    }
+
+    // Parsear fecha límite
+    const fechaLimiteDate = new Date(fechaLimite);
+    const calculation = calculateNotificationDate(fechaLimiteDate, tiempoAntelacion);
+
+    if (!calculation.isValid) {
+      log('info', `Cannot schedule cancellation deadline notification: ${calculation.reason}`);
+      return false;
+    }
+
+    const { notificationDate } = calculation;
+
+    // Obtener template
+    const templates = await getNotificationTemplates();
+    const template = templates.find(t => t.id === 'cancellation_deadline') || DEFAULT_TEMPLATES[3];
+
+    // Renderizar contenido
+    const variables = {
+      nombre: reserva.nombre,
+      fecha: fechaLimiteDate.toLocaleDateString('es-ES', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }),
+    };
+
+    const title = renderTemplate(template.title, variables);
+    const body = renderTemplate(template.body, variables);
+
+    // Programar notificación
+    const notificationId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        sound: template.sound,
+        priority:
+          template.priority === 'max'
+            ? Notifications.AndroidNotificationPriority.MAX
+            : Notifications.AndroidNotificationPriority.HIGH,
+        data: {
+          type: 'reserva',
+          id: reserva.id,
+          viajeId: reserva.viajeId,
+          scheduledFor: notificationDate.toISOString(),
+        } as NotificationData,
+      },
+      trigger: {
+        date: notificationDate,
+        channelId: 'reservas',
+      },
+    });
+
+    // Guardar metadata
+    await saveNotificationId(notificationId, 'reserva', reserva.id, notificationDate, title, body);
+
+    log('info', `✅ Cancellation deadline notification scheduled successfully for reserva ${reserva.id}`, {
+      notificationId,
+      scheduledFor: notificationDate.toISOString(),
+      title,
+    });
+
+    return true;
+  } catch (error) {
+    log('error', 'Error scheduling cancellation deadline notification', error);
     return false;
   }
 }

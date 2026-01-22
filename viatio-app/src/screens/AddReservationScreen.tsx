@@ -131,6 +131,11 @@ export default function AddReservationScreen({ route, navigation }: Props) {
   const [shares, setShares] = useState<Omit<ExpenseShare, 'calculatedAmount'>[]>([]);
   const [paidDate, setPaidDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
+  // Estados para fechas límite
+  const [fechaLimitePago, setFechaLimitePago] = useState<string>('');
+  const [cancelacionGratuita, setCancelacionGratuita] = useState<boolean>(false);
+  const [fechaLimiteCancelacion, setFechaLimiteCancelacion] = useState<string>('');
+
   // Opciones para dropdowns de pago
   const paidByOptions: DropdownOption[] = members.length > 0
     ? members.map(member => ({
@@ -386,6 +391,14 @@ export default function AddReservationScreen({ route, navigation }: Props) {
       console.log('[AddReservation] Tipo de metadatos:', typeof formData.metadatos);
 
       // Crear la reserva (sin documentoId, ya que usaremos la tabla intermedia)
+      // Preparar metadatos con fechas límite
+      const metadatosCompletos = {
+        ...formData.metadatos,
+        fechaLimitePago: fechaLimitePago || undefined,
+        cancelacionGratuita: cancelacionGratuita || undefined,
+        fechaLimiteCancelacion: cancelacionGratuita ? (fechaLimiteCancelacion || undefined) : undefined,
+      };
+
       const input: CreateReservaInput = {
         viajeId,
         categoria: formData.categoria,
@@ -406,7 +419,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
         participantUids: participantUids.length > 0 ? participantUids : undefined,
         shares: shares.length > 0 ? shares : undefined,
         notas: formData.notas,
-        metadatos: formData.metadatos,
+        metadatos: metadatosCompletos,
       };
 
       const result = await addReserva(input);
@@ -726,6 +739,42 @@ export default function AddReservationScreen({ route, navigation }: Props) {
               />
             )}
 
+            {/* Cancelación gratuita - Solo para accommodation */}
+            {formData.categoria === 'accommodation' && (
+              <>
+                <Pressable
+                  onPress={() => {
+                    const newValue = !cancelacionGratuita;
+                    setCancelacionGratuita(newValue);
+                    if (!newValue) {
+                      setFechaLimiteCancelacion('');
+                    }
+                  }}
+                  style={styles.checkboxRow}
+                >
+                  <View style={[
+                    styles.checkbox,
+                    cancelacionGratuita && styles.checkboxSelected
+                  ]}>
+                    {cancelacionGratuita && (
+                      <Ionicons name="checkmark" size={16} color="#fff" />
+                    )}
+                  </View>
+                  <Text style={styles.checkboxLabel}>Cancelación gratuita</Text>
+                </Pressable>
+
+                {cancelacionGratuita && (
+                  <DatePickerInput
+                    label="Fecha límite de cancelación"
+                    value={fechaLimiteCancelacion}
+                    onChange={setFechaLimiteCancelacion}
+                    minDate={new Date()}
+                    maxDate={formData.fechaInicio ? new Date(formData.fechaInicio) : undefined}
+                  />
+                )}
+              </>
+            )}
+
             {formData.categoria === 'activity' && (
               <SubtypeSelector
                 label="Tipo de actividad"
@@ -926,6 +975,16 @@ export default function AddReservationScreen({ route, navigation }: Props) {
                   ))}
                 </View>
               </View>
+
+              {/* Fecha límite de pago - Solo si está pendiente */}
+              {formData.estadoPago === 'pending' && (
+                <DatePickerInput
+                  label="Fecha límite de pago (opcional)"
+                  value={fechaLimitePago}
+                  onChange={setFechaLimitePago}
+                  minDate={new Date()}
+                />
+              )}
 
               {/* Selector de quién pagó - Solo en viajes compartidos y si el estado es pagado o parcial */}
               {viaje?.isShared && members.length > 0 && (formData.estadoPago === 'paid' || formData.estadoPago === 'partial') && (
@@ -1389,5 +1448,30 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: theme.colors.text,
     marginBottom: theme.spacing.xs,
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  checkboxSelected: {
+    backgroundColor: theme.colors.accent,
+    borderColor: theme.colors.accent,
+  },
+  checkboxLabel: {
+    fontSize: 15,
+    color: theme.colors.text,
+    fontWeight: '500',
   },
 });
