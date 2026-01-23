@@ -691,9 +691,13 @@ export async function deleteReserva(id: string): Promise<boolean> {
 
   // 6. Sincronizar eliminación con Firestore si es viaje compartido (antes de eliminar)
   if (reserva.firestoreId) {
-    syncDeleteIfShared(reserva.viajeId, 'reservations', reserva.firestoreId).catch((error) => {
-      console.warn('[ReservasService] Error al sincronizar eliminación:', error);
-    });
+    try {
+      await syncDeleteIfShared(reserva.viajeId, 'reservations', reserva.firestoreId);
+      console.log('[ReservasService] Eliminación sincronizada con Firestore');
+    } catch (error) {
+      console.warn('[ReservasService] Error al sincronizar eliminación con Firestore:', error);
+      // Continuar con la eliminación local aunque falle la sincronización
+    }
   }
 
   // 7. Finalmente, eliminar la reserva
