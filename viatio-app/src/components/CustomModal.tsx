@@ -5,7 +5,7 @@
  * Variantes: success, error, warning, info
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Modal,
   View,
@@ -13,6 +13,7 @@ import {
   StyleSheet,
   Pressable,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '@/config/theme';
@@ -76,6 +77,7 @@ export const CustomModal: React.FC<CustomModalProps> = ({
   secondaryButton,
 }) => {
   const config = MODAL_CONFIG[type];
+  const [isLoading, setIsLoading] = useState(false);
 
   return (
     <Modal
@@ -105,31 +107,54 @@ export const CustomModal: React.FC<CustomModalProps> = ({
                 styles.button,
                 primaryButton?.destructive ? styles.destructiveButton : styles.primaryButton,
                 !secondaryButton && styles.fullWidthButton,
+                isLoading && styles.buttonDisabled,
               ]}
-              onPress={() => {
-                primaryButton?.onPress();
-                onClose();
-              }}
-            >
-              <Text
-                style={
-                  primaryButton?.destructive
-                    ? styles.destructiveButtonText
-                    : styles.primaryButtonText
+              onPress={async () => {
+                if (isLoading) return;
+                setIsLoading(true);
+                try {
+                  await primaryButton?.onPress();
+                  onClose();
+                } finally {
+                  setIsLoading(false);
                 }
-              >
-                {primaryButton?.text || 'OK'}
-              </Text>
+              }}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text
+                  style={
+                    primaryButton?.destructive
+                      ? styles.destructiveButtonText
+                      : styles.primaryButtonText
+                  }
+                >
+                  {primaryButton?.text || 'OK'}
+                </Text>
+              )}
             </Pressable>
 
             {/* Botón secundario (abajo) */}
             {secondaryButton && (
               <Pressable
-                style={[styles.button, styles.secondaryButton]}
-                onPress={() => {
-                  secondaryButton.onPress();
-                  onClose();
+                style={[
+                  styles.button,
+                  styles.secondaryButton,
+                  isLoading && styles.buttonDisabled,
+                ]}
+                onPress={async () => {
+                  if (isLoading) return;
+                  setIsLoading(true);
+                  try {
+                    await secondaryButton.onPress();
+                    onClose();
+                  } finally {
+                    setIsLoading(false);
+                  }
                 }}
+                disabled={isLoading}
               >
                 <Text style={styles.secondaryButtonText}>
                   {secondaryButton.text}
@@ -223,5 +248,8 @@ const styles = StyleSheet.create({
     ...theme.typography.subtitle,
     color: theme.colors.textSecondary,
     fontWeight: '500',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
 });
