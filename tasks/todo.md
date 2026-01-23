@@ -1218,3 +1218,79 @@ console.log('[DEBUG calculateSettlementSuggestions] Final suggestions:', ...)
 - **Bajo**: Los cambios no afectan la lógica de negocio
 - **Bajo**: El debounce de 500ms es suficientemente corto para mantener UX fluida
 - **Ninguno**: Los logs de debug no eran necesarios en producción
+
+
+## 🎨 Mejora Visual de Modales (23/01/2026)
+
+### Objetivo
+Mejorar la apariencia visual de los modales con múltiples botones para seguir el estilo de la app, igual que los modales de un solo botón.
+
+### Cambios Completados
+
+#### FASE 1: Mejora del componente CustomModal
+- [x] Añadida prop `destructive?: boolean` al primaryButton
+- [x] Cambiado layout de botones de horizontal a vertical para mejor jerarquía visual
+- [x] Botón primario siempre arriba (acción principal)
+- [x] Botón secundario abajo (acción de cancelar)
+- [x] Nuevo estilo `destructiveButton` con color rojo (`theme.colors.error`)
+- [x] Aumentado minHeight de botones a 50px para mejor área táctil
+- [x] Aumentado paddingVertical a 14px
+- [x] Botón secundario ahora transparente con borde de 1.5px
+- [x] Mejorados fontWeights (600 para primario/destructivo, 500 para secundario)
+
+#### FASE 2: Reemplazo masivo de Alert.alert
+Se reemplazaron todos los `Alert.alert` nativos por `CustomModal` personalizado en:
+
+**Pantallas principales (19 archivos)**:
+- [x] TripReservationsScreen.tsx
+- [x] EditReservationScreen.tsx
+- [x] EventoDetailScreen.tsx
+- [x] ArchivedTripsScreen.tsx
+- [x] AddEventoScreen.tsx
+- [x] TripListScreen.tsx
+- [x] ReservationDetailScreen.tsx
+- [x] TripDocumentsScreen.tsx
+- [x] AddReservationScreen.tsx
+- [x] ProfileScreen.tsx
+- [x] EditProfileScreen.tsx
+- [x] SettingsScreen.tsx
+- [x] NotificationsSettingsScreen.tsx
+- [x] ScanReservationScreen.tsx
+- [x] TripMapScreen.tsx
+- [x] CopilotSettingsScreen.tsx
+- [x] HelpScreen.tsx
+- [x] NotificationsManagementScreen.tsx
+- [x] NotificationDebugScreen.tsx
+- [x] VerifyEmailScreen.tsx
+
+**Pantallas de viajes compartidos (5 archivos)**:
+- [x] CreateSharedTripScreen.tsx
+- [x] ExpenseDetailScreen.tsx
+- [x] SharedTripDetailScreen.tsx
+- [x] TripMembersScreen.tsx
+- [x] TripSettlementsScreen.tsx
+
+**Componentes (2 archivos)**:
+- [x] PlaceMatchNotification.tsx
+- [x] SelectItem.tsx
+
+**Total**: 26 archivos migrados, ~40 modales reemplazados
+
+### Comparación Visual
+
+**Antes (Alert.alert nativo)**:
+- Botones horizontales (Cancelar | Eliminar)
+- Sin iconos, sin colores de marca
+- Área táctil pequeña
+
+**Después (CustomModal)**:
+- Botones verticales (Eliminar arriba, Cancelar abajo)
+- Icono de 48px con fondo de color
+- Botones de 50px con colores distintivos
+- Botón destructivo en rojo prominente
+
+### Verificación
+- [x] Compilación TypeScript sin errores
+- [x] Todas las pantallas migradas
+- [x] 0 Alert.alert restantes en screens/
+

@@ -33,7 +33,8 @@
       "Bash(npm install:*)",
       "Bash(npx expo-doctor)",
       "Bash(npm run start:clear:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(npm start)"
     ]
   }
 }

@@ -30,6 +30,8 @@ export { SectionHeader } from './SectionHeader';
 export { FloatingActionButton } from './FloatingActionButton';
 export { ErrorBoundary } from './ErrorBoundary';
 export { LoadingOverlay } from './LoadingOverlay';
+export { CustomModal } from './CustomModal';
+export type { ModalType } from './CustomModal';
 export { TripCard } from './TripCard';
 export { default as ReservationCard } from './ReservationCard';
 export { default as DocumentCard } from './DocumentCard';

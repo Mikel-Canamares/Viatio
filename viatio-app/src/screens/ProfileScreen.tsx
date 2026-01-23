@@ -13,7 +13,6 @@ import {
   Image,
   Pressable,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +21,7 @@ import { useAuth } from '@/context/AuthContext';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { Card } from '@/components/Card';
 import { ProfileMenuItem } from '@/components/ProfileMenuItem';
+import { CustomModal } from '@/components';
 import { theme } from '@/config';
 import { getEstadisticasUsuario } from '@/services/perfilService';
 import type { EstadisticasUsuario } from '@/types/perfil';
@@ -37,6 +37,7 @@ export default function ProfileScreen({ navigation }: Props) {
 
   const [estadisticas, setEstadisticas] = useState<EstadisticasUsuario | null>(null);
   const [loading, setLoading] = useState(true);
+  const [logoutModal, setLogoutModal] = useState(false);
 
   /**
    * Carga las estadísticas del usuario al montar
@@ -73,25 +74,16 @@ export default function ProfileScreen({ navigation }: Props) {
    * Maneja el cierre de sesión con confirmación
    */
   const handleLogout = () => {
-    Alert.alert(
-      'Cerrar sesión',
-      '¿Estás seguro de que quieres cerrar sesión?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Cerrar sesión',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await logout();
-            } catch (error) {
-              console.error('Error al cerrar sesión:', error);
-              showToast.error('Error', 'No se pudo cerrar sesión. Intenta de nuevo.');
-            }
-          },
-        },
-      ]
-    );
+    setLogoutModal(true);
+  };
+
+  const confirmLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+      showToast.error('Error', 'No se pudo cerrar sesión. Intenta de nuevo.');
+    }
   };
 
   return (
@@ -249,6 +241,24 @@ export default function ProfileScreen({ navigation }: Props) {
         {/* Versión de la app */}
         <Text style={styles.appVersion}>Viatio v1.0.0</Text>
       </View>
+
+      {/* Modal de confirmación de logout */}
+      <CustomModal
+        visible={logoutModal}
+        type="warning"
+        title="Cerrar sesión"
+        message="¿Estás seguro de que quieres cerrar sesión?"
+        onClose={() => setLogoutModal(false)}
+        primaryButton={{
+          text: 'Cerrar sesión',
+          onPress: confirmLogout,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {},
+        }}
+      />
     </ScreenContainer>
   );
 }

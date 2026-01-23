@@ -13,7 +13,6 @@ import {
   ScrollView,
   ActivityIndicator,
   Pressable,
-  Alert,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -23,6 +22,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { SecondaryButton } from '@/components/SecondaryButton';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { SectionHeader } from '@/components/SectionHeader';
+import { CustomModal } from '@/components';
 import { useEventosStore } from '@/store/eventosStore';
 import {
   EventoPersonalizado,
@@ -58,6 +58,7 @@ export function EventoDetailScreen() {
 
   const [evento, setEvento] = useState<EventoPersonalizado | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deleteModal, setDeleteModal] = useState(false);
 
   // Cargar evento
   useEffect(() => {
@@ -96,25 +97,16 @@ export function EventoDetailScreen() {
   };
 
   const handleDelete = () => {
-    Alert.alert(
-      'Eliminar evento',
-      '¿Estás seguro de que quieres eliminar este evento?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: async () => {
-            const success = await removeEvento(eventoId);
-            if (success) {
-              navigation.goBack();
-            } else {
-              showToast.error('Error', 'No se pudo eliminar el evento');
-            }
-          },
-        },
-      ]
-    );
+    setDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    const success = await removeEvento(eventoId);
+    if (success) {
+      navigation.goBack();
+    } else {
+      showToast.error('Error', 'No se pudo eliminar el evento');
+    }
   };
 
   if (loading) {
@@ -241,6 +233,23 @@ export function EventoDetailScreen() {
           </SecondaryButton>
         </View>
       </ScrollView>
+
+      <CustomModal
+        visible={deleteModal}
+        type="warning"
+        title="Eliminar evento"
+        message="¿Estás seguro de que quieres eliminar este evento?"
+        onClose={() => setDeleteModal(false)}
+        primaryButton={{
+          text: 'Eliminar',
+          onPress: confirmDelete,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {},
+        }}
+      />
     </ScreenContainer>
   );
 }

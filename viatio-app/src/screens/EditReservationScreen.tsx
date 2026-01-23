@@ -15,7 +15,6 @@ import {
   Pressable,
   ActivityIndicator,
   Image,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -31,6 +30,7 @@ import {
   SectionHeader,
   PrimaryButton,
   SubtypeSelector,
+  CustomModal,
 } from '@/components';
 import { DatePickerInput } from '@/components/DatePickerInput';
 import { MemberChipsSelector } from '@/components/shared/MemberChipsSelector';
@@ -115,6 +115,13 @@ export default function EditReservationScreen({ route, navigation }: Props) {
   const [fechaLimitePago, setFechaLimitePago] = useState<string>('');
   const [cancelacionGratuita, setCancelacionGratuita] = useState<boolean>(false);
   const [fechaLimiteCancelacion, setFechaLimiteCancelacion] = useState<string>('');
+
+  // Estados para modales
+  const [permissionModal, setPermissionModal] = useState(false);
+  const [deleteDocModal, setDeleteDocModal] = useState<{
+    visible: boolean;
+    documentoId: string | null;
+  }>({ visible: false, documentoId: null });
 
   useEffect(() => {
     loadData();
@@ -273,7 +280,7 @@ export default function EditReservationScreen({ route, navigation }: Props) {
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permiso denegado', 'Se necesita acceso a la galería para seleccionar imágenes');
+      setPermissionModal(true);
       return;
     }
 
@@ -301,23 +308,17 @@ export default function EditReservationScreen({ route, navigation }: Props) {
   };
 
   const handleDeleteExistingDocument = (documentoId: string) => {
-    Alert.alert(
-      'Eliminar documento',
-      '¿Deseas eliminar el documento asociado? Se eliminará al guardar los cambios.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: () => {
-            // Añadir a lista de documentos a eliminar
-            setDocumentsToDelete((prev) => [...prev, documentoId]);
-            // Remover de lista de documentos existentes
-            setExistingDocuments((prev) => prev.filter((d) => d.id !== documentoId));
-          },
-        },
-      ]
-    );
+    setDeleteDocModal({ visible: true, documentoId });
+  };
+
+  const confirmDeleteDocument = () => {
+    if (deleteDocModal.documentoId) {
+      // Añadir a lista de documentos a eliminar
+      setDocumentsToDelete((prev) => [...prev, deleteDocModal.documentoId!]);
+      // Remover de lista de documentos existentes
+      setExistingDocuments((prev) => prev.filter((d) => d.id !== deleteDocModal.documentoId));
+      setDeleteDocModal({ visible: false, documentoId: null });
+    }
   };
 
   const handleRemoveAttachedFile = () => {
@@ -917,6 +918,35 @@ export default function EditReservationScreen({ route, navigation }: Props) {
           </ScrollView>
         </KeyboardAvoidingView>
       </ScreenContainer>
+
+      <CustomModal
+        visible={permissionModal}
+        type="error"
+        title="Permiso denegado"
+        message="Se necesita acceso a la galería para seleccionar imágenes"
+        onClose={() => setPermissionModal(false)}
+        primaryButton={{
+          text: 'OK',
+          onPress: () => {},
+        }}
+      />
+
+      <CustomModal
+        visible={deleteDocModal.visible}
+        type="warning"
+        title="Eliminar documento"
+        message="¿Deseas eliminar el documento asociado? Se eliminará al guardar los cambios."
+        onClose={() => setDeleteDocModal({ visible: false, documentoId: null })}
+        primaryButton={{
+          text: 'Eliminar',
+          onPress: confirmDeleteDocument,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {},
+        }}
+      />
     </View>
   );
 }

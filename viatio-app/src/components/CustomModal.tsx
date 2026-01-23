@@ -28,6 +28,7 @@ interface CustomModalProps {
   primaryButton?: {
     text: string;
     onPress: () => void;
+    destructive?: boolean; // Para acciones de eliminación
   };
   secondaryButton?: {
     text: string;
@@ -98,6 +99,30 @@ export const CustomModal: React.FC<CustomModalProps> = ({
 
           {/* Botones */}
           <View style={styles.buttonsContainer}>
+            {/* Botón primario (siempre arriba si hay secundario) */}
+            <Pressable
+              style={[
+                styles.button,
+                primaryButton?.destructive ? styles.destructiveButton : styles.primaryButton,
+                !secondaryButton && styles.fullWidthButton,
+              ]}
+              onPress={() => {
+                primaryButton?.onPress();
+                onClose();
+              }}
+            >
+              <Text
+                style={
+                  primaryButton?.destructive
+                    ? styles.destructiveButtonText
+                    : styles.primaryButtonText
+                }
+              >
+                {primaryButton?.text || 'OK'}
+              </Text>
+            </Pressable>
+
+            {/* Botón secundario (abajo) */}
             {secondaryButton && (
               <Pressable
                 style={[styles.button, styles.secondaryButton]}
@@ -111,22 +136,6 @@ export const CustomModal: React.FC<CustomModalProps> = ({
                 </Text>
               </Pressable>
             )}
-
-            <Pressable
-              style={[
-                styles.button,
-                styles.primaryButton,
-                !secondaryButton && styles.fullWidthButton,
-              ]}
-              onPress={() => {
-                primaryButton?.onPress();
-                onClose();
-              }}
-            >
-              <Text style={styles.primaryButtonText}>
-                {primaryButton?.text || 'OK'}
-              </Text>
-            </Pressable>
           </View>
         </Pressable>
       </Pressable>
@@ -173,21 +182,21 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   buttonsContainer: {
-    flexDirection: 'row',
+    flexDirection: 'column', // Vertical para mejor jerarquía visual
     gap: theme.spacing.md,
     width: '100%',
   },
   button: {
-    flex: 1,
-    paddingVertical: theme.spacing.md,
+    width: '100%',
+    paddingVertical: theme.spacing.md + 2, // 14px para mejor área táctil
     paddingHorizontal: theme.spacing.lg,
     borderRadius: theme.radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
+    minHeight: 50, // Aumentado a 50px para mejor táctil
   },
   fullWidthButton: {
-    flex: 1,
+    width: '100%',
   },
   primaryButton: {
     backgroundColor: theme.colors.primaryLight,
@@ -195,14 +204,24 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     ...theme.typography.subtitle,
     color: theme.colors.primaryForeground,
+    fontWeight: '600',
+  },
+  destructiveButton: {
+    backgroundColor: theme.colors.error,
+  },
+  destructiveButtonText: {
+    ...theme.typography.subtitle,
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   secondaryButton: {
-    backgroundColor: theme.colors.secondary,
-    borderWidth: 1,
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
     borderColor: theme.colors.border,
   },
   secondaryButtonText: {
     ...theme.typography.subtitle,
-    color: theme.colors.text,
+    color: theme.colors.textSecondary,
+    fontWeight: '500',
   },
 });

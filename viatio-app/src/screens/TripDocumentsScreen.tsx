@@ -12,7 +12,6 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +21,7 @@ import {
   PrimaryButton,
   Card,
   DocumentCategoryGroup,
+  CustomModal,
 } from '@/components';
 import { theme } from '@/config';
 import { useDocumentosStore, documentosSelectors } from '@/store/documentosStore';
@@ -54,6 +54,10 @@ export default function TripDocumentsScreen({ route, navigation }: Props) {
 
   const [viaje, setViaje] = useState<Viaje | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [deleteModal, setDeleteModal] = useState<{
+    visible: boolean;
+    documento: Documento | null;
+  }>({ visible: false, documento: null });
 
   // ============================================
   // EFFECTS
@@ -151,22 +155,16 @@ export default function TripDocumentsScreen({ route, navigation }: Props) {
   };
 
   const handleDeleteDocument = (documento: Documento) => {
-    Alert.alert(
-      'Eliminar documento',
-      `¿Estás seguro de que quieres eliminar "${documento.nombre}"? Si está asociado a una reserva, se desvinculará automáticamente.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: async () => {
-            await removeDocumento(documento.id);
-            // Recargar lista
-            await loadDocumentos();
-          },
-        },
-      ]
-    );
+    setDeleteModal({ visible: true, documento });
+  };
+
+  const confirmDeleteDocument = async () => {
+    if (deleteModal.documento) {
+      await removeDocumento(deleteModal.documento.id);
+      // Recargar lista
+      await loadDocumentos();
+      setDeleteModal({ visible: false, documento: null });
+    }
   };
 
   // ============================================
@@ -274,6 +272,23 @@ export default function TripDocumentsScreen({ route, navigation }: Props) {
           Añadir documento
         </PrimaryButton>
       </View>
+
+      <CustomModal
+        visible={deleteModal.visible}
+        type="warning"
+        title="Eliminar documento"
+        message={`¿Estás seguro de que quieres eliminar "${deleteModal.documento?.nombre}"? Si está asociado a una reserva, se desvinculará automáticamente.`}
+        onClose={() => setDeleteModal({ visible: false, documento: null })}
+        primaryButton={{
+          text: 'Eliminar',
+          onPress: confirmDeleteDocument,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {},
+        }}
+      />
     </View>
   );
 }

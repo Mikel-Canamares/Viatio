@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -33,6 +33,7 @@ import { Card } from '@/components/Card';
 import { SwitchItem } from '@/components/SwitchItem';
 import { SelectItem } from '@/components/SelectItem';
 import { TimeInput } from '@/components/TimeInput';
+import { CustomModal } from '@/components';
 import { theme } from '@/config';
 import { showToast } from '@/utils/toast';
 
@@ -49,6 +50,14 @@ export default function NotificationsSettingsScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [permissionsGranted, setPermissionsGranted] = useState(false);
 
+  // Estado del modal
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    type: 'error' as const,
+    title: '',
+    message: '',
+  });
+
   useEffect(() => {
     loadPreferencias();
     checkPermissions();
@@ -64,10 +73,12 @@ export default function NotificationsSettingsScreen({ navigation }: Props) {
     setPermissionsGranted(granted);
 
     if (!granted) {
-      Alert.alert(
-        'Permisos denegados',
-        'Para recibir notificaciones, debes activar los permisos en la configuración del dispositivo.'
-      );
+      setModalConfig({
+        type: 'error',
+        title: 'Permisos denegados',
+        message: 'Para recibir notificaciones, debes activar los permisos en la configuración del dispositivo.',
+      });
+      setModalVisible(true);
     }
   };
 
@@ -401,6 +412,19 @@ export default function NotificationsSettingsScreen({ navigation }: Props) {
 
         <View style={styles.bottomPadding} />
       </ScrollView>
+
+      {/* Modal de confirmación */}
+      <CustomModal
+        visible={modalVisible}
+        type={modalConfig.type}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        onClose={() => setModalVisible(false)}
+        primaryButton={{
+          text: 'Entendido',
+          onPress: () => {},
+        }}
+      />
     </ScreenContainer>
   );
 }

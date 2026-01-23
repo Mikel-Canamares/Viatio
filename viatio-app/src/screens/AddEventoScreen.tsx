@@ -15,7 +15,6 @@ import {
   Platform,
   Pressable,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -30,6 +29,7 @@ import {
   DayPicker,
   useDiasViaje,
   TimeInput,
+  CustomModal,
 } from '@/components';
 import type { DiaViaje } from '@/components';
 import { useEventosStore } from '@/store/eventosStore';
@@ -85,6 +85,14 @@ export function AddEventoScreen() {
   const [notas, setNotas] = useState<string>('');
   const [prioridad] = useState<PrioridadEvento>('media');
   const [diaSeleccionado, setDiaSeleccionado] = useState<DiaViaje | null>(null);
+
+  // Estado para modal de sugerencia de lugar
+  const [placeSuggestionModal, setPlaceSuggestionModal] = useState<{
+    visible: boolean;
+    type: 'single' | 'multiple' | null;
+    suggestions: any[];
+    eventoCreado: any;
+  }>({ visible: false, type: null, suggestions: [], eventoCreado: null });
 
   // Cargar datos del viaje, días y evento (si estamos en modo edición)
   useEffect(() => {
@@ -306,74 +314,21 @@ export function AddEventoScreen() {
             );
             navigation.goBack();
           } else if (matchResult.type === 'suggested' && matchResult.suggestions) {
-            // Sugerencia única - preguntar al usuario
-            Alert.alert(
-              'Evento creado',
-              `¿Quieres añadir "${matchResult.suggestions[0].name}" al mapa?`,
-              [
-                {
-                  text: 'No',
-                  style: 'cancel',
-                  onPress: () => navigation.goBack(),
-                },
-                {
-                  text: 'Sí',
-                  onPress: async () => {
-                    const categoria = mapEventoCategoriaToLugarCategoria(eventoCreado.categoria);
-                    const lugar = await confirmPlaceSuggestion(
-                      eventoCreado.id,
-                      eventoCreado.viajeId,
-                      eventoCreado.diaId,
-                      matchResult.suggestions![0],
-                      categoria
-                    );
-
-                    if (lugar) {
-                      await linkEventoToLugar(eventoCreado.id, lugar.id);
-                      console.log('[AddEvento] Lugar confirmado y vinculado:', lugar.nombre);
-                    }
-
-                    navigation.goBack();
-                  },
-                },
-              ]
-            );
+            // Sugerencia única - preguntar al usuario con modal
+            setPlaceSuggestionModal({
+              visible: true,
+              type: 'single',
+              suggestions: matchResult.suggestions,
+              eventoCreado,
+            });
           } else if (matchResult.type === 'multiple' && matchResult.suggestions) {
-            // Múltiples opciones - mostrar selector
-            const suggestions = matchResult.suggestions.slice(0, 3); // Máximo 3 opciones
-            const buttons = [
-              {
-                text: 'Ninguno',
-                style: 'cancel' as const,
-                onPress: () => navigation.goBack(),
-              },
-              ...suggestions.map((suggestion, index) => ({
-                text: `${index + 1}. ${suggestion.name}`,
-                onPress: async () => {
-                  const categoria = mapEventoCategoriaToLugarCategoria(eventoCreado.categoria);
-                  const lugar = await confirmPlaceSuggestion(
-                    eventoCreado.id,
-                    eventoCreado.viajeId,
-                    eventoCreado.diaId,
-                    suggestion,
-                    categoria
-                  );
-
-                  if (lugar) {
-                    await linkEventoToLugar(eventoCreado.id, lugar.id);
-                    console.log('[AddEvento] Lugar seleccionado y vinculado:', lugar.nombre);
-                  }
-
-                  navigation.goBack();
-                },
-              })),
-            ];
-
-            Alert.alert(
-              'Evento creado',
-              'Hemos encontrado varios lugares posibles. ¿Cuál quieres añadir al mapa?',
-              buttons
-            );
+            // Múltiples opciones - mostrar modal con opciones
+            setPlaceSuggestionModal({
+              visible: true,
+              type: 'multiple',
+              suggestions: matchResult.suggestions.slice(0, 3),
+              eventoCreado,
+            });
           } else {
             // No se encontró lugar
             showToast.success('Evento creado', 'El evento se ha creado correctamente.');
@@ -391,6 +346,34 @@ export function AddEventoScreen() {
         navigation.goBack();
       }
     }
+  };
+
+  const handlePlaceSuggestionConfirm = async () => {
+    if (!placeSuggestionModal.eventoCreado || placeSuggestionModal.suggestions.length === 0) {
+      return;
+    }
+
+    const categoria = mapEventoCategoriaToLugarCategoria(placeSuggestionModal.eventoCreado.categoria);
+    const lugar = await confirmPlaceSuggestion(
+      placeSuggestionModal.eventoCreado.id,
+      placeSuggestionModal.eventoCreado.viajeId,
+      placeSuggestionModal.eventoCreado.diaId,
+      placeSuggestionModal.suggestions[0],
+      categoria
+    );
+
+    if (lugar) {
+      await linkEventoToLugar(placeSuggestionModal.eventoCreado.id, lugar.id);
+      console.log('[AddEvento] Lugar confirmado y vinculado:', lugar.nombre);
+    }
+
+    setPlaceSuggestionModal({ visible: false, type: null, suggestions: [], eventoCreado: null });
+    navigation.goBack();
+  };
+
+  const handlePlaceSuggestionDecline = () => {
+    setPlaceSuggestionModal({ visible: false, type: null, suggestions: [], eventoCreado: null });
+    navigation.goBack();
   };
 
   const headerTitle = isEditMode ? 'Editar evento' : 'Nuevo evento';
@@ -561,6 +544,27 @@ export function AddEventoScreen() {
         selectedDia={diaSeleccionado}
         onSelect={handleDaySelect}
         onClose={() => setShowDayPicker(false)}
+      />
+
+      {/* Modal de sugerencia de lugar */}
+      <CustomModal
+        visible={placeSuggestionModal.visible}
+        type="info"
+        title="Evento creado"
+        message={
+          placeSuggestionModal.type === 'single' && placeSuggestionModal.suggestions.length > 0
+            ? `¿Quieres añadir "${placeSuggestionModal.suggestions[0].name}" al mapa?`
+            : 'Hemos encontrado varios lugares posibles. El más relevante se añadirá al mapa.'
+        }
+        onClose={handlePlaceSuggestionDecline}
+        primaryButton={{
+          text: placeSuggestionModal.type === 'single' ? 'Sí' : 'Añadir',
+          onPress: handlePlaceSuggestionConfirm,
+        }}
+        secondaryButton={{
+          text: 'No',
+          onPress: handlePlaceSuggestionDecline,
+        }}
       />
     </ScreenContainer>
   );

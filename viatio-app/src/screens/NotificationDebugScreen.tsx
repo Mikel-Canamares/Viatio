@@ -13,12 +13,11 @@ import {
   ScrollView,
   Pressable,
   RefreshControl,
-  Alert,
   Platform,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { ScreenContainer, PageHeader, Card, PrimaryButton } from '@/components';
+import { ScreenContainer, PageHeader, Card, PrimaryButton, CustomModal } from '@/components';
 import {
   getAllScheduledNotificationsInfo,
   getNotificationStats,
@@ -78,6 +77,16 @@ export default function NotificationDebugScreen({ navigation }: Props) {
     successRate: 0,
   });
   const [recentLogs, setRecentLogs] = useState<any[]>([]);
+
+  // Estado del modal
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    type: 'warning' as const,
+    title: '',
+    message: '',
+    primaryButton: { text: 'Confirmar', onPress: () => {}, destructive: true },
+    secondaryButton: { text: 'Cancelar', onPress: () => {} },
+  });
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -161,27 +170,30 @@ export default function NotificationDebugScreen({ navigation }: Props) {
   };
 
   const handleCancelAll = () => {
-    Alert.alert(
-      'Cancelar todas las notificaciones',
-      '¿Estás seguro? Esto cancelará TODAS las notificaciones programadas.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Confirmar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await cancelAllNotifications();
-              showToast.success('Éxito', 'Todas las notificaciones han sido canceladas');
-              await loadData();
-            } catch (error) {
-              console.error('[NotificationDebug] Error cancelando notificaciones:', error);
-              showToast.error('Error', 'No se pudo cancelar las notificaciones');
-            }
-          },
+    setModalConfig({
+      type: 'warning',
+      title: 'Cancelar todas las notificaciones',
+      message: '¿Estás seguro? Esto cancelará TODAS las notificaciones programadas.',
+      primaryButton: {
+        text: 'Confirmar',
+        onPress: async () => {
+          try {
+            await cancelAllNotifications();
+            showToast.success('Éxito', 'Todas las notificaciones han sido canceladas');
+            await loadData();
+          } catch (error) {
+            console.error('[NotificationDebug] Error cancelando notificaciones:', error);
+            showToast.error('Error', 'No se pudo cancelar las notificaciones');
+          }
         },
-      ]
-    );
+        destructive: true,
+      },
+      secondaryButton: {
+        text: 'Cancelar',
+        onPress: () => {},
+      },
+    });
+    setModalVisible(true);
   };
 
   const handleToggleDebugMode = async () => {
@@ -212,34 +224,37 @@ export default function NotificationDebugScreen({ navigation }: Props) {
   };
 
   const handleClearLogs = () => {
-    Alert.alert(
-      'Limpiar logs',
-      '¿Estás seguro de que quieres borrar todos los logs? Esta acción no se puede deshacer.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Borrar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await clearLogs();
-              setRecentLogs([]);
-              setLogStats({
-                totalScheduled: 0,
-                totalCancelled: 0,
-                totalFailed: 0,
-                totalDelivered: 0,
-                successRate: 0,
-              });
-              showToast.success('Logs borrados', 'Todos los logs han sido eliminados');
-            } catch (error) {
-              console.error('[NotificationDebug] Error limpiando logs:', error);
-              showToast.error('Error', 'No se pudieron borrar los logs');
-            }
-          },
+    setModalConfig({
+      type: 'warning',
+      title: 'Limpiar logs',
+      message: '¿Estás seguro de que quieres borrar todos los logs? Esta acción no se puede deshacer.',
+      primaryButton: {
+        text: 'Borrar',
+        onPress: async () => {
+          try {
+            await clearLogs();
+            setRecentLogs([]);
+            setLogStats({
+              totalScheduled: 0,
+              totalCancelled: 0,
+              totalFailed: 0,
+              totalDelivered: 0,
+              successRate: 0,
+            });
+            showToast.success('Logs borrados', 'Todos los logs han sido eliminados');
+          } catch (error) {
+            console.error('[NotificationDebug] Error limpiando logs:', error);
+            showToast.error('Error', 'No se pudieron borrar los logs');
+          }
         },
-      ]
-    );
+        destructive: true,
+      },
+      secondaryButton: {
+        text: 'Cancelar',
+        onPress: () => {},
+      },
+    });
+    setModalVisible(true);
   };
 
   const formatDate = (date: Date) => {
@@ -471,6 +486,17 @@ export default function NotificationDebugScreen({ navigation }: Props) {
           </Text>
         </View>
       </ScrollView>
+
+      {/* Modal de confirmación */}
+      <CustomModal
+        visible={modalVisible}
+        type={modalConfig.type}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        onClose={() => setModalVisible(false)}
+        primaryButton={modalConfig.primaryButton}
+        secondaryButton={modalConfig.secondaryButton}
+      />
     </ScreenContainer>
   );
 }

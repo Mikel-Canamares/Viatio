@@ -14,7 +14,6 @@ import {
   ActivityIndicator,
   ScrollView,
   Pressable,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -26,6 +25,7 @@ import {
   ReservationCard,
   PrimaryButton,
   ScreenContainer,
+  CustomModal,
 } from '@/components';
 import { theme } from '@/config';
 import { useReservasStore } from '@/store/reservasStore';
@@ -46,6 +46,10 @@ export default function TripReservationsScreen({ route, navigation }: Props) {
   const { viajeId } = route.params;
   const { reservas, loading, fetchReservas, removeReserva } = useReservasStore();
   const [filtroActivo, setFiltroActivo] = useState<CategoriaReserva | 'all'>('all');
+  const [deleteModal, setDeleteModal] = useState<{
+    visible: boolean;
+    reserva: Reserva | null;
+  }>({ visible: false, reserva: null });
 
   useEffect(() => {
     loadReservas();
@@ -111,21 +115,14 @@ export default function TripReservationsScreen({ route, navigation }: Props) {
   };
 
   const handleDeleteReservation = (reserva: Reserva) => {
-    Alert.alert(
-      'Eliminar reserva',
-      `¿Estás seguro de que quieres eliminar "${reserva.nombre}"?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: async () => {
-            await removeReserva(reserva.id);
-            await loadReservas();
-          },
-        },
-      ]
-    );
+    setDeleteModal({ visible: true, reserva });
+  };
+
+  const confirmDeleteReservation = async () => {
+    if (deleteModal.reserva) {
+      await removeReserva(deleteModal.reserva.id);
+      await loadReservas();
+    }
   };
 
   const handleAddReservation = () => {
@@ -230,6 +227,24 @@ export default function TripReservationsScreen({ route, navigation }: Props) {
           </PrimaryButton>
         </View>
       </View>
+
+      {/* Modal de confirmación de eliminación */}
+      <CustomModal
+        visible={deleteModal.visible}
+        type="warning"
+        title="Eliminar reserva"
+        message={`¿Estás seguro de que quieres eliminar "${deleteModal.reserva?.nombre}"?`}
+        onClose={() => setDeleteModal({ visible: false, reserva: null })}
+        primaryButton={{
+          text: 'Eliminar',
+          onPress: confirmDeleteReservation,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {},
+        }}
+      />
     </ScreenContainer>
   );
 }

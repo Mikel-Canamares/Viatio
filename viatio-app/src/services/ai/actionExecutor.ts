@@ -3,6 +3,15 @@
  *
  * Ejecuta las acciones propuestas por el Copilot.
  * Cada tipo de acción tiene su handler específico.
+ *
+ * NOTA: Este módulo es un servicio (no un componente React).
+ * Actualmente usa Alert.alert para confirmaciones, pero esto debería
+ * refactorizarse para usar callbacks o eventos que permitan a los
+ * componentes que lo usen mostrar CustomModal en su lugar.
+ *
+ * TODO: Refactorizar para pasar callbacks de confirmación como parámetros
+ * del ActionExecutorContext, permitiendo que los componentes muestren
+ * modales personalizados en lugar de usar Alert.alert directamente.
  */
 
 import { Alert } from 'react-native';

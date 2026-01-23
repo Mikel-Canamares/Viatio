@@ -6,12 +6,12 @@ import {
   ScrollView,
   Pressable,
   Image,
-  Alert,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer, PageHeader, Card } from '@/components';
+import { CustomModal } from '@/components/CustomModal';
 import { useSharedTripsStore } from '@/store/sharedTripsStore';
 import { useExpensesV2Store } from '@/store/expensesV2Store';
 import { useConfiguracionStore } from '@/store/useConfiguracionStore';
@@ -43,6 +43,7 @@ export default function ExpenseDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [convertedAmount, setConvertedAmount] = useState<number | null>(null);
   const [convertedShares, setConvertedShares] = useState<Record<string, number>>({});
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const userCurrency = config.monedaDefault || 'EUR';
 
@@ -115,26 +116,17 @@ export default function ExpenseDetailScreen() {
   };
 
   const handleDelete = () => {
-    Alert.alert(
-      'Eliminar gasto',
-      '¿Estás seguro de que quieres eliminar este gasto?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: async () => {
-            const success = await removeExpense(tripId, expenseId, members);
-            if (success) {
-              showToast.success('Gasto eliminado', 'Los balances se han actualizado');
-              navigation.goBack();
-            } else {
-              showToast.error('Error', 'No se pudo eliminar el gasto');
-            }
-          },
-        },
-      ]
-    );
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    const success = await removeExpense(tripId, expenseId, members);
+    if (success) {
+      showToast.success('Gasto eliminado', 'Los balances se han actualizado');
+      navigation.goBack();
+    } else {
+      showToast.error('Error', 'No se pudo eliminar el gasto');
+    }
   };
 
   if (loading || !expense) {
@@ -327,6 +319,23 @@ export default function ExpenseDetailScreen() {
           )}
         </View>
       )}
+
+      <CustomModal
+        visible={showDeleteModal}
+        type="warning"
+        title="Eliminar gasto"
+        message="¿Estás seguro de que quieres eliminar este gasto?"
+        onClose={() => setShowDeleteModal(false)}
+        primaryButton={{
+          text: 'Eliminar',
+          onPress: confirmDelete,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => setShowDeleteModal(false),
+        }}
+      />
     </ScreenContainer>
   );
 }

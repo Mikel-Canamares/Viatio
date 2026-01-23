@@ -5,13 +5,12 @@ import {
   StyleSheet,
   Pressable,
   Modal,
-  Alert,
 } from 'react-native';
 import MapView, { Marker, Region, PROVIDER_GOOGLE, MapPressEvent } from 'react-native-maps';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { ScreenContainer, PageHeader, CopilotFAB } from '@/components';
+import { ScreenContainer, PageHeader, CopilotFAB, CustomModal } from '@/components';
 import { PlaceSearchBar } from '@/components/PlaceSearchBar';
 import { PlaceDetailCard } from '@/components/PlaceDetailCard';
 import { AddToTripModal } from '@/components/AddToTripModal';
@@ -74,6 +73,22 @@ export default function TripMapScreen() {
   const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
   const [initialMapCentered, setInitialMapCentered] = useState(false);
+
+  // Estado del modal
+  const [customModalVisible, setCustomModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState<{
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+    primaryButton: { text: string; onPress: () => void; destructive?: boolean };
+    secondaryButton?: { text: string; onPress: () => void };
+  }>({
+    type: 'info',
+    title: '',
+    message: '',
+    primaryButton: { text: 'OK', onPress: () => {} },
+    secondaryButton: undefined,
+  });
 
   // Cargar viaje y centrar mapa en destino al montar (solo si no viene de agenda)
   useEffect(() => {
@@ -147,10 +162,14 @@ export default function TripMapScreen() {
         console.log('[TripMapScreen] Ubicación del usuario obtenida');
       } else {
         setHasLocationPermission(false);
-        Alert.alert(
-          'Permisos de ubicación',
-          'Para mostrarte en el mapa, necesitamos acceso a tu ubicación.'
-        );
+        setModalConfig({
+          type: 'error',
+          title: 'Permisos de ubicación',
+          message: 'Para mostrarte en el mapa, necesitamos acceso a tu ubicación.',
+          primaryButton: { text: 'Entendido', onPress: () => {} },
+          secondaryButton: undefined,
+        });
+        setCustomModalVisible(true);
       }
     } catch (error) {
       console.error('Error solicitando permisos de ubicación:', error);
@@ -282,7 +301,14 @@ export default function TripMapScreen() {
           longitudeDelta: 0.01,
         }, 300);
       } else {
-        Alert.alert('Sin información', 'No se encontró información para este punto');
+        setModalConfig({
+          type: 'info',
+          title: 'Sin información',
+          message: 'No se encontró información para este punto',
+          primaryButton: { text: 'OK', onPress: () => {} },
+          secondaryButton: undefined,
+        });
+        setCustomModalVisible(true);
       }
     } catch (error) {
       console.error('Error obteniendo lugar:', error);
@@ -347,7 +373,14 @@ export default function TripMapScreen() {
         googlePlaceId: place.placeId, // Guardar el ID de Google Places
       });
 
-      Alert.alert('Lugar añadido', `"${place.name}" añadido a tu viaje`);
+      setModalConfig({
+        type: 'success',
+        title: 'Lugar añadido',
+        message: `"${place.name}" añadido a tu viaje`,
+        primaryButton: { text: 'OK', onPress: () => {} },
+        secondaryButton: undefined,
+      });
+      setCustomModalVisible(true);
       setShowAddModal(false);
       setPlaceToAdd(null);
       setSelectedPlace(null);
@@ -460,42 +493,55 @@ export default function TripMapScreen() {
 
   // Eliminar lugar
   const handleDeleteLugar = (lugar: Lugar) => {
-    Alert.alert(
-      'Eliminar lugar',
-      `¿Eliminar "${lugar.nombre}" de tu viaje?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteLugar(lugar.id);
-              Alert.alert('Eliminado', 'Lugar eliminado del viaje');
-              await loadLugaresAndReservas();
-            } catch (error) {
-              showToast.error('Error', 'No se pudo eliminar');
-            }
-          },
+    setModalConfig({
+      type: 'warning',
+      title: 'Eliminar lugar',
+      message: `¿Eliminar "${lugar.nombre}" de tu viaje?`,
+      primaryButton: {
+        text: 'Eliminar',
+        onPress: async () => {
+          try {
+            await deleteLugar(lugar.id);
+            setModalConfig({
+              type: 'success',
+              title: 'Eliminado',
+              message: 'Lugar eliminado del viaje',
+              primaryButton: { text: 'OK', onPress: () => {} },
+              secondaryButton: undefined,
+            });
+            setCustomModalVisible(true);
+            await loadLugaresAndReservas();
+          } catch (error) {
+            showToast.error('Error', 'No se pudo eliminar');
+          }
         },
-      ]
-    );
+        destructive: true,
+      },
+      secondaryButton: {
+        text: 'Cancelar',
+        onPress: () => {},
+      },
+    });
+    setCustomModalVisible(true);
   };
 
   // Centrar mapa en ubicación del usuario
   const handleCenterOnUserLocation = async () => {
     if (!hasLocationPermission) {
-      Alert.alert(
-        'Permisos requeridos',
-        'Necesitamos acceso a tu ubicación para mostrarte en el mapa.',
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          {
-            text: 'Permitir',
-            onPress: () => requestLocationPermission(),
-          },
-        ]
-      );
+      setModalConfig({
+        type: 'error',
+        title: 'Permisos requeridos',
+        message: 'Necesitamos acceso a tu ubicación para mostrarte en el mapa.',
+        primaryButton: {
+          text: 'Permitir',
+          onPress: () => requestLocationPermission(),
+        },
+        secondaryButton: {
+          text: 'Cancelar',
+          onPress: () => {},
+        },
+      });
+      setCustomModalVisible(true);
       return;
     }
 
@@ -698,6 +744,17 @@ export default function TripMapScreen() {
         style={{ bottom: 80 }}
       />
       */}
+
+      {/* Modal de confirmación */}
+      <CustomModal
+        visible={customModalVisible}
+        type={modalConfig.type}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        onClose={() => setCustomModalVisible(false)}
+        primaryButton={modalConfig.primaryButton}
+        secondaryButton={modalConfig.secondaryButton}
+      />
     </ScreenContainer>
   );
 }

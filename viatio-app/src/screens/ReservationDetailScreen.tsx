@@ -12,7 +12,6 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  Alert,
   Image,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
@@ -25,6 +24,7 @@ import {
   Card,
   SectionHeader,
   CategoryBadge,
+  CustomModal,
 } from '@/components';
 import { theme } from '@/config';
 import { useReservasStore } from '@/store/reservasStore';
@@ -113,6 +113,7 @@ export default function ReservationDetailScreen({ route, navigation }: Props) {
   const [documentos, setDocumentos] = useState<Documento[]>([]);
   const [loading, setLoading] = useState(true);
   const [viaje, setViaje] = useState<Viaje | null>(null);
+  const [copyModal, setCopyModal] = useState(false);
 
   // Hook para obtener miembros del viaje compartido
   const { members, loading: loadingMembers } = useTripMembers(viaje?.firestoreId || null);
@@ -159,7 +160,7 @@ export default function ReservationDetailScreen({ route, navigation }: Props) {
   const handleCopyConfirmation = async () => {
     if (reserva?.numeroConfirmacion) {
       await Clipboard.setStringAsync(reserva.numeroConfirmacion);
-      Alert.alert('Copiado', 'Número de confirmación copiado al portapapeles');
+      setCopyModal(true);
     }
   };
 
@@ -409,6 +410,18 @@ export default function ReservationDetailScreen({ route, navigation }: Props) {
           )}
         </ScrollView>
       </ScreenContainer>
+
+      <CustomModal
+        visible={copyModal}
+        type="info"
+        title="Copiado"
+        message="Número de confirmación copiado al portapapeles"
+        onClose={() => setCopyModal(false)}
+        primaryButton={{
+          text: 'OK',
+          onPress: () => {},
+        }}
+      />
     </View>
   );
 }

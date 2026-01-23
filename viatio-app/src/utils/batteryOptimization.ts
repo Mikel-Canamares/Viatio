@@ -3,6 +3,16 @@
  *
  * Utilidades para ayudar al usuario a desactivar la optimización de batería
  * en Android, que puede impedir la entrega de notificaciones.
+ *
+ * NOTA: Este módulo es una utilidad (no un componente React).
+ * Actualmente usa Alert.alert para mostrar información, pero esto debería
+ * refactorizarse para usar callbacks que permitan a los componentes que
+ * lo usen mostrar CustomModal en su lugar.
+ *
+ * TODO: Refactorizar para pasar callbacks como parámetros:
+ * - showBatteryOptimizationAlert(onConfirm, onCancel)
+ * - showNotificationDeliveryTips(onConfigure, onDismiss)
+ * Esto permitirá que los componentes muestren modales personalizados.
  */
 
 import { Platform, Linking, Alert } from 'react-native';

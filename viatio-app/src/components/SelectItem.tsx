@@ -6,10 +6,10 @@
  */
 
 import { useState } from 'react';
-import {Pressable, View, Text, StyleSheet, ActionSheetIOS, Platform,
-  Alert} from 'react-native';
+import {Pressable, View, Text, StyleSheet, ActionSheetIOS, Platform} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '@/config';
+import { CustomModal } from './CustomModal';
 
 export interface SelectOption {
   /** Valor de la opción */
@@ -37,7 +37,8 @@ interface SelectItemProps {
 }
 
 export function SelectItem({ label, value, options, onSelect, icon }: SelectItemProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(0);
 
   // Obtener la etiqueta del valor actual
   const currentOption = options.find((opt) => opt.value === value);
@@ -60,53 +61,79 @@ export function SelectItem({ label, value, options, onSelect, icon }: SelectItem
         }
       );
     } else {
-      // Android: usar Alert con opciones
-      Alert.alert(
-        label,
-        'Selecciona una opción',
-        [
-          ...options.map((opt) => ({
-            text: opt.label,
-            onPress: () => onSelect(opt.value),
-          })),
-          {
-            text: 'Cancelar',
-            style: 'cancel',
-          },
-        ],
-        { cancelable: true }
-      );
+      // Android: usar CustomModal
+      // Mostrar modal con primera opción, permitiendo iterar
+      setSelectedIndex(0);
+      setModalVisible(true);
     }
   };
 
+  const handleSelectOption = (index: number) => {
+    onSelect(options[index].value);
+    setModalVisible(false);
+  };
+
+  const handleNextOption = () => {
+    const nextIndex = (selectedIndex + 1) % options.length;
+    setSelectedIndex(nextIndex);
+  };
+
   return (
-    <Pressable
-      onPress={handlePress}
-      style={({ pressed }) => [
-        styles.container,
-        pressed && styles.pressed,
-      ]}
-    >
-      {/* Icono opcional */}
-      {icon && (
-        <View style={styles.iconContainer}>
-          <Ionicons name={icon} size={20} color={theme.colors.primaryLight} />
+    <>
+      <Pressable
+        onPress={handlePress}
+        style={({ pressed }) => [
+          styles.container,
+          pressed && styles.pressed,
+        ]}
+      >
+        {/* Icono opcional */}
+        {icon && (
+          <View style={styles.iconContainer}>
+            <Ionicons name={icon} size={20} color={theme.colors.primaryLight} />
+          </View>
+        )}
+
+        {/* Contenido */}
+        <View style={styles.content}>
+          <Text style={styles.label}>{label}</Text>
+          <Text style={styles.value}>{currentLabel}</Text>
         </View>
+
+        {/* Chevron */}
+        <Ionicons
+          name="chevron-forward"
+          size={20}
+          color={theme.colors.textMuted}
+        />
+      </Pressable>
+
+      {/* Modal para Android */}
+      {Platform.OS === 'android' && (
+        <CustomModal
+          visible={modalVisible}
+          type="info"
+          title={label}
+          message={`${selectedIndex + 1} de ${options.length}:\n${options[selectedIndex]?.label || ''}`}
+          onClose={() => setModalVisible(false)}
+          primaryButton={{
+            text: 'Seleccionar',
+            onPress: () => handleSelectOption(selectedIndex),
+          }}
+          secondaryButton={
+            options.length > 1
+              ? {
+                  text: 'Siguiente opción',
+                  onPress: handleNextOption,
+                }
+              : {
+                  text: 'Cancelar',
+                  onPress: () => setModalVisible(false),
+                }
+          }
+        />
       )}
-
-      {/* Contenido */}
-      <View style={styles.content}>
-        <Text style={styles.label}>{label}</Text>
-        <Text style={styles.value}>{currentLabel}</Text>
-      </View>
-
-      {/* Chevron */}
-      <Ionicons
-        name="chevron-forward"
-        size={20}
-        color={theme.colors.textMuted}
-      />
-    </Pressable>
+    </>
   );
 }
 

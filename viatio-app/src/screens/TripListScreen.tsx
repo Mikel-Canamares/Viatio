@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, FlatList, StyleSheet, ActivityIndicator, Text, Pressable, Alert } from 'react-native';
+import { View, FlatList, StyleSheet, ActivityIndicator, Text, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -15,6 +15,7 @@ import {
   PageHeader,
   TripCard,
   PrimaryButton,
+  CustomModal,
 } from '@/components';
 import { useViajesStore } from '@/store';
 import { useAuth } from '@/context';
@@ -49,6 +50,12 @@ export default function TripListScreen({ navigation }: Props) {
   const { user } = useAuth();
   const [repairExecuted, setRepairExecuted] = useState(false);
   const [filterType, setFilterType] = useState<FilterType>('activos');
+  const [deleteModal, setDeleteModal] = useState<{
+    visible: boolean;
+    viajeId: string | null;
+    destino: string;
+    message: string;
+  }>({ visible: false, viajeId: null, destino: '', message: '' });
 
   useEffect(() => {
     if (user?.uid) {
@@ -111,29 +118,26 @@ export default function TripListScreen({ navigation }: Props) {
           ? `Se eliminarán:\n• ${counts.reservas} reserva(s)\n• ${counts.lugares} lugar(es)\n• ${counts.documentos} documento(s)\n• ${counts.gastos} gasto(s)\n\nEsta acción no se puede deshacer.`
           : 'Esta acción no se puede deshacer.';
 
-      Alert.alert(
-        '¿Eliminar viaje?',
-        `Vas a eliminar "${destino}".\n\n${message}`,
-        [
-          {
-            text: 'Cancelar',
-            style: 'cancel',
-          },
-          {
-            text: 'Eliminar',
-            style: 'destructive',
-            onPress: async () => {
-              try {
-                await deleteViajeCompletely(viajeId);
-              } catch (error) {
-                showToast.error('Error', 'No se pudo eliminar el viaje');
-              }
-            },
-          },
-        ]
-      );
+      setDeleteModal({
+        visible: true,
+        viajeId,
+        destino,
+        message: `Vas a eliminar "${destino}".\n\n${message}`,
+      });
     } catch (error) {
       showToast.error('Error', 'No se pudo obtener información del viaje');
+    }
+  };
+
+  const confirmDeleteTrip = async () => {
+    if (deleteModal.viajeId) {
+      try {
+        await deleteViajeCompletely(deleteModal.viajeId);
+        setDeleteModal({ visible: false, viajeId: null, destino: '', message: '' });
+      } catch (error) {
+        setDeleteModal({ visible: false, viajeId: null, destino: '', message: '' });
+        showToast.error('Error', 'No se pudo eliminar el viaje');
+      }
     }
   };
 
@@ -306,6 +310,23 @@ export default function TripListScreen({ navigation }: Props) {
           Añadir viaje
         </PrimaryButton>
       </View>
+
+      <CustomModal
+        visible={deleteModal.visible}
+        type="warning"
+        title="¿Eliminar viaje?"
+        message={deleteModal.message}
+        onClose={() => setDeleteModal({ visible: false, viajeId: null, destino: '', message: '' })}
+        primaryButton={{
+          text: 'Eliminar',
+          onPress: confirmDeleteTrip,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {},
+        }}
+      />
     </View>
   );
 }

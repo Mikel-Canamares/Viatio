@@ -6,8 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import {View, Text, StyleSheet, ScrollView,
-  Alert, Pressable} from 'react-native';
+import {View, Text, StyleSheet, ScrollView, Pressable} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { ProfileStackParamList } from '@/navigation/types';
@@ -19,6 +18,7 @@ import { SectionTitle } from '@/components/SectionTitle';
 import { SelectItem, SelectOption } from '@/components/SelectItem';
 import { ProfileMenuItem } from '@/components/ProfileMenuItem';
 import { CurrencyPicker } from '@/components/CurrencyPicker';
+import { CustomModal } from '@/components';
 import { useConfiguracionStore } from '@/store/useConfiguracionStore';
 import { IDIOMAS_DISPONIBLES } from '@/types/perfil';
 import { ALL_CURRENCIES } from '@/config/currencies';
@@ -53,6 +53,12 @@ export default function SettingsScreen() {
   const { user } = useAuth();
   const { config, isLoading, loadConfig, updateConfig } = useConfiguracionStore();
   const [cacheSize, setCacheSize] = useState<string>('Calculando...');
+  const [exportModal, setExportModal] = useState(false);
+  const [clearCacheModal, setClearCacheModal] = useState(false);
+  const [deepCleanModal, setDeepCleanModal] = useState(false);
+  const [deleteAccountModal, setDeleteAccountModal] = useState(false);
+  const [deleteAccountConfirmModal, setDeleteAccountConfirmModal] = useState(false);
+  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
 
   // Cargar configuración al montar (sincroniza con Firebase si hay usuario)
   useEffect(() => {
@@ -129,116 +135,48 @@ export default function SettingsScreen() {
 
   // Exportar datos
   const handleExportData = () => {
-    Alert.alert(
-      'Exportar datos',
-      'Esta función estará disponible próximamente. Podrás exportar todos tus viajes, reservas y gastos en formato JSON.',
-      [{ text: 'OK' }]
-    );
+    setExportModal(true);
   };
 
   // Limpiar caché
   const handleClearCache = () => {
-    Alert.alert(
-      'Limpiar caché',
-      `Se eliminarán ${cacheSize} de datos en caché. La configuración y tus viajes no se verán afectados.`,
-      [
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
-        {
-          text: 'Limpiar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Aquí podrías limpiar cachés específicas
-              // Por ahora solo recalculamos el tamaño
-              await calculateCacheSize();
-              showToast.success('Éxito', 'Caché limpiada correctamente');
-            } catch (error) {
-              showToast.error('Error', 'No se pudo limpiar la caché');
-            }
-          },
-        },
-      ]
-    );
+    setClearCacheModal(true);
+  };
+
+  const confirmClearCache = async () => {
+    try {
+      // Aquí podrías limpiar cachés específicas
+      // Por ahora solo recalculamos el tamaño
+      await calculateCacheSize();
+      showToast.success('Éxito', 'Caché limpiada correctamente');
+    } catch (error) {
+      showToast.error('Error', 'No se pudo limpiar la caché');
+    }
   };
 
   // Limpiar base de datos completamente (DESARROLLO)
   const handleDeepCleanDatabase = () => {
-    Alert.alert(
-      '🔥 LIMPIEZA PROFUNDA DE BASE DE DATOS',
-      '⚠️ ADVERTENCIA: Esta acción es IRREVERSIBLE.\n\nSe eliminará COMPLETAMENTE:\n• Todos tus viajes\n• Todas tus reservas\n• Todos tus lugares\n• Todos tus gastos\n• Todos tus documentos\n\nLa base de datos se recreará desde cero.\n\n¿Continuar?',
-      [
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
-        {
-          text: 'LIMPIAR TODO',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              showToast.info('Limpiando...', 'Esto puede tardar unos segundos');
-              await deepCleanDatabase();
-              showToast.success('✅ Completado', 'Base de datos limpiada y recreada exitosamente');
+    setDeepCleanModal(true);
+  };
 
-              // Instrucciones post-limpieza
-              Alert.alert(
-                '✅ Base de datos limpia',
-                'La base de datos se ha recreado completamente.\n\nPara mejores resultados:\n1. Cierra la app completamente\n2. Vuelve a abrirla\n3. Prueba creando un nuevo viaje',
-                [{ text: 'Entendido' }]
-              );
-            } catch (error) {
-              showToast.error('Error', 'No se pudo limpiar la base de datos');
-              console.error('[Settings] Error en deepClean:', error);
-            }
-          },
-        },
-      ]
-    );
+  const confirmDeepClean = async () => {
+    try {
+      showToast.info('Limpiando...', 'Esto puede tardar unos segundos');
+      await deepCleanDatabase();
+      showToast.success('Completado', 'Base de datos limpiada y recreada exitosamente');
+    } catch (error) {
+      showToast.error('Error', 'No se pudo limpiar la base de datos');
+      console.error('[Settings] Error en deepClean:', error);
+    }
   };
 
   // Eliminar cuenta
   const handleDeleteAccount = () => {
-    Alert.alert(
-      '⚠️ Eliminar cuenta',
-      'Esta acción es IRREVERSIBLE. Se eliminarán permanentemente:\n\n• Todos tus viajes\n• Todas tus reservas\n• Todos tus documentos\n• Todos tus gastos\n• Tu cuenta de usuario\n\n¿Estás completamente seguro?',
-      [
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
-        {
-          text: 'Eliminar cuenta',
-          style: 'destructive',
-          onPress: () => {
-            // Segunda confirmación
-            Alert.alert(
-              'Confirmación final',
-              'Escribe "ELIMINAR" para confirmar',
-              [
-                {
-                  text: 'Cancelar',
-                  style: 'cancel',
-                },
-                {
-                  text: 'Confirmar',
-                  style: 'destructive',
-                  onPress: () => {
-                    // TODO: Implementar eliminación de cuenta
-                    Alert.alert(
-                      'Función no disponible',
-                      'La eliminación de cuenta estará disponible en una próxima versión.'
-                    );
-                  },
-                },
-              ]
-            );
-          },
-        },
-      ]
-    );
+    setDeleteAccountModal(true);
+  };
+
+  const confirmDeleteAccount = () => {
+    setDeleteAccountConfirmModal(true);
   };
 
   // Convertir opciones de idioma al formato SelectOption
@@ -252,9 +190,6 @@ export default function SettingsScreen() {
   const currencyLabel = selectedCurrency
     ? `${selectedCurrency.flag || ''} ${selectedCurrency.code} - ${selectedCurrency.name}`
     : config.monedaDefault;
-
-  // Estado para controlar el modal del CurrencyPicker
-  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
 
   if (isLoading) {
     return (
@@ -391,6 +326,91 @@ export default function SettingsScreen() {
         {/* Espaciado inferior */}
         <View style={styles.bottomSpacing} />
       </ScrollView>
+
+      {/* Modales */}
+      <CustomModal
+        visible={exportModal}
+        type="info"
+        title="Exportar datos"
+        message="Esta función estará disponible próximamente. Podrás exportar todos tus viajes, reservas y gastos en formato JSON."
+        onClose={() => setExportModal(false)}
+        primaryButton={{
+          text: 'OK',
+          onPress: () => {},
+        }}
+      />
+
+      <CustomModal
+        visible={clearCacheModal}
+        type="warning"
+        title="Limpiar caché"
+        message={`Se eliminarán ${cacheSize} de datos en caché. La configuración y tus viajes no se verán afectados.`}
+        onClose={() => setClearCacheModal(false)}
+        primaryButton={{
+          text: 'Limpiar',
+          onPress: confirmClearCache,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {},
+        }}
+      />
+
+      <CustomModal
+        visible={deepCleanModal}
+        type="warning"
+        title="LIMPIEZA PROFUNDA DE BASE DE DATOS"
+        message="ADVERTENCIA: Esta acción es IRREVERSIBLE.\n\nSe eliminará COMPLETAMENTE:\n• Todos tus viajes\n• Todas tus reservas\n• Todos tus lugares\n• Todos tus gastos\n• Todos tus documentos\n\nLa base de datos se recreará desde cero.\n\n¿Continuar?"
+        onClose={() => setDeepCleanModal(false)}
+        primaryButton={{
+          text: 'LIMPIAR TODO',
+          onPress: confirmDeepClean,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {},
+        }}
+      />
+
+      <CustomModal
+        visible={deleteAccountModal}
+        type="warning"
+        title="Eliminar cuenta"
+        message="Esta acción es IRREVERSIBLE. Se eliminarán permanentemente:\n\n• Todos tus viajes\n• Todas tus reservas\n• Todos tus documentos\n• Todos tus gastos\n• Tu cuenta de usuario\n\n¿Estás completamente seguro?"
+        onClose={() => setDeleteAccountModal(false)}
+        primaryButton={{
+          text: 'Eliminar cuenta',
+          onPress: confirmDeleteAccount,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {},
+        }}
+      />
+
+      <CustomModal
+        visible={deleteAccountConfirmModal}
+        type="info"
+        title="Función no disponible"
+        message="La eliminación de cuenta estará disponible en una próxima versión."
+        onClose={() => setDeleteAccountConfirmModal(false)}
+        primaryButton={{
+          text: 'OK',
+          onPress: () => {},
+        }}
+      />
+
+      {showCurrencyPicker && (
+        <CurrencyPicker
+          value={config.monedaDefault}
+          onChange={handleMonedaChange}
+          modalOnly
+          onClose={() => setShowCurrencyPicker(false)}
+        />
+      )}
     </ScreenContainer>
   );
 }

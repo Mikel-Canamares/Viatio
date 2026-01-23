@@ -15,7 +15,6 @@ import {
   Platform,
   Pressable,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -33,6 +32,7 @@ import {
   Dropdown,
   DropdownOption,
   ParticipantCheckboxList,
+  CustomModal,
 } from '@/components';
 import { DatePickerInput } from '@/components/DatePickerInput';
 import { ReservationCurrencyPicker } from '@/components/ReservationCurrencyPicker';
@@ -112,6 +112,15 @@ export default function AddReservationScreen({ route, navigation }: Props) {
   );
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [pickingFile, setPickingFile] = useState(false);
+  const [documentWarningModal, setDocumentWarningModal] = useState<{
+    visible: boolean;
+    documentoIds: string[];
+  }>({ visible: false, documentoIds: [] });
+  const [deleteFileModal, setDeleteFileModal] = useState<{
+    visible: boolean;
+    index: number | null;
+  }>({ visible: false, index: null });
+  const [discardModal, setDiscardModal] = useState(false);
 
   // Hook para obtener miembros del viaje compartido
   const { members, loading: loadingMembers } = useTripMembers(viaje?.firestoreId || null);
@@ -348,12 +357,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
         console.log('[AddReservation] Total documentos creados exitosamente:', documentoIds.length);
 
         if (documentoIds.length === 0 && allFiles.length > 0) {
-          Alert.alert('Advertencia', 'No se pudieron guardar los documentos adjuntos. ¿Deseas continuar creando la reserva sin documentos?',
-            [
-              { text: 'Cancelar', style: 'cancel', onPress: () => {} },
-              { text: 'Continuar', onPress: () => proceedWithReservation(documentoIds) }
-            ]
-          );
+          setDocumentWarningModal({ visible: true, documentoIds });
           return;
         }
       }
@@ -525,18 +529,13 @@ export default function AddReservationScreen({ route, navigation }: Props) {
   };
 
   const handleRemoveFile = (index: number) => {
-    Alert.alert(
-      'Eliminar archivo',
-      '¿Deseas eliminar este archivo?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: () => setAttachedFiles((prev: AttachedFile[]) => prev.filter((_: AttachedFile, i: number) => i !== index))
-        },
-      ]
-    );
+    setDeleteFileModal({ visible: true, index });
+  };
+
+  const confirmDeleteFile = () => {
+    if (deleteFileModal.index !== null) {
+      setAttachedFiles((prev: AttachedFile[]) => prev.filter((_: AttachedFile, i: number) => i !== deleteFileModal.index));
+    }
   };
 
   if (mode === 'select') {
@@ -1145,6 +1144,41 @@ export default function AddReservationScreen({ route, navigation }: Props) {
           </ScrollView>
         </KeyboardAvoidingView>
       </ScreenContainer>
+
+      {/* Modal de advertencia de documentos */}
+      <CustomModal
+        visible={documentWarningModal.visible}
+        type="warning"
+        title="Advertencia"
+        message="No se pudieron guardar los documentos adjuntos. ¿Deseas continuar creando la reserva sin documentos?"
+        onClose={() => setDocumentWarningModal({ visible: false, documentoIds: [] })}
+        primaryButton={{
+          text: 'Continuar',
+          onPress: () => proceedWithReservation(documentWarningModal.documentoIds),
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {},
+        }}
+      />
+
+      {/* Modal de confirmación de eliminar archivo */}
+      <CustomModal
+        visible={deleteFileModal.visible}
+        type="warning"
+        title="Eliminar archivo"
+        message="¿Deseas eliminar este archivo?"
+        onClose={() => setDeleteFileModal({ visible: false, index: null })}
+        primaryButton={{
+          text: 'Eliminar',
+          onPress: confirmDeleteFile,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {},
+        }}
+      />
     </View>
   );
 }
