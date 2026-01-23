@@ -912,3 +912,309 @@ Modificar la lógica para usar una clave única compuesta que considere tanto el
 - Este bug afecta solo a viajes compartidos
 - Los viajes locales no compartidos funcionan correctamente
 - El problema se manifiesta solo cuando el usuario que descarga el viaje compartido ya tiene datos locales con los mismos IDs
+
+---
+
+## Sistema de Notificaciones Integral (23/01/2026)
+
+### Objetivo
+Optimizar y expandir el sistema de notificaciones de Viatio para:
+1. Alinear notificaciones locales con la arquitectura Firebase existente
+2. Implementar notificaciones para el módulo de gastos
+3. Añadir notificaciones in-app (banners)
+4. Mejorar el control granular del usuario
+5. Optimizar costes de Firebase
+
+### Cambios Completados
+
+#### FASE 1: Preferencias Expandidas
+- [x] Expandir `PreferenciasNotificaciones` en `types/perfil.ts`:
+  - Master switch `notificacionesActivas`
+  - Alertas de presupuesto con umbrales (50%, 75%, 90%)
+  - Preferencias de gastos compartidos (nuevoGasto, gastoEditado, etc.)
+  - Modo silencio ('off', 'urgent_only', 'all')
+  - Horario de silencio configurable
+- [x] Actualizar `perfilService.ts`:
+  - Migración automática de preferencias antiguas
+  - Funciones `shouldSendNotification()`, `isInSilentHours()`
+  - Tracking de último umbral notificado por viaje
+- [x] Rediseñar `NotificationsSettingsScreen.tsx`:
+  - Sección "Viajes y Reservas"
+  - Sección "Presupuesto" con selector de umbral
+  - Sección "Gastos Compartidos" (5 toggles)
+  - Sección "Control de Notificaciones" (modo silencio + horario)
+  - Master switch prominente
+
+#### FASE 2: Notificaciones de Presupuesto
+- [x] Crear `budgetNotificationsService.ts`:
+  - `checkBudgetAndNotify()` - verifica umbral y envía notificación local
+  - Control de duplicados (no notificar el mismo umbral 2 veces)
+  - Formatos de moneda y mensajes personalizados
+- [x] Integrar en `gastosStore.ts`:
+  - Llamada a `checkBudgetAndNotify()` después de añadir gasto
+  - Carga automática del viaje y resumen para el cálculo
+
+#### FASE 3: Notificaciones In-App (Banners)
+- [x] Crear `InAppNotificationBanner.tsx`:
+  - Componente animado con slide desde arriba
+  - Auto-dismiss en 4 segundos
+  - Iconos y colores según tipo de notificación
+  - Botón de cierre manual
+- [x] Crear `NotificationBannerContext.tsx`:
+  - Provider que escucha notificaciones en primer plano
+  - Cola de notificaciones (muestra una a la vez)
+  - Respeta modo silencio y horario
+- [x] Integrar en `App.tsx`
+
+#### FASE 4: Cloud Functions para Gastos Compartidos
+- [x] Crear `functions/src/expenses.ts`:
+  - `onExpenseCreated` - notifica cuando alguien añade gasto
+  - `onExpenseUpdated` - notifica cambios significativos
+  - `onExpenseDeleted` - notifica eliminación
+- [x] Crear `functions/src/settlements.ts`:
+  - `onSettlementCreated` - notifica solicitud de pago
+  - `onSettlementUpdated` - notifica pago completado
+- [x] Crear `functions/src/utils/rateLimiter.ts`:
+  - Límite 50 notificaciones/usuario/día
+  - Límite 30 notificaciones/viaje/día
+  - Deduplicación (5 minutos)
+
+#### FASE 5: Deep Linking Expandido
+- [x] Actualizar `notificationNavigation.ts`:
+  - Nuevos tipos: budget_warning, expense_*, settlement_*, trip_invite
+  - Navegación a ExpenseDetail, TripSettlements, etc.
+  - Función `navigateToNotification()` para uso desde banners
+
+#### FASE 6: Cleanup y Optimización
+- [x] Crear `functions/src/cleanup.ts`:
+  - `cleanupInactiveTokens` - limpia tokens sin usar >30 días (domingos 3AM)
+  - `cleanupRateLimitCounters` - limpia contadores antiguos (diario 4AM)
+  - `cleanupExpiredNotifications` - limpia notificaciones >30 días (lunes 5AM)
+
+### Archivos Creados
+| Archivo | Propósito |
+|---------|-----------|
+| `services/budgetNotificationsService.ts` | Alertas de presupuesto |
+| `components/InAppNotificationBanner.tsx` | Banner animado |
+| `context/NotificationBannerContext.tsx` | Provider para banners |
+| `functions/src/expenses.ts` | Triggers de gastos |
+| `functions/src/settlements.ts` | Triggers de liquidaciones |
+| `functions/src/utils/rateLimiter.ts` | Rate limiting |
+| `functions/src/cleanup.ts` | Limpieza automática |
+
+### Archivos Modificados
+| Archivo | Cambios |
+|---------|---------|
+| `types/perfil.ts` | +4 interfaces, +3 constantes, +40 líneas |
+| `services/perfilService.ts` | +7 funciones, +100 líneas |
+| `screens/NotificationsSettingsScreen.tsx` | Rediseño completo (+220 líneas) |
+| `store/gastosStore.ts` | Integración presupuesto |
+| `utils/notificationNavigation.ts` | Nuevos tipos y rutas |
+| `App.tsx` | +NotificationBannerProvider |
+| `functions/src/index.ts` | Re-exportar nuevas funciones |
+
+### Review
+
+#### Resumen
+Sistema de notificaciones integral implementado con:
+- **Estrategia híbrida**: Local (viajes, presupuesto) + Push (gastos compartidos)
+- **Control granular**: 15+ toggles configurables por el usuario
+- **Anti-invasivo**: Master switch, modo silencio, horario silencio
+- **Optimización de costes**: Rate limiting, deduplicación, cleanup automático
+
+#### Decisiones Tomadas
+| Decisión | Valor |
+|----------|-------|
+| Umbrales presupuesto | 50%, 75%, 90% |
+| Default gastos compartidos | Activadas |
+| Digest diario | No (fase futura) |
+| Acciones en notificaciones | Solo navegación |
+
+#### Verificación
+- [x] TypeScript compila sin errores (viatio-app)
+- [x] TypeScript compila sin errores (functions)
+- [ ] Probar preferencias en dispositivo
+- [ ] Probar alerta de presupuesto al añadir gasto
+- [ ] Probar banner in-app
+- [ ] Deploy Cloud Functions y probar push compartidos
+- [ ] Probar deep linking desde notificaciones
+
+#### Próximos Pasos
+1. **Deploy Functions**: `firebase deploy --only functions`
+2. **Pruebas manuales**: Seguir checklist de verificación
+3. **Ajustar umbrales**: Si rate limiting es muy agresivo, ajustar
+4. **Digest (futuro)**: Implementar resumen diario opcional
+
+---
+
+## 🔄 Corrección de Logs Repetitivos en Módulo de Gastos (23/01/2026)
+
+### Problema Detectado
+Al entrar al módulo de gastos de un viaje, se observaban logs repetitivos que generaban ruido en la consola y posibles recargas innecesarias:
+
+```
+LOG  [TripDetail] Reservas actualizadas, recargando stats...
+ERROR  Error obteniendo tasas de Frankfurter: [TypeError: Network request failed]
+ERROR  Error obteniendo tasas: [TypeError: Network request failed]
+WARN  Usando caché antigua de tasas debido a error de API
+LOG  [DEBUG calculateSettlementSuggestions] Completed settlements: 0
+LOG  [DEBUG calculateSettlementSuggestions] Pending settlements: 0
+LOG  [DEBUG calculateSettlementSuggestions] Balances received: [...]
+LOG  [DEBUG calculateSettlementSuggestions] Adjusted balances: [...]
+LOG  [DEBUG calculateSettlementSuggestions] Debtors: []
+LOG  [DEBUG calculateSettlementSuggestions] Creditors: []
+LOG  [DEBUG calculateSettlementSuggestions] Final suggestions: []
+```
+
+### Análisis de Causas
+
+#### 1. Recargas múltiples de stats en TripDetailScreen
+- Los callbacks `handleReservationsChange` y `handlePlacesChange` se ejecutaban inmediatamente al detectar cambios
+- Esto causaba múltiples llamadas consecutivas a `getViajeStats()`
+- Sin debounce, cada evento de sincronización disparaba una recarga
+
+#### 2. Logs de error repetitivos por API de divisas
+- El servicio `currencyService.ts` logueaba errores de red cada vez que fallaba la API de Frankfurter
+- En modo offline o con mala conexión, esto generaba múltiples logs de error
+- Aunque el servicio tenía fallback a caché, los errores se logueaban igualmente
+
+#### 3. Logs de debug en calculateSettlementSuggestions
+- La función `calculateSettlementSuggestions` en `expensesService.ts` contenía 7 console.log de DEBUG
+- Esta función se ejecuta en múltiples flujos del store (10 lugares diferentes)
+- Cada operación de gastos o liquidaciones generaba múltiples logs
+
+### Soluciones Implementadas
+
+#### 1. Debounce en TripDetailScreen ([TripDetailScreen.tsx:68-108](viatio-app/src/screens/TripDetailScreen.tsx#L68-L108))
+
+**Cambios**:
+- Añadido ref `reloadStatsTimeoutRef` para controlar el timeout de debounce
+- Modificados callbacks para usar debounce de 500ms antes de ejecutar `getViajeStats()`
+- Si llega un nuevo cambio mientras hay uno pendiente, se cancela el anterior
+- Añadido cleanup del timeout al desmontar el componente
+
+**Código**:
+```typescript
+const reloadStatsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+const handleReservationsChange = useCallback(() => {
+  console.log('[TripDetail] Reservas actualizadas, programando recarga de stats...');
+
+  if (reloadStatsTimeoutRef.current) {
+    clearTimeout(reloadStatsTimeoutRef.current);
+  }
+
+  reloadStatsTimeoutRef.current = setTimeout(() => {
+    console.log('[TripDetail] Ejecutando recarga de stats');
+    getViajeStats(viajeId).then(setStats).catch(console.error);
+  }, 500);
+}, [viajeId]);
+```
+
+**Beneficios**:
+- Reduce llamadas múltiples consecutivas a una sola
+- Mejora el rendimiento en sincronización de viajes compartidos
+- Logs más limpios y legibles
+
+#### 2. Silenciar logs de error de red en currencyService ([currencyService.ts:81-104](viatio-app/src/services/currencyService.ts#L81-L104))
+
+**Cambios**:
+- En `fetchExchangeRates`: Solo loguear errores si NO es un problema de red
+- En `getExchangeRates`: Detectar errores de red y solo loguear cuando no es error de conexión
+- Mantener el warn cuando se usa caché solo si no es error de red
+
+**Código**:
+```typescript
+// En fetchExchangeRates
+catch (error) {
+  if (error instanceof Error && !error.message.includes('Network request failed')) {
+    console.error('[CurrencyService] Error obteniendo tasas de Frankfurter:', error);
+  }
+  throw error;
+}
+
+// En getExchangeRates
+catch (error) {
+  const cached = await getCachedRates(baseCurrency);
+  if (cached) {
+    const isNetworkError = error instanceof Error && error.message.includes('Network request failed');
+    if (!isNetworkError) {
+      console.warn('[CurrencyService] Error obteniendo tasas, usando caché:', error);
+    }
+    return cached;
+  }
+
+  const isNetworkError = error instanceof Error && error.message.includes('Network request failed');
+  if (!isNetworkError) {
+    console.error('[CurrencyService] Error obteniendo tasas sin caché disponible:', error);
+  }
+
+  return null;
+}
+```
+
+**Beneficios**:
+- Modo offline ya no genera errores en consola
+- Los errores reales (API down, respuestas incorrectas) se siguen logueando
+- Reduce el ruido en los logs durante desarrollo y pruebas
+
+#### 3. Eliminar logs de debug en calculateSettlementSuggestions ([expensesService.ts:552-649](viatio-app/src/services/firestore/expensesService.ts#L552-L649))
+
+**Cambios**:
+- Eliminados 7 console.log de debug en `calculateSettlementSuggestions`
+- Mantenida la lógica de cálculo intacta
+- Limpiados comentarios de debug
+
+**Logs eliminados**:
+```typescript
+// Eliminados:
+console.log('[DEBUG calculateSettlementSuggestions] Completed settlements:', ...)
+console.log('[DEBUG calculateSettlementSuggestions] Pending settlements:', ...)
+console.log('[DEBUG calculateSettlementSuggestions] Balances received:', ...)
+console.log('[DEBUG] Ajustando por settlement pendiente:', ...)
+console.log('[DEBUG calculateSettlementSuggestions] Adjusted balances:', ...)
+console.log('[DEBUG calculateSettlementSuggestions] Debtors:', ...)
+console.log('[DEBUG calculateSettlementSuggestions] Creditors:', ...)
+console.log('[DEBUG calculateSettlementSuggestions] Final suggestions:', ...)
+```
+
+**Beneficios**:
+- Consola mucho más limpia en operaciones de gastos
+- Sin impacto en la funcionalidad (los logs eran solo informativos)
+- Mejor performance (menos operaciones de string formatting)
+
+### Archivos Modificados
+
+| Archivo | Cambios | Líneas |
+|---------|---------|--------|
+| [TripDetailScreen.tsx](viatio-app/src/screens/TripDetailScreen.tsx) | +37 líneas (debounce) | 68-108 |
+| [currencyService.ts](viatio-app/src/services/currencyService.ts) | +20 líneas (silenciar logs de red) | 81-104, 114-147 |
+| [expensesService.ts](viatio-app/src/services/firestore/expensesService.ts) | -50 líneas (remover logs debug) | 552-649 |
+
+### Verificación
+
+- [x] Compilación TypeScript sin errores
+- [x] Los callbacks de TripDetailScreen usan debounce correctamente
+- [x] Logs de error de red silenciados cuando se usa caché
+- [x] Logs de debug eliminados de calculateSettlementSuggestions
+- [ ] Probar en modo offline: verificar que no hay errores de Frankfurter
+- [ ] Probar sincronización de viaje compartido: verificar que stats se recargan solo una vez
+- [ ] Probar añadir/editar/eliminar gasto: verificar ausencia de logs debug
+
+### Impacto
+
+**Antes**:
+- 15+ líneas de logs por cada cambio en gastos
+- Múltiples errores de API en modo offline
+- Recargas múltiples de stats en sincronización
+
+**Después**:
+- 2-3 líneas de logs informativos
+- Sin errores de API en modo offline (usa caché silenciosamente)
+- Una sola recarga de stats (debounced)
+
+### Riesgos
+
+- **Bajo**: Los cambios no afectan la lógica de negocio
+- **Bajo**: El debounce de 500ms es suficientemente corto para mantener UX fluida
+- **Ninguno**: Los logs de debug no eran necesarios en producción

@@ -98,15 +98,6 @@ export default function AddReservationScreen({ route, navigation }: Props) {
   const { handlePlaceMatch } = useHandlePlaceMatch();
   const { config } = useConfiguracionStore();
 
-  // Debug: Log de datos recibidos
-  console.log('[AddReservation] viajeId:', viajeId);
-  console.log('[AddReservation] prefillData exists:', !!prefillData);
-  if (prefillData) {
-    console.log('[AddReservation] prefillData.categoria:', prefillData.categoria);
-    console.log('[AddReservation] prefillData.nombre:', prefillData.nombre);
-  }
-  console.log('[AddReservation] scannedFiles count:', scannedFiles?.length || 0);
-
   const [mode, setMode] = useState<ScreenMode>(
     prefillData || scannedFiles ? 'manual' : 'select'
   );
@@ -165,7 +156,6 @@ export default function AddReservationScreen({ route, navigation }: Props) {
   // Sincronizar formData con prefillData cuando cambia
   useEffect(() => {
     if (prefillData) {
-      console.log('[AddReservation] Sincronizando formData con prefillData');
       setFormData(prefillData);
     }
   }, [prefillData]);

@@ -65,16 +65,48 @@ export default function TripDetailScreen({ navigation, route }: Props) {
     firestoreIdRef.current = viaje?.firestoreId || null;
   }, [viaje]);
 
-  // Callbacks memoizados para evitar recrearlos
+  // Refs para debounce de recarga de stats
+  const reloadStatsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Callbacks memoizados con debounce para evitar recargas múltiples
   const handleReservationsChange = useCallback(() => {
-    console.log('[TripDetail] Reservas actualizadas, recargando stats...');
-    getViajeStats(viajeId).then(setStats).catch(console.error);
+    console.log('[TripDetail] Reservas actualizadas, programando recarga de stats...');
+
+    // Cancelar timeout pendiente si existe
+    if (reloadStatsTimeoutRef.current) {
+      clearTimeout(reloadStatsTimeoutRef.current);
+    }
+
+    // Programar recarga con debounce de 500ms
+    reloadStatsTimeoutRef.current = setTimeout(() => {
+      console.log('[TripDetail] Ejecutando recarga de stats');
+      getViajeStats(viajeId).then(setStats).catch(console.error);
+    }, 500);
   }, [viajeId]);
 
   const handlePlacesChange = useCallback(() => {
-    console.log('[TripDetail] Lugares actualizados, recargando stats...');
-    getViajeStats(viajeId).then(setStats).catch(console.error);
+    console.log('[TripDetail] Lugares actualizados, programando recarga de stats...');
+
+    // Cancelar timeout pendiente si existe
+    if (reloadStatsTimeoutRef.current) {
+      clearTimeout(reloadStatsTimeoutRef.current);
+    }
+
+    // Programar recarga con debounce de 500ms
+    reloadStatsTimeoutRef.current = setTimeout(() => {
+      console.log('[TripDetail] Ejecutando recarga de stats');
+      getViajeStats(viajeId).then(setStats).catch(console.error);
+    }, 500);
   }, [viajeId]);
+
+  // Cleanup del timeout al desmontar
+  useEffect(() => {
+    return () => {
+      if (reloadStatsTimeoutRef.current) {
+        clearTimeout(reloadStatsTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Sincronización en tiempo real para viajes compartidos
   // Solo usar valores derivados del viaje una vez cargado

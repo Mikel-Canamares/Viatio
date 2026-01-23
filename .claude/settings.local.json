@@ -26,7 +26,14 @@
       "Bash(findstr:*)",
       "Bash(git checkout:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(firebase login:*)",
+      "Bash(npm run build:*)",
+      "Bash(firebase deploy:*)",
+      "Bash(npm install:*)",
+      "Bash(npx expo-doctor)",
+      "Bash(npm run start:clear:*)",
+      "Bash(dir:*)"
     ]
   }
 }

@@ -116,6 +116,7 @@ export type ProfileStackParamList = {
   EditProfile: undefined;
   NotificationsSettings: undefined;
   NotificationsManagement: undefined;
+  NotificationDebug: undefined;
   Notifications: undefined;
   Settings: undefined;
   CopilotSettings: undefined;

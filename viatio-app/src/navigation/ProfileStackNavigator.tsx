@@ -9,6 +9,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import {
   ProfileScreen,
   EditProfileScreen,
+  NotificationDebugScreen,
   SettingsScreen,
   HelpScreen,
 } from '@/screens';
@@ -35,6 +36,7 @@ export function ProfileStackNavigator() {
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="NotificationsSettings" component={NotificationsSettingsScreen} />
       <Stack.Screen name="NotificationsManagement" component={NotificationsManagementScreen} />
+      <Stack.Screen name="NotificationDebug" component={NotificationDebugScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="CopilotSettings" component={CopilotSettingsScreen} />

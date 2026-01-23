@@ -221,3 +221,79 @@ export async function updateUserConfig(
     return false;
   }
 }
+
+// ============================================
+// PUSH NOTIFICATIONS
+// ============================================
+
+/**
+ * Guarda el push token del usuario en Firestore
+ * @param pushToken Token de Expo Push Notifications
+ */
+export async function savePushToken(pushToken: string): Promise<void> {
+  try {
+    const { auth } = await import('@/config/firebase');
+    const user = auth.currentUser;
+
+    if (!user) {
+      throw new Error('Usuario no autenticado');
+    }
+
+    const userRef = doc(db, 'users', user.uid);
+    await updateDoc(userRef, {
+      pushToken,
+      pushTokenUpdatedAt: serverTimestamp(),
+    });
+
+    console.log('[UsersService] ✅ Push token guardado para usuario:', user.uid);
+  } catch (error) {
+    logError(error, 'usersService.savePushToken');
+    throw error;
+  }
+}
+
+/**
+ * Elimina el push token del usuario (al hacer logout)
+ */
+export async function removePushToken(): Promise<void> {
+  try {
+    const { auth } = await import('@/config/firebase');
+    const user = auth.currentUser;
+
+    if (!user) {
+      console.log('[UsersService] No hay usuario autenticado, omitiendo eliminación de token');
+      return;
+    }
+
+    const userRef = doc(db, 'users', user.uid);
+    await updateDoc(userRef, {
+      pushToken: null,
+      pushTokenUpdatedAt: serverTimestamp(),
+    });
+
+    console.log('[UsersService] ✅ Push token eliminado para usuario:', user.uid);
+  } catch (error) {
+    logError(error, 'usersService.removePushToken');
+    // No lanzar error, solo logear
+  }
+}
+
+/**
+ * Obtiene el push token del usuario actual
+ */
+export async function getPushToken(uid: string): Promise<string | null> {
+  try {
+    const userRef = doc(db, 'users', uid);
+    const userSnap = await getDoc(userRef);
+
+    if (!userSnap.exists()) {
+      return null;
+    }
+
+    const data = userSnap.data();
+    return data.pushToken || null;
+  } catch (error) {
+    logError(error, 'usersService.getPushToken');
+    return null;
+  }
+}

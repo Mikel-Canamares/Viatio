@@ -31,17 +31,20 @@ export function TimeInput({
   // Convertir string "HH:mm" a Date para el picker
   const getDateFromTimeString = (timeStr: string): Date => {
     const now = new Date();
-    if (timeStr) {
+    if (timeStr && timeStr.trim() !== '') {
       const [hours, minutes] = timeStr.split(':').map(Number);
-      now.setHours(hours || 0, minutes || 0, 0, 0);
+      if (!isNaN(hours) && !isNaN(minutes)) {
+        now.setHours(hours, minutes, 0, 0);
+      }
     }
     return now;
   };
 
   const dateValue = getDateFromTimeString(value);
 
-  // Formatear Date a string "HH:mm"
+  // Formatear Date a string "HH:mm" - SIEMPRE en hora local
   const formatTimeString = (date: Date): string => {
+    // Obtener horas y minutos en zona horaria local del dispositivo
     const hours = date.getHours().toString().padStart(2, '0');
     const minutes = date.getMinutes().toString().padStart(2, '0');
     return `${hours}:${minutes}`;

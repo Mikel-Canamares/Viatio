@@ -99,7 +99,10 @@ export async function fetchExchangeRates(baseCurrency: string): Promise<Exchange
 
     return rates;
   } catch (error) {
-    console.error('Error obteniendo tasas de Frankfurter:', error);
+    // Solo loguear error si no es un problema de red (más verboso para debug)
+    if (error instanceof Error && !error.message.includes('Network request failed')) {
+      console.error('[CurrencyService] Error obteniendo tasas de Frankfurter:', error);
+    }
     throw error;
   }
 }
@@ -126,13 +129,21 @@ export async function getExchangeRates(
     // Descargar tasas actualizadas
     return await fetchExchangeRates(baseCurrency);
   } catch (error) {
-    console.error('Error obteniendo tasas:', error);
-
     // Si falla la API, intentar usar caché antigua (aunque esté expirada)
     const cached = await getCachedRates(baseCurrency);
     if (cached) {
-      console.warn('Usando caché antigua de tasas debido a error de API');
+      // Solo loguear en modo debug si es error de red (comportamiento esperado offline)
+      const isNetworkError = error instanceof Error && error.message.includes('Network request failed');
+      if (!isNetworkError) {
+        console.warn('[CurrencyService] Error obteniendo tasas, usando caché:', error);
+      }
       return cached;
+    }
+
+    // Solo loguear si no hay caché y no es error de red
+    const isNetworkError = error instanceof Error && error.message.includes('Network request failed');
+    if (!isNetworkError) {
+      console.error('[CurrencyService] Error obteniendo tasas sin caché disponible:', error);
     }
 
     return null;

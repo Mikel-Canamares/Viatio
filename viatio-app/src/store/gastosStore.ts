@@ -8,6 +8,8 @@
 import { create } from 'zustand';
 import { Gasto, CreateGastoInput, ResumenGastos } from '@/types/gasto';
 import * as gastosService from '@/services/gastosService';
+import { checkBudgetAndNotify } from '@/services/budgetNotificationsService';
+import { getViajeById } from '@/services/viajesService';
 
 // ============================================
 // TIPOS
@@ -88,8 +90,21 @@ export const useGastosStore = create<GastosState & GastosActions>((set, get) => 
         gastos: [gasto, ...state.gastos],
         loading: false,
       }));
+
       // Actualizar resumen
-      get().fetchResumen(input.viajeId);
+      const resumen = await gastosService.getResumenGastosConvertido(input.viajeId);
+      set({ resumen });
+
+      // Verificar umbral de presupuesto y notificar si corresponde
+      try {
+        const viaje = await getViajeById(input.viajeId);
+        if (viaje && resumen) {
+          await checkBudgetAndNotify(viaje, resumen.total);
+        }
+      } catch (budgetError) {
+        console.error('[GastosStore] Error verificando presupuesto:', budgetError);
+      }
+
       return gasto;
     } catch (error) {
       set({ error: 'Error al crear gasto', loading: false });

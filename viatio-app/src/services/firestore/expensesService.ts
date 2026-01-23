@@ -559,15 +559,9 @@ export function calculateSettlementSuggestions(
   // Aumentado de 1 a 10 para evitar sugerencias casi vacías
   const BALANCE_THRESHOLD = 10; // 10 céntimos
 
-  // DEBUG: Loguear settlements
+  // Filtrar settlements por estado
   const completedSettlements = settlements.filter(s => s.status === 'completed');
   const pendingSettlements = settlements.filter(s => s.status === 'pending');
-  console.log('[DEBUG calculateSettlementSuggestions] Completed settlements:', completedSettlements.length);
-  console.log('[DEBUG calculateSettlementSuggestions] Pending settlements:', pendingSettlements.length);
-  console.log('[DEBUG calculateSettlementSuggestions] Balances received:', balances.map(b => ({
-    name: b.displayName,
-    netBalance: b.netBalance / 100, // Mostrar en unidades para facilitar lectura
-  })));
 
   // Los balances ya vienen ajustados por settlements completados desde calculateBalances
   // No necesitamos re-ajustar aquí
@@ -579,17 +573,11 @@ export function calculateSettlementSuggestions(
     const toBalance = adjustedBalances.find(b => b.uid === settlement.toUid);
 
     if (fromBalance && toBalance) {
-      console.log(`[DEBUG] Ajustando por settlement pendiente: ${fromBalance.displayName} → ${toBalance.displayName} = ${settlement.amount / 100}`);
       // El settlement pendiente ya "cubre" esta deuda
       fromBalance.netBalance += settlement.amount;
       toBalance.netBalance -= settlement.amount;
     }
   });
-
-  console.log('[DEBUG calculateSettlementSuggestions] Adjusted balances:', adjustedBalances.map(b => ({
-    name: b.displayName,
-    netBalance: b.netBalance / 100,
-  })));
 
   // Separar en deudores (balance negativo) y acreedores (balance positivo)
   // Aplicar threshold para evitar diferencias por redondeo
@@ -602,15 +590,6 @@ export function calculateSettlementSuggestions(
     .filter(b => b.netBalance > BALANCE_THRESHOLD)
     .map(b => ({ ...b, remaining: b.netBalance }))
     .sort((a, b) => b.remaining - a.remaining);
-
-  console.log('[DEBUG calculateSettlementSuggestions] Debtors:', debtors.map(d => ({
-    name: d.displayName,
-    remaining: d.remaining / 100,
-  })));
-  console.log('[DEBUG calculateSettlementSuggestions] Creditors:', creditors.map(c => ({
-    name: c.displayName,
-    remaining: c.remaining / 100,
-  })));
 
   // Emparejar deudores con acreedores
   let debtorIndex = 0;
@@ -639,12 +618,6 @@ export function calculateSettlementSuggestions(
     if (debtor.remaining <= BALANCE_THRESHOLD) debtorIndex++;
     if (creditor.remaining <= BALANCE_THRESHOLD) creditorIndex++;
   }
-
-  console.log('[DEBUG calculateSettlementSuggestions] Final suggestions:', suggestions.map(s => ({
-    from: s.fromName,
-    to: s.toName,
-    amount: s.amount / 100,
-  })));
 
   return suggestions;
 }
