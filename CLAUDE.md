@@ -60,6 +60,7 @@ REGLAS CRÍTICAS DE COMPORTAMIENTO (OBLIGATORIAS)
      ```
    - Si hay error, pega el log COMPLETO y diagnostica
    - NO sigas adelante con errores sin resolver
+   - NO realices commits
 
 4. **CONTROL DE DEPENDENCIAS**
    - Usa SIEMPRE `npx expo install` para paquetes nativos

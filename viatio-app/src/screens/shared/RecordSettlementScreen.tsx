@@ -39,7 +39,13 @@ export default function RecordSettlementScreen() {
   const { currentTrip, members } = useSharedTripsStore();
   const { addSettlement } = useExpensesV2Store();
   const { config } = useConfiguracionStore();
+
+  // Moneda del viaje (para conversión interna)
+  const tripCurrency = currentTrip?.currency || 'EUR';
+
+  // Moneda del usuario (para mostrar al usuario)
   const userCurrency = config.monedaDefault || 'EUR';
+  const [currency, setCurrency] = useState(userCurrency);
 
   const [amount, setAmount] = useState((suggestedAmount / 100).toFixed(2));
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -59,20 +65,18 @@ export default function RecordSettlementScreen() {
     setLoading(true);
 
     try {
-      const tripCurrency = currentTrip?.currency || 'EUR';
-
       const settlement = await addSettlement(
         tripId,
         {
           fromUid,
           toUid,
           amount: displayToCents(amountNum),
-          currency: userCurrency,
+          currency, // Moneda seleccionada por el usuario
           date,
           notes: notes.trim() || undefined,
         },
         members,
-        tripCurrency
+        tripCurrency // Moneda de referencia del viaje
       );
 
       if (settlement) {
@@ -157,11 +161,11 @@ export default function RecordSettlementScreen() {
               placeholder="0.00"
               placeholderTextColor={theme.colors.textTertiary}
             />
-            <Text style={styles.currency}>{userCurrency}</Text>
+            <Text style={styles.currency}>{currency}</Text>
           </View>
 
           <Text style={styles.suggestedText}>
-            Sugerido: {centsToDisplay(suggestedAmount, userCurrency)}
+            Sugerido: {centsToDisplay(suggestedAmount, currency)}
           </Text>
         </Card>
 

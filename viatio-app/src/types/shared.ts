@@ -168,6 +168,8 @@ export interface SharedExpense {
   currency: string; // Moneda del viaje (normalizada)
   originalAmount?: number; // Monto original ingresado (céntimos) - si fue en otra moneda
   originalCurrency?: string; // Moneda original del ticket - si fue diferente a la del viaje
+  exchangeRate?: number; // Tasa de cambio usada (originalCurrency → currency)
+  exchangeRateDate?: string; // Fecha de la tasa de cambio (ISO)
   category: string;
   date: string;
   paidByUid: string;
@@ -212,6 +214,8 @@ export interface Settlement {
   currency: string; // Moneda del viaje (normalizada)
   originalAmount?: number; // Monto original ingresado (céntimos) - si fue en otra moneda
   originalCurrency?: string; // Moneda original - si fue diferente a la del viaje
+  exchangeRate?: number; // Tasa de cambio usada (originalCurrency → currency)
+  exchangeRateDate?: string; // Fecha de la tasa de cambio (ISO)
   date: string;
   notes: string | null;
   status: SettlementStatus;

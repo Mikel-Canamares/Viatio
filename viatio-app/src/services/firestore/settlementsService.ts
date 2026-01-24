@@ -27,6 +27,8 @@ interface SettlementDoc {
   currency: string; // Moneda del viaje
   originalAmount: number | null; // Monto original si fue en otra moneda
   originalCurrency: string | null; // Moneda original
+  exchangeRate: number | null; // Tasa de cambio usada (originalCurrency → currency)
+  exchangeRateDate: string | null; // Fecha de la tasa de cambio (ISO)
   date: string;
   notes: string | null;
   status: SettlementStatus;
@@ -68,6 +70,8 @@ export async function createSettlement(
     let normalizedAmount = input.amount;
     let originalAmount: number | null = null;
     let originalCurrency: string | null = null;
+    let exchangeRate: number | null = null;
+    let exchangeRateDate: string | null = null;
 
     if (input.currency !== tripCurrency) {
       console.log(`[createSettlement] Convirtiendo ${input.amount / 100} ${input.currency} → ${tripCurrency}`);
@@ -81,6 +85,8 @@ export async function createSettlement(
 
       originalAmount = input.amount;
       originalCurrency = input.currency;
+      exchangeRate = conversion.rate;
+      exchangeRateDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
       normalizedAmount = Math.round(conversion.converted * 100);
 
       console.log(`[createSettlement] Resultado: ${normalizedAmount / 100} ${tripCurrency} (tasa: ${conversion.rate})`);
@@ -95,6 +101,8 @@ export async function createSettlement(
       currency: tripCurrency, // Moneda del viaje
       originalAmount, // null si no hubo conversión
       originalCurrency, // null si no hubo conversión
+      exchangeRate, // null si no hubo conversión
+      exchangeRateDate, // null si no hubo conversión
       date: input.date,
       notes: input.notes || null,
       status: 'pending',
@@ -111,6 +119,8 @@ export async function createSettlement(
       ...settlementData,
       originalAmount: originalAmount ?? undefined,
       originalCurrency: originalCurrency ?? undefined,
+      exchangeRate: exchangeRate ?? undefined,
+      exchangeRateDate: exchangeRateDate ?? undefined,
       createdAt: new Date(),
       completedAt: null,
     };
@@ -143,6 +153,8 @@ export async function getTripSettlements(tripId: string): Promise<Settlement[]> 
         currency: data.currency,
         originalAmount: data.originalAmount ?? undefined,
         originalCurrency: data.originalCurrency ?? undefined,
+        exchangeRate: data.exchangeRate ?? undefined,
+        exchangeRateDate: data.exchangeRateDate ?? undefined,
         date: data.date,
         notes: data.notes,
         status: data.status,
@@ -241,6 +253,8 @@ export function subscribeToSettlements(
             currency: data.currency,
             originalAmount: data.originalAmount ?? undefined,
             originalCurrency: data.originalCurrency ?? undefined,
+            exchangeRate: data.exchangeRate ?? undefined,
+            exchangeRateDate: data.exchangeRateDate ?? undefined,
             date: data.date,
             notes: data.notes,
             status: data.status,

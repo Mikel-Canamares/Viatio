@@ -39,6 +39,8 @@ interface ExpenseDoc {
   currency: string; // Moneda del viaje
   originalAmount: number | null; // Monto original si fue en otra moneda
   originalCurrency: string | null; // Moneda original del ticket
+  exchangeRate: number | null; // Tasa de cambio usada (originalCurrency → currency)
+  exchangeRateDate: string | null; // Fecha de la tasa de cambio (ISO)
   category: string;
   date: string;
   paidByUid: string;
@@ -168,6 +170,8 @@ export async function createExpense(
     let normalizedAmount = input.amount;
     let originalAmount: number | null = null;
     let originalCurrency: string | null = null;
+    let exchangeRate: number | null = null;
+    let exchangeRateDate: string | null = null;
 
     if (input.currency !== tripCurrency) {
       console.log(`[createExpense] Convirtiendo ${input.amount / 100} ${input.currency} → ${tripCurrency}`);
@@ -183,6 +187,8 @@ export async function createExpense(
       // Guardar valores originales
       originalAmount = input.amount;
       originalCurrency = input.currency;
+      exchangeRate = conversion.rate;
+      exchangeRateDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
       // Usar valor convertido (volver a céntimos)
       normalizedAmount = Math.round(conversion.converted * 100);
@@ -203,6 +209,8 @@ export async function createExpense(
       currency: tripCurrency, // Moneda del viaje (normalizada)
       originalAmount, // null si no hubo conversión
       originalCurrency, // null si no hubo conversión
+      exchangeRate, // null si no hubo conversión
+      exchangeRateDate, // null si no hubo conversión
       category: input.category,
       date: input.date,
       paidByUid: input.paidByUid,
@@ -227,6 +235,8 @@ export async function createExpense(
       ...expenseData,
       originalAmount: originalAmount ?? undefined,
       originalCurrency: originalCurrency ?? undefined,
+      exchangeRate: exchangeRate ?? undefined,
+      exchangeRateDate: exchangeRateDate ?? undefined,
       createdAt: new Date(),
       updatedAt: new Date(),
       deletedAt: null,
@@ -260,6 +270,8 @@ export async function getExpense(
       currency: data.currency,
       originalAmount: data.originalAmount ?? undefined,
       originalCurrency: data.originalCurrency ?? undefined,
+      exchangeRate: data.exchangeRate ?? undefined,
+      exchangeRateDate: data.exchangeRateDate ?? undefined,
       category: data.category,
       date: data.date,
       paidByUid: data.paidByUid,
@@ -306,6 +318,8 @@ export async function getTripExpenses(tripId: string): Promise<SharedExpense[]> 
         currency: data.currency,
         originalAmount: data.originalAmount ?? undefined,
         originalCurrency: data.originalCurrency ?? undefined,
+        exchangeRate: data.exchangeRate ?? undefined,
+        exchangeRateDate: data.exchangeRateDate ?? undefined,
         category: data.category,
         date: data.date,
         paidByUid: data.paidByUid,
@@ -388,6 +402,8 @@ export async function updateExpense(
 
         updateData.originalAmount = newAmount;
         updateData.originalCurrency = newCurrency;
+        updateData.exchangeRate = conversion.rate;
+        updateData.exchangeRateDate = new Date().toISOString().split('T')[0];
         newAmount = Math.round(conversion.converted * 100);
 
         console.log(`[updateExpense] Resultado: ${newAmount / 100} ${tripCurrency}`);
@@ -395,6 +411,8 @@ export async function updateExpense(
         // Si es la misma moneda, limpiar campos originales
         updateData.originalAmount = null;
         updateData.originalCurrency = null;
+        updateData.exchangeRate = null;
+        updateData.exchangeRateDate = null;
       }
 
       updateData.amount = newAmount;
@@ -480,18 +498,18 @@ export function calculateBalances(
   if (tripCurrency) {
     expenses.forEach(expense => {
       if (expense.currency !== tripCurrency) {
-        console.error(
-          `[calculateBalances] ERROR: Gasto ${expense.id} tiene moneda ${expense.currency}, ` +
-          `esperaba ${tripCurrency}. Los cálculos serán incorrectos.`
+        console.warn(
+          `[calculateBalances] WARNING: Gasto ${expense.id} tiene moneda ${expense.currency}, ` +
+          `esperaba ${tripCurrency}. Puede haber una inconsistencia en los datos.`
         );
       }
     });
 
     settlements.forEach(settlement => {
       if (settlement.currency !== tripCurrency) {
-        console.error(
-          `[calculateBalances] ERROR: Settlement ${settlement.id} tiene moneda ${settlement.currency}, ` +
-          `esperaba ${tripCurrency}. Los cálculos serán incorrectos.`
+        console.warn(
+          `[calculateBalances] WARNING: Settlement ${settlement.id} tiene moneda ${settlement.currency}, ` +
+          `esperaba ${tripCurrency}. Puede haber una inconsistencia en los datos.`
         );
       }
     });
@@ -695,6 +713,8 @@ export function subscribeToExpenses(
           currency: data.currency,
           originalAmount: data.originalAmount ?? undefined,
           originalCurrency: data.originalCurrency ?? undefined,
+          exchangeRate: data.exchangeRate ?? undefined,
+          exchangeRateDate: data.exchangeRateDate ?? undefined,
           category: data.category,
           date: data.date,
           paidByUid: data.paidByUid,
