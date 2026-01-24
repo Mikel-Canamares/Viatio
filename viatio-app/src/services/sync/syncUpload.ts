@@ -601,14 +601,25 @@ export async function syncDeleteIfShared(
   collectionName: 'reservations' | 'places' | 'expenses' | 'documents' | 'events',
   entityFirestoreId: string | null
 ): Promise<void> {
-  if (!entityFirestoreId) return;
+  console.log('[SyncUpload] syncDeleteIfShared llamado:', { viajeId, collectionName, entityFirestoreId });
+
+  if (!entityFirestoreId) {
+    console.log('[SyncUpload] entityFirestoreId es null, retornando');
+    return;
+  }
 
   try {
     const tripFirestoreId = await getSharedTripFirestoreId(viajeId);
+    console.log('[SyncUpload] tripFirestoreId obtenido:', tripFirestoreId);
+
     if (tripFirestoreId) {
       await markDeletedInFirestore(tripFirestoreId, collectionName, entityFirestoreId);
+      console.log('[SyncUpload] ✅ markDeletedInFirestore completado');
+    } else {
+      console.log('[SyncUpload] Viaje no compartido, no se sincroniza eliminación');
     }
   } catch (error) {
-    console.warn('[SyncUpload] Error sincronizando eliminación:', error);
+    console.error('[SyncUpload] ❌ Error sincronizando eliminación:', error);
+    throw error; // Re-throw para que el caller lo maneje
   }
 }
