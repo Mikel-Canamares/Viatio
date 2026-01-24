@@ -302,7 +302,7 @@ export async function getReservasByViajeId(viajeId: string): Promise<Reserva[]> 
       CAST(shares AS TEXT) as shares,
       notas,
       CAST(metadatos AS TEXT) as metadatos,
-      documentoId, lugarId, createdAt, updatedAt
+      documentoId, lugarId, firestoreId, createdAt, updatedAt
     FROM reservas
     WHERE viajeId = ?
     ORDER BY fechaInicio ASC, horaInicio ASC`,
@@ -336,7 +336,7 @@ export async function getReservasByCategoria(
       CAST(shares AS TEXT) as shares,
       notas,
       CAST(metadatos AS TEXT) as metadatos,
-      documentoId, lugarId, createdAt, updatedAt
+      documentoId, lugarId, firestoreId, createdAt, updatedAt
     FROM reservas
     WHERE viajeId = ? AND categoria = ?
     ORDER BY fechaInicio ASC, horaInicio ASC`,
@@ -367,7 +367,7 @@ export async function getReservaById(id: string): Promise<Reserva | null> {
       CAST(shares AS TEXT) as shares,
       notas,
       CAST(metadatos AS TEXT) as metadatos,
-      documentoId, lugarId, createdAt, updatedAt
+      documentoId, lugarId, firestoreId, createdAt, updatedAt
     FROM reservas WHERE id = ?`,
     [id]
   );
