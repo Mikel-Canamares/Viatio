@@ -227,6 +227,28 @@ export async function updateUserConfig(
 // ============================================
 
 /**
+ * Obtiene el push token guardado para un usuario
+ * @param uid ID del usuario
+ * @returns Push token o null si no existe
+ */
+export async function getPushToken(uid: string): Promise<string | null> {
+  try {
+    const userRef = doc(db, 'users', uid);
+    const userSnap = await getDoc(userRef);
+
+    if (!userSnap.exists()) {
+      return null;
+    }
+
+    const data = userSnap.data();
+    return data.pushToken || null;
+  } catch (error) {
+    logError(error, 'usersService.getPushToken');
+    return null;
+  }
+}
+
+/**
  * Guarda el push token del usuario en Firestore
  * @param pushToken Token de Expo Push Notifications
  */
@@ -275,25 +297,5 @@ export async function removePushToken(): Promise<void> {
   } catch (error) {
     logError(error, 'usersService.removePushToken');
     // No lanzar error, solo logear
-  }
-}
-
-/**
- * Obtiene el push token del usuario actual
- */
-export async function getPushToken(uid: string): Promise<string | null> {
-  try {
-    const userRef = doc(db, 'users', uid);
-    const userSnap = await getDoc(userRef);
-
-    if (!userSnap.exists()) {
-      return null;
-    }
-
-    const data = userSnap.data();
-    return data.pushToken || null;
-  } catch (error) {
-    logError(error, 'usersService.getPushToken');
-    return null;
   }
 }

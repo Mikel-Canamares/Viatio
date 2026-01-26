@@ -109,6 +109,7 @@ export interface SharedTrip {
   name: string;
   description: string;
   destination: string;
+  destinationPlaceId?: string | null;
   startDate: string;
   endDate: string;
   coverImage: string | null;

@@ -11,6 +11,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer, PageHeader, PrimaryButton, Card } from '@/components';
 import { DatePickerInput } from '@/components/DatePickerInput';
+import { CurrencyPicker } from '@/components/CurrencyPicker';
 import { useSharedTripsStore } from '@/store/sharedTripsStore';
 import { useExpensesV2Store } from '@/store/expensesV2Store';
 import { useConfiguracionStore } from '@/store/useConfiguracionStore';
@@ -167,6 +168,15 @@ export default function RecordSettlementScreen() {
           <Text style={styles.suggestedText}>
             Sugerido: {centsToDisplay(suggestedAmount, currency)}
           </Text>
+        </Card>
+
+        {/* Moneda */}
+        <Card style={styles.card}>
+          <CurrencyPicker
+            label="Moneda del pago"
+            value={currency}
+            onChange={setCurrency}
+          />
         </Card>
 
         {/* Fecha */}

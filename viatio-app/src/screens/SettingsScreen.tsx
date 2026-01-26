@@ -304,6 +304,12 @@ export default function SettingsScreen() {
         <SectionTitle title="🛠️ Desarrollo (Temporal)" />
         <Card padding={0} style={styles.card}>
           <ProfileMenuItem
+            icon="notifications-outline"
+            label="🔔 Diagnóstico Push Notifications"
+            value="Probar notificaciones push"
+            onPress={() => navigation.navigate('DiagnosticoPush')}
+          />
+          <ProfileMenuItem
             icon="refresh-outline"
             label="🔥 Limpiar base de datos"
             value="Resetear SQLite completamente"

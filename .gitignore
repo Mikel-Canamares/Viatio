@@ -4,6 +4,9 @@ firebase-debug.log
 firebase-debug.*.log
 ui-debug.log
 .runtimeconfig.json
+google-services.json
+GoogleService-Info.plist
+functions/service-account.json
 
 # Node modules
 node_modules/

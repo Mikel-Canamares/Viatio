@@ -96,6 +96,28 @@ export default function TripMapScreen() {
     requestLocationPermission();
   }, []);
 
+  // Calcular zoom apropiado según tipo de lugar
+  const calculateZoomForPlaceType = (types: string[]): { latitudeDelta: number; longitudeDelta: number } => {
+    // Orden de prioridad: country > administrative_area > locality > default
+    if (types.includes('country')) {
+      // País completo (ej: Filipinas, España)
+      return { latitudeDelta: 8.0, longitudeDelta: 8.0 };
+    }
+
+    if (types.includes('administrative_area_level_1') || types.includes('administrative_area_level_2')) {
+      // Región/provincia (ej: Cataluña, California)
+      return { latitudeDelta: 2.0, longitudeDelta: 2.0 };
+    }
+
+    if (types.includes('locality') || types.includes('postal_town')) {
+      // Ciudad (ej: Barcelona, Manila)
+      return { latitudeDelta: 0.1, longitudeDelta: 0.1 };
+    }
+
+    // Default: zoom medio (para lugares sin tipo específico)
+    return { latitudeDelta: 0.5, longitudeDelta: 0.5 };
+  };
+
   // Cargar viaje y centrar mapa en el destino
   const loadViajeAndCenterMap = async () => {
     try {
@@ -116,14 +138,16 @@ export default function TripMapScreen() {
         const destinoDetails = await getPlaceDetails(viajeData.destinoPlaceId);
 
         if (destinoDetails) {
+          // Calcular zoom dinámico según tipo de lugar
+          const zoom = calculateZoomForPlaceType(destinoDetails.types);
+
           const destinoRegion: Region = {
             latitude: destinoDetails.latitude,
             longitude: destinoDetails.longitude,
-            latitudeDelta: 0.1, // Zoom amplio para ver la ciudad completa
-            longitudeDelta: 0.1,
+            ...zoom, // Aplicar zoom calculado
           };
 
-          console.log('[TripMapScreen] ✓ Centrando mapa en:', viajeData.destino, destinoRegion);
+          console.log('[TripMapScreen] ✓ Centrando mapa en:', viajeData.destino, 'Tipo:', destinoDetails.types[0], 'Zoom:', zoom);
           setRegion(destinoRegion);
           setInitialMapCentered(true);
 

@@ -17,6 +17,7 @@ import NotificationsSettingsScreen from '@/screens/NotificationSettingsScreen';
 import NotificationsManagementScreen from '@/screens/NotificationsManagementScreen';
 import NotificationsScreen from '@/screens/notifications/NotificationsScreen';
 import CopilotSettingsScreen from '@/screens/CopilotSettingsScreen';
+import DiagnosticoPushScreen from '@/screens/DiagnosticoPushScreen';
 import type { ProfileStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -38,6 +39,7 @@ export function ProfileStackNavigator() {
       <Stack.Screen name="NotificationsManagement" component={NotificationsManagementScreen} />
       <Stack.Screen name="NotificationDebug" component={NotificationDebugScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="DiagnosticoPush" component={DiagnosticoPushScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="CopilotSettings" component={CopilotSettingsScreen} />
       <Stack.Screen name="Help" component={HelpScreen} />

@@ -86,7 +86,7 @@ export default function InviteToTripScreen() {
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         {/* Invitar por email */}
         <Card style={styles.card}>
-          <Text style={styles.cardTitle}>Invitar por email</Text>
+          <Text style={styles.cardTitle}>Introducir email</Text>
 
           <Text style={styles.inputLabel}>Email</Text>
           <TextInput

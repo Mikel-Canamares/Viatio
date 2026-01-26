@@ -10,6 +10,7 @@ import {
   Pressable,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer, PageHeader, PrimaryButton, Card, Dropdown, DropdownOption, ParticipantCheckboxList } from '@/components';
 import { ReservationCurrencyPicker } from '@/components/ReservationCurrencyPicker';
@@ -42,6 +43,7 @@ export default function AddSharedExpenseScreen() {
   const { tripId, expenseId } = route.params;
   const { user } = useAuth();
   const isEditing = !!expenseId;
+  const insets = useSafeAreaInsets();
 
   const { currentTrip, members, fetchMembers, selectTrip } = useSharedTripsStore();
   const { addExpense, editExpense, getExpenseById } = useExpensesV2Store();
@@ -52,7 +54,7 @@ export default function AddSharedExpenseScreen() {
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState('EUR');
-  const [category, setCategory] = useState<CategoriaGasto>('comida');
+  const [category, setCategory] = useState<CategoriaGasto | undefined>(undefined);
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [paidByUid, setPaidByUid] = useState<string>(user?.uid || '');
   const [splitMethod, setSplitMethod] = useState<SplitMethod>('equal');
@@ -231,6 +233,10 @@ export default function AddSharedExpenseScreen() {
       newErrors.amount = 'Introduce un importe válido';
     }
 
+    if (!category) {
+      newErrors.category = 'Selecciona una categoría';
+    }
+
     if (!paidByUid) {
       newErrors.paidBy = 'Selecciona quién pagó';
     }
@@ -254,6 +260,9 @@ export default function AddSharedExpenseScreen() {
 
   const handleSubmit = async () => {
     if (!validate()) return;
+
+    // Guard: category debe estar definida después de la validación
+    if (!category) return;
 
     setLoading(true);
 
@@ -321,7 +330,13 @@ export default function AddSharedExpenseScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: Math.max(insets.bottom, 16) + 80 } // 80px para el botón + espacio
+          ]}
+        >
           {/* Descripción e importe */}
           <Card style={styles.card}>
             <Text style={styles.sectionTitle}>¿Qué pagaste?</Text>
@@ -405,6 +420,9 @@ export default function AddSharedExpenseScreen() {
                 )}
               </View>
             </ScrollView>
+            {errors.category && (
+              <Text style={styles.errorText}>{errors.category}</Text>
+            )}
           </Card>
 
           {/* Pagado por + Cuando (misma fila) */}
@@ -521,7 +539,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 32,
   },
   card: {
     marginBottom: 16,

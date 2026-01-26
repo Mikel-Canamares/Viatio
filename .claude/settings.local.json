@@ -34,7 +34,8 @@
       "Bash(npx expo-doctor)",
       "Bash(npm run start:clear:*)",
       "Bash(dir:*)",
-      "Bash(npm start)"
+      "Bash(npm start)",
+      "WebFetch(domain:docs.expo.dev)"
     ]
   }
 }

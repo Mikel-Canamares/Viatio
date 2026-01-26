@@ -239,6 +239,7 @@ export default function SharedExpensesScreen() {
         <ExpenseCard
           expense={item}
           currentUserId={user?.uid}
+          userCurrency={userCurrency}
           onPress={() => handleExpensePress(item)}
         />
       )}

@@ -34,6 +34,7 @@ interface TripDoc {
   name: string;
   description: string;
   destination: string;
+  destinationPlaceId?: string | null;
   startDate: string;
   endDate: string;
   coverImage: string | null;
@@ -67,6 +68,7 @@ function tripDocToSharedTrip(id: string, data: TripDoc): SharedTrip {
     name: data.name,
     description: data.description,
     destination: data.destination,
+    destinationPlaceId: data.destinationPlaceId || null,
     startDate: data.startDate,
     endDate: data.endDate,
     coverImage: data.coverImage,
@@ -104,6 +106,7 @@ export async function createSharedTrip(input: {
   name: string;
   description?: string;
   destination: string;
+  destinationPlaceId?: string;
   startDate: string;
   endDate: string;
   currency?: string;
@@ -119,6 +122,7 @@ export async function createSharedTrip(input: {
       name: input.name,
       description: input.description || '',
       destination: input.destination,
+      destinationPlaceId: input.destinationPlaceId || null,
       startDate: input.startDate,
       endDate: input.endDate,
       coverImage: null,
@@ -238,7 +242,7 @@ export async function getUserTrips(): Promise<SharedTrip[]> {
  */
 export async function updateSharedTrip(
   tripId: string,
-  updates: Partial<Pick<SharedTrip, 'name' | 'description' | 'destination' | 'startDate' | 'endDate' | 'currency' | 'coverImage'>>
+  updates: Partial<Pick<SharedTrip, 'name' | 'description' | 'destination' | 'destinationPlaceId' | 'startDate' | 'endDate' | 'currency' | 'coverImage'>>
 ): Promise<SharedTrip | null> {
   try {
     const tripRef = doc(db, 'trips', tripId);

@@ -35,6 +35,7 @@ interface FirestoreTrip {
   name: string;
   description: string;
   destination: string;
+  destinationPlaceId?: string | null;
   startDate: string;
   endDate: string;
   coverImage: string | null;
@@ -407,7 +408,7 @@ async function createLocalViaje(
     id,
     usuarioId: userId,
     destino: tripData.destination,
-    destinoPlaceId: undefined,
+    destinoPlaceId: tripData.destinationPlaceId || undefined,
     fechaInicio: tripData.startDate,
     fechaFin: tripData.endDate,
     descripcion: tripData.description || undefined,

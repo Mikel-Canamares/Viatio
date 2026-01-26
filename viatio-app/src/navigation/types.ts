@@ -118,6 +118,7 @@ export type ProfileStackParamList = {
   NotificationsManagement: undefined;
   NotificationDebug: undefined;
   Notifications: undefined;
+  DiagnosticoPush: undefined;
   Settings: undefined;
   CopilotSettings: undefined;
   Help: undefined;

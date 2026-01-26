@@ -26,12 +26,14 @@ const categoryToSpanish: Record<string, CategoriaGasto> = {
 interface ExpenseCardProps {
   expense: SharedExpense;
   currentUserId?: string;
+  userCurrency?: string; // Moneda del perfil del usuario para conversiones
   onPress?: () => void;
 }
 
 export function ExpenseCard({
   expense,
   currentUserId,
+  userCurrency,
   onPress,
 }: ExpenseCardProps) {
   // Obtener configuración de categoría (mapeando si es necesario)
@@ -93,9 +95,23 @@ export function ExpenseCard({
 
       {/* Importes */}
       <View style={styles.amountsContainer}>
-        <Text style={styles.totalAmount}>
-          {centsToDisplay(expense.amount, expense.currency)}
-        </Text>
+        {/* Monto original (si existe y es diferente a la moneda del usuario) */}
+        {expense.originalAmount && expense.originalCurrency ? (
+          <>
+            <Text style={styles.totalAmount}>
+              {centsToDisplay(expense.originalAmount, expense.originalCurrency)}
+            </Text>
+            {userCurrency && expense.originalCurrency !== userCurrency && (
+              <Text style={styles.convertedAmount}>
+                ≈ {centsToDisplay(expense.amount, expense.currency)}
+              </Text>
+            )}
+          </>
+        ) : (
+          <Text style={styles.totalAmount}>
+            {centsToDisplay(expense.amount, expense.currency)}
+          </Text>
+        )}
 
         {myShare && myImpact !== 0 && (
           <Text style={[
@@ -171,6 +187,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: theme.colors.text,
+  },
+  convertedAmount: {
+    fontSize: 11,
+    color: theme.colors.textSecondary,
+    marginTop: 2,
   },
   myShare: {
     fontSize: 12,
