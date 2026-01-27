@@ -206,9 +206,9 @@ export default function EditProfileScreen({ navigation }: Props) {
   };
 
   return (
-    <View style={styles.container}>
+    <ScreenContainer>
       <PageHeader title="Editar perfil" onBack={handleBack} />
-      <ScreenContainer>
+
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -327,15 +327,11 @@ export default function EditProfileScreen({ navigation }: Props) {
           onPress: () => {},
         }}
       />
-      </ScreenContainer>
-    </View>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   content: {
     flex: 1,
     padding: theme.spacing.lg,

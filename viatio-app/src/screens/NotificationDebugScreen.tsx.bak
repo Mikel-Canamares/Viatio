@@ -267,9 +267,9 @@ export default function NotificationDebugScreen({ navigation }: Props) {
   };
 
   return (
-    <View style={styles.wrapper}>
+    <ScreenContainer edges={['top']}>
       <PageHeader title="Debug de Notificaciones" onBack={() => navigation.goBack()} />
-      <ScreenContainer edges={['top']}>
+
       <ScrollView
         style={styles.container}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
@@ -497,8 +497,7 @@ export default function NotificationDebugScreen({ navigation }: Props) {
         primaryButton={modalConfig.primaryButton}
         secondaryButton={modalConfig.secondaryButton}
       />
-      </ScreenContainer>
-    </View>
+    </ScreenContainer>
   );
 }
 
@@ -520,9 +519,6 @@ function InfoRow({
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    flex: 1,
-  },
   container: {
     flex: 1,
     padding: theme.spacing.md,

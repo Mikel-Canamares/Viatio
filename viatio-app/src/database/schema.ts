@@ -9,7 +9,7 @@
 // VERSIÓN DEL ESQUEMA
 // ============================================
 
-export const CURRENT_SCHEMA_VERSION = 18;
+export const CURRENT_SCHEMA_VERSION = 19;
 
 // ============================================
 // CREACIÓN DE TABLAS
@@ -181,6 +181,22 @@ const CREATE_EVENTOS_PERSONALIZADOS_TABLE = `
   );
 `;
 
+const CREATE_CHECKLIST_ITEMS_TABLE = `
+  CREATE TABLE IF NOT EXISTS checklist_items (
+    id TEXT PRIMARY KEY NOT NULL,
+    viajeId TEXT NOT NULL,
+    usuarioId TEXT NOT NULL,
+    texto TEXT NOT NULL,
+    completado INTEGER NOT NULL DEFAULT 0,
+    orden INTEGER NOT NULL DEFAULT 0,
+    seccion TEXT NOT NULL,
+    firestoreId TEXT,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT NOT NULL,
+    FOREIGN KEY (viajeId) REFERENCES viajes(id) ON DELETE CASCADE
+  );
+`;
+
 const CREATE_MIGRATIONS_TABLE = `
   CREATE TABLE IF NOT EXISTS _migrations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -198,6 +214,7 @@ export const CREATE_TABLES_SQL = [
   CREATE_GASTOS_TABLE,
   CREATE_RESERVAS_DOCUMENTOS_TABLE,
   CREATE_EVENTOS_PERSONALIZADOS_TABLE,
+  CREATE_CHECKLIST_ITEMS_TABLE,
   CREATE_MIGRATIONS_TABLE,
 ];
 
@@ -340,6 +357,21 @@ const INDEX_EVENTOS_LUGAR = `
   ON eventos_personalizados(lugarId);
 `;
 
+const INDEX_CHECKLIST_VIAJE = `
+  CREATE INDEX IF NOT EXISTS idx_checklist_viajeId
+  ON checklist_items(viajeId);
+`;
+
+const INDEX_CHECKLIST_USUARIO = `
+  CREATE INDEX IF NOT EXISTS idx_checklist_usuarioId
+  ON checklist_items(usuarioId);
+`;
+
+const INDEX_CHECKLIST_SECCION = `
+  CREATE INDEX IF NOT EXISTS idx_checklist_seccion
+  ON checklist_items(seccion);
+`;
+
 export const CREATE_INDEXES_SQL = [
   INDEX_VIAJES_USUARIO,
   INDEX_VIAJES_FECHAS,
@@ -368,4 +400,7 @@ export const CREATE_INDEXES_SQL = [
   INDEX_EVENTOS_DIA,
   INDEX_EVENTOS_CATEGORIA,
   INDEX_EVENTOS_LUGAR,
+  INDEX_CHECKLIST_VIAJE,
+  INDEX_CHECKLIST_USUARIO,
+  INDEX_CHECKLIST_SECCION,
 ];

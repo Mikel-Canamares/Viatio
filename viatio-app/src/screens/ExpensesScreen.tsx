@@ -465,12 +465,14 @@ export function ExpensesScreen() {
 
   if (loadingViaje) {
     return (
-      <ScreenContainer>
+      <View style={styles.container}>
         <PageHeader title="Gastos" onBack={handleBack} />
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptySubtitle}>Cargando...</Text>
-        </View>
-      </ScreenContainer>
+        <ScreenContainer>
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptySubtitle}>Cargando...</Text>
+          </View>
+        </ScreenContainer>
+      </View>
     );
   }
 
@@ -483,8 +485,9 @@ export function ExpensesScreen() {
 
   if (!isLoading && isEmpty) {
     return (
-      <ScreenContainer>
+      <View style={styles.container}>
         <PageHeader title="Gastos" onBack={handleBack} />
+        <ScreenContainer>
         <View style={styles.emptyContainer}>
           <Ionicons name="wallet-outline" size={64} color={theme.colors.textMuted} />
           <Text style={styles.emptyTitle}>No hay gastos registrados</Text>
@@ -500,7 +503,8 @@ export function ExpensesScreen() {
             Añadir gasto
           </PrimaryButton>
         </View>
-      </ScreenContainer>
+        </ScreenContainer>
+      </View>
     );
   }
 
@@ -510,8 +514,9 @@ export function ExpensesScreen() {
 
   if (isShared && firestoreId) {
     return (
-      <ScreenContainer>
+      <View style={styles.container}>
         <PageHeader title="Gastos compartidos" onBack={handleBack} />
+        <ScreenContainer>
 
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -719,7 +724,8 @@ export function ExpensesScreen() {
             Añadir gasto
           </PrimaryButton>
         </View>
-      </ScreenContainer>
+        </ScreenContainer>
+      </View>
     );
   }
 
@@ -728,8 +734,9 @@ export function ExpensesScreen() {
   // ============================================
 
   return (
-    <ScreenContainer>
+    <View style={styles.container}>
       <PageHeader title="Gastos" onBack={handleBack} />
+      <ScreenContainer>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -797,7 +804,8 @@ export function ExpensesScreen() {
           Añadir gasto
         </PrimaryButton>
       </View>
-    </ScreenContainer>
+      </ScreenContainer>
+    </View>
   );
 }
 
@@ -806,6 +814,9 @@ export function ExpensesScreen() {
 // ============================================
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   scrollContent: {
     padding: theme.spacing.lg,
     paddingBottom: 100,

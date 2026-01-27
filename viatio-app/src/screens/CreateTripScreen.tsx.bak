@@ -121,9 +121,9 @@ export default function CreateTripScreen({ navigation }: Props) {
   };
 
   return (
-    <View style={styles.container}>
-      <PageHeader title="Nuevo viaje" onBack={() => navigation.goBack()} />
+    <>
       <ScreenContainer>
+        <PageHeader title="Nuevo viaje" onBack={() => navigation.goBack()} />
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -180,15 +180,13 @@ export default function CreateTripScreen({ navigation }: Props) {
           </ScrollView>
         </KeyboardAvoidingView>
       </ScreenContainer>
+
       <LoadingOverlay visible={loading} message="Creando viaje..." />
-    </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   scroll: {
     flex: 1,
   },

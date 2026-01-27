@@ -24,6 +24,7 @@ import type { Lugar } from '@/types/lugar';
 import type { Gasto } from '@/types/gasto';
 import type { Documento } from '@/types/documento';
 import type { EventoPersonalizado } from '@/types/evento';
+import type { ChecklistItem } from '@/types/checklist';
 
 // ============================================
 // TIPOS
@@ -448,7 +449,7 @@ export async function linkDocumentToReservationInFirestore(
  */
 export async function markDeletedInFirestore(
   tripFirestoreId: string,
-  collectionName: 'reservations' | 'places' | 'expenses' | 'documents' | 'events',
+  collectionName: 'reservations' | 'places' | 'expenses' | 'documents' | 'events' | 'checklist',
   entityFirestoreId: string
 ): Promise<boolean> {
   try {
@@ -598,7 +599,7 @@ export async function syncDocumentLinkIfShared(
  */
 export async function syncDeleteIfShared(
   viajeId: string,
-  collectionName: 'reservations' | 'places' | 'expenses' | 'documents' | 'events',
+  collectionName: 'reservations' | 'places' | 'expenses' | 'documents' | 'events' | 'checklist',
   entityFirestoreId: string | null
 ): Promise<void> {
   console.log('[SyncUpload] syncDeleteIfShared llamado:', { viajeId, collectionName, entityFirestoreId });
@@ -621,5 +622,80 @@ export async function syncDeleteIfShared(
   } catch (error) {
     console.error('[SyncUpload] ❌ Error sincronizando eliminación:', error);
     throw error; // Re-throw para que el caller lo maneje
+  }
+}
+
+// ============================================
+// UPLOAD DE CHECKLIST ITEMS
+// ============================================
+
+/**
+ * Sube un item de checklist a Firestore
+ * Solo sube items con seccion = 'grupal'
+ */
+export async function uploadChecklistItem(
+  item: ChecklistItem,
+  tripFirestoreId: string
+): Promise<UploadResult> {
+  const result: UploadResult = { success: false, firestoreId: null };
+
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      result.error = 'Usuario no autenticado';
+      return result;
+    }
+
+    // Usar el ID local como ID en Firestore para mantener consistencia
+    const firestoreId = item.firestoreId || item.id;
+    const itemRef = doc(firestoreDb, 'trips', tripFirestoreId, 'checklist', firestoreId);
+
+    await setDoc(itemRef, {
+      texto: item.texto,
+      completado: item.completado,
+      orden: item.orden,
+      localId: item.id,
+
+      // Auditoría
+      createdBy: user.uid,
+      updatedBy: user.uid,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      deletedAt: null,
+    }, { merge: true });
+
+    // Actualizar el firestoreId en SQLite si no existía
+    if (!item.firestoreId) {
+      await updateLocalFirestoreId('checklist_items', item.id, firestoreId);
+    }
+
+    result.success = true;
+    result.firestoreId = firestoreId;
+    console.log('[SyncUpload] Checklist item subido:', item.texto, '->', firestoreId);
+
+    return result;
+  } catch (error: any) {
+    logError(error, 'uploadChecklistItem');
+    result.error = error.message;
+    return result;
+  }
+}
+
+/**
+ * Sincroniza un item de checklist si el viaje es compartido y es grupal
+ */
+export async function syncChecklistItemIfShared(item: ChecklistItem): Promise<void> {
+  try {
+    // Solo sincronizar items grupales
+    if (item.seccion !== 'grupal') {
+      return;
+    }
+
+    const tripFirestoreId = await getSharedTripFirestoreId(item.viajeId);
+    if (tripFirestoreId) {
+      await uploadChecklistItem(item, tripFirestoreId);
+    }
+  } catch (error) {
+    console.warn('[SyncUpload] Error sincronizando checklist item:', error);
   }
 }

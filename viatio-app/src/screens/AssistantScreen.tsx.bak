@@ -325,7 +325,7 @@ export default function AssistantScreen({ route, navigation }: Props) {
     : (!showHistorial ? handleBackToHistory : undefined);
 
   return (
-    <View style={styles.container}>
+    <ScreenContainer scroll={false}>
       <PageHeader
         title={headerTitle}
         onBack={handleHeaderBack}
@@ -342,8 +342,8 @@ export default function AssistantScreen({ route, navigation }: Props) {
           ) : undefined
         }
       />
-      <ScreenContainer scroll={false}>
-        {showHistorial ? (
+
+      {showHistorial ? (
         // Vista de historial de conversaciones
         <View style={styles.historialContainer}>
           <ConversationHistoryList
@@ -428,8 +428,7 @@ export default function AssistantScreen({ route, navigation }: Props) {
           </View>
         </KeyboardAvoidingView>
       )}
-      </ScreenContainer>
-    </View>
+    </ScreenContainer>
   );
 }
 

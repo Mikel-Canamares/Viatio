@@ -148,19 +148,22 @@ export default function TripReservationsScreen({ route, navigation }: Props) {
 
   if (loading && reservas.length === 0) {
     return (
-      <ScreenContainer>
+      <View style={styles.container}>
         <PageHeader title="Reservas" onBack={() => navigation.goBack()} />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primaryLight} />
-          <Text style={styles.loadingText}>Cargando reservas...</Text>
-        </View>
-      </ScreenContainer>
+        <ScreenContainer>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.colors.primaryLight} />
+            <Text style={styles.loadingText}>Cargando reservas...</Text>
+          </View>
+        </ScreenContainer>
+      </View>
     );
   }
 
   return (
-    <ScreenContainer>
+    <View style={styles.container}>
       <PageHeader title="Reservas" onBack={() => navigation.goBack()} />
+      <ScreenContainer>
       <View style={styles.contentWrapper}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Todas las reservas</Text>
@@ -245,11 +248,15 @@ export default function TripReservationsScreen({ route, navigation }: Props) {
           onPress: () => {},
         }}
       />
-    </ScreenContainer>
+      </ScreenContainer>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   contentWrapper: {
     flex: 1,
     paddingHorizontal: 20,

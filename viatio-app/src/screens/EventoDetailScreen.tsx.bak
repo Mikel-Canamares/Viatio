@@ -111,39 +111,35 @@ export function EventoDetailScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <ScreenContainer>
         <PageHeader title="Detalle del evento" onBack={handleBack} />
-        <ScreenContainer>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-          </View>
-        </ScreenContainer>
-      </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      </ScreenContainer>
     );
   }
 
   if (!evento) {
     return (
-      <View style={styles.container}>
+      <ScreenContainer>
         <PageHeader title="Detalle del evento" onBack={handleBack} />
-        <ScreenContainer>
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>Evento no encontrado</Text>
-          </View>
-        </ScreenContainer>
-      </View>
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>Evento no encontrado</Text>
+        </View>
+      </ScreenContainer>
     );
   }
 
   const categoriaConfig = EVENTO_CATEGORIAS[evento.categoria];
 
   return (
-    <View style={styles.container}>
+    <ScreenContainer>
       <PageHeader
         title="Detalle del evento"
         onBack={handleBack}
       />
-      <ScreenContainer>
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -254,8 +250,7 @@ export function EventoDetailScreen() {
           onPress: () => {},
         }}
       />
-      </ScreenContainer>
-    </View>
+    </ScreenContainer>
   );
 }
 
@@ -264,9 +259,6 @@ export function EventoDetailScreen() {
 // ============================================
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   scrollView: {
     flex: 1,
   },

@@ -102,21 +102,19 @@ export default function CopilotSettingsScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
+      <ScreenContainer>
         <PageHeader title="Configurar Copilot" onBack={() => navigation.goBack()} />
-        <ScreenContainer>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Cargando configuración...</Text>
         </View>
-        </ScreenContainer>
-      </View>
+      </ScreenContainer>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <ScreenContainer>
       <PageHeader title="Configurar Copilot" onBack={() => navigation.goBack()} />
-      <ScreenContainer>
+
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Header con icono */}
         <View style={styles.header}>
@@ -308,15 +306,11 @@ export default function CopilotSettingsScreen() {
           onPress: () => {},
         }}
       />
-      </ScreenContainer>
-    </View>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   content: {
     flex: 1,
   },

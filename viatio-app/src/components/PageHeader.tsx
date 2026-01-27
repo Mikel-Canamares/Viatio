@@ -92,10 +92,11 @@ export function PageHeader({
 const styles = StyleSheet.create({
   safeArea: {
     backgroundColor: theme.colors.primary,
+    paddingTop: 8,
   },
   container: {
     position: 'relative',
-    height: 56,
+    height: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

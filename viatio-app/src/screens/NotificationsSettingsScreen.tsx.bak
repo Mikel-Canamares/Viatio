@@ -153,7 +153,7 @@ export default function NotificationsSettingsScreen({ navigation }: Props) {
   const isDisabled = loading || !permissionsGranted || !preferencias.notificacionesActivas;
 
   return (
-    <View style={styles.container}>
+    <ScreenContainer>
       <PageHeader
         title="Notificaciones"
         onBack={() => navigation.goBack()}
@@ -166,7 +166,7 @@ export default function NotificationsSettingsScreen({ navigation }: Props) {
           </Pressable>
         }
       />
-      <ScreenContainer>
+
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Banner de permisos */}
         {!permissionsGranted && (
@@ -425,15 +425,11 @@ export default function NotificationsSettingsScreen({ navigation }: Props) {
           onPress: () => {},
         }}
       />
-      </ScreenContainer>
-    </View>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   content: {
     flex: 1,
     padding: theme.spacing.lg,

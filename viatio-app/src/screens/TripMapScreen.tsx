@@ -590,7 +590,7 @@ export default function TripMapScreen() {
   };
 
   return (
-    <ScreenContainer>
+    <View style={styles.container}>
       <PageHeader
         title="Mapa"
         onBack={() => navigation.goBack()}
@@ -607,6 +607,7 @@ export default function TripMapScreen() {
           </Pressable>
         }
       />
+      <ScreenContainer>
 
       {viewMode === 'map' ? (
         <View style={styles.mapContainer}>
@@ -779,11 +780,15 @@ export default function TripMapScreen() {
         primaryButton={modalConfig.primaryButton}
         secondaryButton={modalConfig.secondaryButton}
       />
-    </ScreenContainer>
+      </ScreenContainer>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   mapContainer: {
     flex: 1,
     position: 'relative',

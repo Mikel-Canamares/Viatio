@@ -19,10 +19,12 @@ admin.initializeApp();
 // Inicializar Expo SDK
 const expo = new Expo();
 
-// Re-exportar funciones de gastos, liquidaciones, viajes y cleanup
+// Re-exportar funciones de gastos, liquidaciones, viajes, reservas, eventos y cleanup
 export { onExpenseCreated, onExpenseUpdated, onExpenseDeleted } from './expenses';
 export { onSettlementCreated, onSettlementUpdated } from './settlements';
 export { onTripDeleted } from './trips';
+export { onReservationCreated, onReservationUpdated, checkUpcomingReservations } from './reservations';
+export { onEventCreated, onEventUpdated, checkUpcomingEvents } from './events';
 export { cleanupInactiveTokens, cleanupRateLimitCounters, cleanupExpiredNotifications } from './cleanup';
 
 /**

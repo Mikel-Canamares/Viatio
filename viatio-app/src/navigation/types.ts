@@ -96,6 +96,7 @@ export type HomeStackParamList = {
   AddSharedExpense: { tripId: string; expenseId?: string };
   ExpenseDetail: { tripId: string; expenseId: string };
   JoinTripByCode: undefined;
+  TripChecklist: { viajeId: string };
 };
 
 // ============================================

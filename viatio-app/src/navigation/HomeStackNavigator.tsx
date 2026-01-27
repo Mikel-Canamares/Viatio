@@ -30,6 +30,7 @@ import { AddExpenseScreen } from '@/screens/AddExpenseScreen';
 import { AddEventoScreen } from '@/screens/AddEventoScreen';
 import { EventoDetailScreen } from '@/screens/EventoDetailScreen';
 import AssistantScreen from '@/screens/AssistantScreen';
+import { TripChecklistScreen } from '@/screens/TripChecklistScreen';
 // Pantallas de viajes compartidos (integradas desde SharedStack)
 import {
   TripMembersScreen,
@@ -74,6 +75,7 @@ export function HomeStackNavigator() {
       <Stack.Screen name="AddEvento" component={AddEventoScreen} />
       <Stack.Screen name="EventoDetail" component={EventoDetailScreen} />
       <Stack.Screen name="Assistant" component={AssistantScreen} />
+      <Stack.Screen name="TripChecklist" component={TripChecklistScreen} />
       {/* Pantallas de viajes compartidos */}
       <Stack.Screen name="TripMembers" component={TripMembersScreen} />
       <Stack.Screen name="InviteToTrip" component={InviteToTripScreen} />

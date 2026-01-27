@@ -193,18 +193,21 @@ export default function SettingsScreen() {
 
   if (isLoading) {
     return (
-      <ScreenContainer>
+      <View style={styles.container}>
         <PageHeader title="Configuración" onBack={() => navigation.goBack()} />
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Cargando configuración...</Text>
-        </View>
-      </ScreenContainer>
+        <ScreenContainer>
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Cargando configuración...</Text>
+          </View>
+        </ScreenContainer>
+      </View>
     );
   }
 
   return (
-    <ScreenContainer scroll>
+    <View style={styles.container}>
       <PageHeader title="Configuración" onBack={() => navigation.goBack()} />
+      <ScreenContainer scroll>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* APARIENCIA */}
@@ -417,11 +420,15 @@ export default function SettingsScreen() {
           onClose={() => setShowCurrencyPicker(false)}
         />
       )}
-    </ScreenContainer>
+      </ScreenContainer>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   content: {
     flex: 1,
     paddingTop: theme.spacing.lg,

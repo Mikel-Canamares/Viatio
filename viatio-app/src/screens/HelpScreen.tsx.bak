@@ -193,9 +193,9 @@ export default function HelpScreen() {
   );
 
   return (
-    <View style={styles.container}>
+    <ScreenContainer>
       <PageHeader title="Centro de ayuda" onBack={() => navigation.goBack()} />
-      <ScreenContainer>
+
       <View style={styles.content}>
         {/* Input de búsqueda */}
         <View style={styles.searchContainer}>
@@ -392,15 +392,11 @@ export default function HelpScreen() {
           onPress: () => {},
         } : undefined}
       />
-      </ScreenContainer>
-    </View>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   content: {
     flex: 1,
     paddingTop: theme.spacing.lg,

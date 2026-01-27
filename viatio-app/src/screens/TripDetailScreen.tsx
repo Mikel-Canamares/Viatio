@@ -21,8 +21,8 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenContainer, Card, CopilotFAB, MembersSection, ShareTripModal } from '@/components';
-import { getViajeById, getViajeStats } from '@/services';
-import type { Viaje, ViajeStats } from '@/types/viaje';
+import { getViajeById } from '@/services'; // getViajeStats temporalmente desactivado
+import type { Viaje } from '@/types/viaje'; // ViajeStats temporalmente desactivado
 import { theme } from '@/config';
 import type { HomeStackParamList } from '@/navigation/types';
 import { parseLocalDate } from '@/utils';
@@ -34,7 +34,7 @@ type Props = NativeStackScreenProps<HomeStackParamList, 'TripDetail'>;
 export default function TripDetailScreen({ navigation, route }: Props) {
   const { viajeId } = route.params;
   const [viaje, setViaje] = useState<Viaje | null>(null);
-  const [stats, setStats] = useState<ViajeStats | null>(null);
+  // const [stats, setStats] = useState<ViajeStats | null>(null); // TEMPORALMENTE DESACTIVADO
   const [loading, setLoading] = useState(true);
   const [showShareModal, setShowShareModal] = useState(false);
 
@@ -42,12 +42,14 @@ export default function TripDetailScreen({ navigation, route }: Props) {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [viajeData, statsData] = await Promise.all([
-        getViajeById(viajeId),
-        getViajeStats(viajeId),
-      ]);
+      const viajeData = await getViajeById(viajeId);
+      // Stats temporalmente desactivadas
+      // const [viajeData, statsData] = await Promise.all([
+      //   getViajeById(viajeId),
+      //   getViajeStats(viajeId),
+      // ]);
       setViaje(viajeData);
-      setStats(statsData);
+      // setStats(statsData);
     } catch (error) {
       console.error('Error loading trip detail:', error);
     } finally {
@@ -80,7 +82,7 @@ export default function TripDetailScreen({ navigation, route }: Props) {
     // Programar recarga con debounce de 500ms
     reloadStatsTimeoutRef.current = setTimeout(() => {
       console.log('[TripDetail] Ejecutando recarga de stats');
-      getViajeStats(viajeId).then(setStats).catch(console.error);
+      // getViajeStats(viajeId).then(setStats).catch(console.error); // TEMPORALMENTE DESACTIVADO
     }, 500);
   }, [viajeId]);
 
@@ -95,7 +97,7 @@ export default function TripDetailScreen({ navigation, route }: Props) {
     // Programar recarga con debounce de 500ms
     reloadStatsTimeoutRef.current = setTimeout(() => {
       console.log('[TripDetail] Ejecutando recarga de stats');
-      getViajeStats(viajeId).then(setStats).catch(console.error);
+      // getViajeStats(viajeId).then(setStats).catch(console.error); // TEMPORALMENTE DESACTIVADO
     }, 500);
   }, [viajeId]);
 
@@ -147,6 +149,9 @@ export default function TripDetailScreen({ navigation, route }: Props) {
         break;
       case 'expenses':
         navigation.navigate('Expenses', { viajeId });
+        break;
+      case 'checklist':
+        navigation.navigate('TripChecklist', { viajeId });
         break;
       default:
         console.log('Unknown screen:', screen);
@@ -237,8 +242,8 @@ export default function TripDetailScreen({ navigation, route }: Props) {
 
         {/* Contenido */}
         <View style={styles.content}>
-          {/* Estadísticas */}
-          {stats && (
+          {/* Estadísticas - TEMPORALMENTE OCULTAS */}
+          {/* {stats && (
             <View style={styles.statsRow}>
               <Card style={styles.statCard} padding={16}>
                 <Text style={styles.statNumber}>{stats.diasTotales}</Text>
@@ -253,15 +258,7 @@ export default function TripDetailScreen({ navigation, route }: Props) {
                 <Text style={styles.statLabel}>lugares</Text>
               </Card>
             </View>
-          )}
-
-          {/* Sección de miembros / compartir viaje */}
-          <MembersSection
-            viaje={viaje}
-            onShareTrip={handleShareTrip}
-            onViewMembers={handleViewMembers}
-            onInvite={handleInvite}
-          />
+          )} */}
 
           {/* Menú de navegación */}
           <View style={styles.menuContainer}>
@@ -334,7 +331,29 @@ export default function TripDetailScreen({ navigation, route }: Props) {
                 <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
               </View>
             </Card>
+
+            {/* Checklist */}
+            <Card onPress={() => handleNavigate('checklist')} style={styles.menuCard}>
+              <View style={styles.menuRow}>
+                <View style={[styles.iconContainer, styles.iconChecklist]}>
+                  <Ionicons name="checkbox-outline" size={24} color="#10B981" />
+                </View>
+                <View style={styles.menuTextContainer}>
+                  <Text style={styles.menuTitle}>Checklist</Text>
+                  <Text style={styles.menuDescription}>Cosas pendientes del viaje</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+              </View>
+            </Card>
           </View>
+
+          {/* Sección de miembros / compartir viaje */}
+          <MembersSection
+            viaje={viaje}
+            onShareTrip={handleShareTrip}
+            onViewMembers={handleViewMembers}
+            onInvite={handleInvite}
+          />
         </View>
       </ScrollView>
 
@@ -476,6 +495,9 @@ const styles = StyleSheet.create({
   },
   iconGastos: {
     backgroundColor: 'rgba(255, 192, 67, 0.1)', // Amarillo
+  },
+  iconChecklist: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)', // Verde checklist
   },
   menuTextContainer: {
     flex: 1,
