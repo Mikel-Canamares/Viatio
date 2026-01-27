@@ -146,6 +146,10 @@ export async function runMigrations(
     await migrateToV19(db);
   }
 
+  if (currentVersion < 20) {
+    await migrateToV20(db);
+  }
+
   console.log('[Migrations] Migraciones completadas exitosamente');
 }
 
@@ -990,6 +994,42 @@ async function migrateToV19(db: SQLite.SQLiteDatabase): Promise<void> {
     console.log('[Migrations] Migración a v19 completada');
   } catch (error) {
     console.error('[Migrations] Error en migración a v19:', error);
+    throw error;
+  }
+}
+
+/**
+ * Migración a versión 20: Añadir campo tripTimeZone a tabla viajes
+ * Permite almacenar la timezone IANA del destino para mostrar hora local del viaje
+ */
+async function migrateToV20(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migrations] Ejecutando migración a v20: Añadir tripTimeZone a viajes...');
+
+  try {
+    // Verificar si la columna tripTimeZone ya existe
+    const viajesInfo = await db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(viajes);'
+    );
+
+    const columnExists = viajesInfo.some(col => col.name === 'tripTimeZone');
+
+    if (!columnExists) {
+      console.log('[Migrations] Añadiendo columna tripTimeZone a viajes...');
+      await db.execAsync('ALTER TABLE viajes ADD COLUMN tripTimeZone TEXT;');
+    } else {
+      console.log('[Migrations] Columna tripTimeZone ya existe, omitiendo...');
+    }
+
+    // Registrar migración
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'INSERT INTO _migrations (version, appliedAt) VALUES (?, ?)',
+      [20, now]
+    );
+
+    console.log('[Migrations] Migración a v20 completada');
+  } catch (error) {
+    console.error('[Migrations] Error en migración a v20:', error);
     throw error;
   }
 }

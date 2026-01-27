@@ -1,15 +1,15 @@
 /**
  * TIME INPUT
  *
- * Input de hora con DateTimePicker nativo.
+ * Input de hora con picker personalizado moderno.
  * Formato 24h: HH:mm
  */
 
 import { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '@/config';
+import { CustomTimePicker } from './CustomTimePicker';
 
 interface TimeInputProps {
   label: string;
@@ -28,48 +28,19 @@ export function TimeInput({
 }: TimeInputProps) {
   const [showPicker, setShowPicker] = useState(false);
 
-  // Convertir string "HH:mm" a Date para el picker
-  const getDateFromTimeString = (timeStr: string): Date => {
-    const now = new Date();
-    if (timeStr && timeStr.trim() !== '') {
-      const [hours, minutes] = timeStr.split(':').map(Number);
-      if (!isNaN(hours) && !isNaN(minutes)) {
-        now.setHours(hours, minutes, 0, 0);
-      }
-    }
-    return now;
-  };
-
-  const dateValue = getDateFromTimeString(value);
-
-  // Formatear Date a string "HH:mm" - SIEMPRE en hora local
-  const formatTimeString = (date: Date): string => {
-    // Obtener horas y minutos en zona horaria local del dispositivo
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    return `${hours}:${minutes}`;
-  };
-
   const displayValue = value || '';
 
-  const handleChange = (_event: any, selectedDate?: Date) => {
-    // En Android, el picker se cierra automáticamente
-    if (Platform.OS === 'android') {
-      setShowPicker(false);
-    }
+  const handleConfirm = (time: string) => {
+    onChangeTime(time);
+    setShowPicker(false);
+  };
 
-    if (selectedDate) {
-      const timeString = formatTimeString(selectedDate);
-      onChangeTime(timeString);
-    }
+  const handleCancel = () => {
+    setShowPicker(false);
   };
 
   const handlePress = () => {
     setShowPicker(true);
-  };
-
-  const handleClose = () => {
-    setShowPicker(false);
   };
 
   return (
@@ -82,91 +53,82 @@ export function TimeInput({
         onPress={handlePress}
         style={[
           styles.input,
+          value && styles.inputFilled,
           error && styles.inputError,
         ]}
       >
-        <Text style={[styles.inputText, !value && styles.placeholder]}>
-          {displayValue || placeholder}
-        </Text>
         <Ionicons
           name="time-outline"
           size={20}
-          color={theme.colors.textMuted}
+          color={
+            value ? theme.colors.primaryLight : theme.colors.textSecondary
+          }
         />
+        <Text style={[styles.inputText, !value && styles.placeholder]}>
+          {displayValue || placeholder}
+        </Text>
       </Pressable>
 
       {/* Error */}
       {error && <Text style={styles.errorText}>{error}</Text>}
 
-      {/* DateTimePicker */}
-      {showPicker && (
-        <>
-          <DateTimePicker
-            value={dateValue}
-            mode="time"
-            is24Hour={true}
-            display="spinner"
-            onChange={handleChange}
-          />
-          {/* iOS: Botón para cerrar */}
-          {Platform.OS === 'ios' && (
-            <Pressable onPress={handleClose} style={styles.iosCloseButton}>
-              <Text style={styles.iosCloseButtonText}>Cerrar</Text>
-            </Pressable>
-          )}
-        </>
-      )}
+      {/* Custom Time Picker */}
+      <CustomTimePicker
+        visible={showPicker}
+        value={value}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+        title={label}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
   },
   label: {
+    ...theme.typography.subtitle,
     fontSize: 14,
-    fontWeight: '500',
     color: theme.colors.text,
-    marginBottom: 6,
+    marginBottom: theme.spacing.sm,
   },
   input: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 8,
+    gap: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: 14,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
-    backgroundColor: '#FFFFFF',
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    ...theme.shadows.card,
+  },
+  inputFilled: {
+    borderColor: theme.colors.primaryLight,
+    borderWidth: 2,
+    backgroundColor: 'rgba(0, 102, 204, 0.03)',
   },
   inputError: {
     borderColor: theme.colors.error,
     borderWidth: 2,
   },
   inputText: {
+    flex: 1,
+    ...theme.typography.body,
     fontSize: 16,
     color: theme.colors.text,
+    fontWeight: '500',
   },
   placeholder: {
-    color: theme.colors.textMuted,
+    color: theme.colors.textSecondary,
+    fontWeight: '400',
   },
   errorText: {
-    fontSize: 12,
+    ...theme.typography.bodySmall,
     color: theme.colors.error,
-    marginTop: 4,
-  },
-  iosCloseButton: {
-    marginTop: theme.spacing.sm,
-    padding: theme.spacing.sm,
-    backgroundColor: theme.colors.primaryLight,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  iosCloseButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    marginTop: theme.spacing.xs,
   },
 });

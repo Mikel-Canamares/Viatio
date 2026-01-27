@@ -17,6 +17,7 @@ export { DateInput } from './DateInput';
 export { DatePickerInput } from './DatePickerInput';
 export { TimeInput } from './TimeInput';
 export { DateRangePicker } from './DateRangePicker';
+export { CustomTimePicker } from './CustomTimePicker';
 export { Dropdown } from './Dropdown';
 export type { DropdownOption } from './Dropdown';
 export { MultiSelectDropdown } from './MultiSelectDropdown';
@@ -54,6 +55,10 @@ export { AddToTripModal } from './AddToTripModal';
 export { SavedPlacesAccordion } from './SavedPlacesAccordion';
 export { PlaceMatchNotification, useHandlePlaceMatch } from './PlaceMatchNotification';
 export { PlaceAutocompleteInput } from './PlaceAutocompleteInput';
+
+// Componentes de Timezone
+export { DualTimeDisplay } from './DualTimeDisplay';
+export { TimeZonePicker } from './TimeZonePicker';
 
 // Componentes de Calendario
 export { CalendarDay } from './CalendarDay';

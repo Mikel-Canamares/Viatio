@@ -74,6 +74,7 @@ export interface ConfiguracionApp {
   monedaDefault: string;
   unidadDistancia: 'km' | 'mi';
   formatoFecha: 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD';
+  homeTimeZone?: string; // Timezone IANA del lugar "casa" del usuario (ej: "Europe/Madrid")
 }
 
 export const IDIOMAS_DISPONIBLES = [
@@ -217,4 +218,5 @@ export const DEFAULT_CONFIGURACION_APP: ConfiguracionApp = {
   monedaDefault: 'EUR',
   unidadDistancia: 'km',
   formatoFecha: 'DD/MM/YYYY',
+  homeTimeZone: undefined, // Se detectará automáticamente del dispositivo
 };

@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ScreenContainer, Card, CopilotFAB, MembersSection, ShareTripModal } from '@/components';
+import { ScreenContainer, Card, CopilotFAB, MembersSection, ShareTripModal, DualTimeDisplay } from '@/components';
 import { getViajeById } from '@/services'; // getViajeStats temporalmente desactivado
 import type { Viaje } from '@/types/viaje'; // ViajeStats temporalmente desactivado
 import { theme } from '@/config';
@@ -28,6 +28,8 @@ import type { HomeStackParamList } from '@/navigation/types';
 import { parseLocalDate } from '@/utils';
 import { showToast } from '@/utils/toast';
 import { useRealtimeSync } from '@/hooks';
+import { useConfiguracionStore } from '@/store/useConfiguracionStore';
+import { getDeviceTimeZone } from '@/services/timezoneService';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'TripDetail'>;
 
@@ -37,6 +39,7 @@ export default function TripDetailScreen({ navigation, route }: Props) {
   // const [stats, setStats] = useState<ViajeStats | null>(null); // TEMPORALMENTE DESACTIVADO
   const [loading, setLoading] = useState(true);
   const [showShareModal, setShowShareModal] = useState(false);
+  const { config } = useConfiguracionStore();
 
   // Memoizar loadData para evitar recrearlo en cada render
   const loadData = useCallback(async () => {
@@ -202,6 +205,11 @@ export default function TripDetailScreen({ navigation, route }: Props) {
 
   const fechasFormateadas = `${format(parseLocalDate(viaje.fechaInicio), 'd MMM', { locale: es })} – ${format(parseLocalDate(viaje.fechaFin), 'd MMM', { locale: es })}`;
 
+  // Obtener timezones para mostrar dual time
+  const tripTimeZone = viaje.tripTimeZone;
+  const homeTimeZone = config.homeTimeZone || getDeviceTimeZone();
+  const showDualTime = tripTimeZone && homeTimeZone && tripTimeZone !== homeTimeZone;
+
   return (
     <ScreenContainer>
       <ScrollView style={styles.scroll}>
@@ -242,6 +250,15 @@ export default function TripDetailScreen({ navigation, route }: Props) {
 
         {/* Contenido */}
         <View style={styles.content}>
+          {/* Dual Time Display - Mostrar solo si hay timezone del viaje y es diferente a la home */}
+          {showDualTime && (
+            <DualTimeDisplay
+              tripTimeZone={tripTimeZone!}
+              homeTimeZone={homeTimeZone}
+              style={styles.dualTimeContainer}
+            />
+          )}
+
           {/* Estadísticas - TEMPORALMENTE OCULTAS */}
           {/* {stats && (
             <View style={styles.statsRow}>
@@ -442,6 +459,9 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: theme.spacing.lg,
+  },
+  dualTimeContainer: {
+    marginBottom: theme.spacing.lg,
   },
   statsRow: {
     flexDirection: 'row',

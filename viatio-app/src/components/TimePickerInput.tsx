@@ -1,8 +1,8 @@
 /**
  * COMPONENTE: TimePickerInput
  *
- * Input para seleccionar hora con picker nativo.
- * Maneja diferencias entre iOS (modal) y Android (inline).
+ * Input para seleccionar hora con picker personalizado moderno.
+ * Usa CustomTimePicker con diseño mejorado y atractivo.
  */
 
 import { useState } from 'react';
@@ -11,12 +11,10 @@ import {
   Text,
   StyleSheet,
   Pressable,
-  Modal,
-  Platform,
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '@/config/theme';
+import { CustomTimePicker } from './CustomTimePicker';
 
 interface TimePickerInputProps {
   label: string;
@@ -35,47 +33,17 @@ export function TimePickerInput({
 }: TimePickerInputProps) {
   const [showPicker, setShowPicker] = useState(false);
 
-  // Convertir string HH:MM a Date
-  const getDateFromTime = (time?: string): Date => {
-    const date = new Date();
-    if (time) {
-      const [hours, minutes] = time.split(':').map(Number);
-      date.setHours(hours, minutes, 0, 0);
-    }
-    return date;
+  const handleConfirm = (time: string) => {
+    onChange(time);
+    setShowPicker(false);
   };
 
-  // Convertir Date a string HH:MM
-  const getTimeFromDate = (date: Date): string => {
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    return `${hours}:${minutes}`;
-  };
-
-  const handleChange = (event: any, selectedDate?: Date) => {
-    if (Platform.OS === 'android') {
-      setShowPicker(false);
-    }
-
-    if (event.type === 'dismissed') {
-      setShowPicker(false);
-      return;
-    }
-
-    if (selectedDate) {
-      onChange(getTimeFromDate(selectedDate));
-      if (Platform.OS === 'android') {
-        setShowPicker(false);
-      }
-    }
+  const handleCancel = () => {
+    setShowPicker(false);
   };
 
   const handleClear = () => {
     onChange(undefined);
-  };
-
-  const handleConfirm = () => {
-    setShowPicker(false);
   };
 
   return (
@@ -108,115 +76,53 @@ export function TimePickerInput({
         )}
       </Pressable>
 
-      {/* iOS: Modal con picker */}
-      {Platform.OS === 'ios' && showPicker && (
-        <Modal transparent animationType="slide">
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setShowPicker(false)}
-          >
-            <View style={styles.pickerContainer}>
-              <View style={styles.pickerHeader}>
-                <Pressable onPress={() => setShowPicker(false)}>
-                  <Text style={styles.pickerCancel}>Cancelar</Text>
-                </Pressable>
-                <Text style={styles.pickerTitle}>{label}</Text>
-                <Pressable onPress={handleConfirm}>
-                  <Text style={styles.pickerDone}>Listo</Text>
-                </Pressable>
-              </View>
-              <DateTimePicker
-                value={getDateFromTime(value)}
-                mode="time"
-                display="spinner"
-                onChange={handleChange}
-                minuteInterval={5}
-              />
-            </View>
-          </Pressable>
-        </Modal>
-      )}
-
-      {/* Android: Picker inline */}
-      {Platform.OS === 'android' && showPicker && (
-        <DateTimePicker
-          value={getDateFromTime(value)}
-          mode="time"
-          display="default"
-          onChange={handleChange}
-          is24Hour={true}
-        />
-      )}
+      <CustomTimePicker
+        visible={showPicker}
+        value={value}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+        title={label}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 16,
+    marginBottom: theme.spacing.lg,
   },
   label: {
+    ...theme.typography.subtitle,
     fontSize: 14,
-    fontWeight: '500',
     color: theme.colors.text,
-    marginBottom: 8,
+    marginBottom: theme.spacing.sm,
   },
   input: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 16,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: theme.spacing.lg,
     paddingVertical: 14,
-    gap: 12,
+    gap: theme.spacing.md,
+    ...theme.shadows.card,
   },
   inputFilled: {
     borderColor: theme.colors.primaryLight,
-    backgroundColor: 'rgba(0, 102, 204, 0.02)',
+    borderWidth: 2,
+    backgroundColor: 'rgba(0, 102, 204, 0.03)',
   },
   inputText: {
     flex: 1,
+    ...theme.typography.body,
     fontSize: 16,
     color: theme.colors.text,
+    fontWeight: '500',
   },
   inputPlaceholder: {
     color: theme.colors.textSecondary,
-  },
-  // Modal styles (iOS)
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-  },
-  pickerContainer: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 20,
-  },
-  pickerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  pickerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.colors.text,
-  },
-  pickerCancel: {
-    fontSize: 16,
-    color: theme.colors.textSecondary,
-  },
-  pickerDone: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.colors.primaryLight,
+    fontWeight: '400',
   },
 });

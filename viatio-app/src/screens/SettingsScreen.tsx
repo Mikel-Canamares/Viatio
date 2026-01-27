@@ -18,7 +18,7 @@ import { SectionTitle } from '@/components/SectionTitle';
 import { SelectItem, SelectOption } from '@/components/SelectItem';
 import { ProfileMenuItem } from '@/components/ProfileMenuItem';
 import { CurrencyPicker } from '@/components/CurrencyPicker';
-import { CustomModal } from '@/components';
+import { CustomModal, TimeZonePicker } from '@/components';
 import { useConfiguracionStore } from '@/store/useConfiguracionStore';
 import { IDIOMAS_DISPONIBLES } from '@/types/perfil';
 import { ALL_CURRENCIES } from '@/config/currencies';
@@ -27,6 +27,7 @@ import { showToast } from '@/utils/toast';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { deepCleanDatabase } from '@/database';
 import { useAuth } from '@/context/AuthContext';
+import { getDeviceTimeZone } from '@/services/timezoneService';
 
 // Opciones de configuración
 const TEMAS_DISPONIBLES: SelectOption[] = [
@@ -59,6 +60,7 @@ export default function SettingsScreen() {
   const [deleteAccountModal, setDeleteAccountModal] = useState(false);
   const [deleteAccountConfirmModal, setDeleteAccountConfirmModal] = useState(false);
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
+  const [showTimeZonePicker, setShowTimeZonePicker] = useState(false);
 
   // Cargar configuración al montar (sincroniza con Firebase si hay usuario)
   useEffect(() => {
@@ -133,6 +135,15 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleTimeZoneChange = async (homeTimeZone: string) => {
+    try {
+      await updateConfig({ homeTimeZone }, user?.uid);
+      showToast.success('Éxito', 'Timezone actualizada correctamente');
+    } catch (error) {
+      showToast.error('Error', 'No se pudo cambiar la timezone');
+    }
+  };
+
   // Exportar datos
   const handleExportData = () => {
     setExportModal(true);
@@ -190,6 +201,10 @@ export default function SettingsScreen() {
   const currencyLabel = selectedCurrency
     ? `${selectedCurrency.flag || ''} ${selectedCurrency.code} - ${selectedCurrency.name}`
     : config.monedaDefault;
+
+  // Obtener timezone home (detectar del dispositivo si no está configurada)
+  const homeTimeZone = config.homeTimeZone || getDeviceTimeZone();
+  const timeZoneLabel = homeTimeZone ? `${homeTimeZone.split('/').pop()?.replace(/_/g, ' ')} (${homeTimeZone})` : 'No configurada';
 
   if (isLoading) {
     return (
@@ -275,6 +290,24 @@ export default function SettingsScreen() {
             onSelect={handleFormatoFechaChange}
             icon="calendar-outline"
           />
+
+          {/* Selector de timezone casa */}
+          <Pressable
+            onPress={() => setShowTimeZonePicker(true)}
+            style={({ pressed }) => [
+              styles.currencyItem,
+              pressed && styles.currencyItemPressed,
+            ]}
+          >
+            <View style={styles.currencyIconContainer}>
+              <Ionicons name="time-outline" size={20} color={theme.colors.primaryLight} />
+            </View>
+            <View style={styles.currencyContent}>
+              <Text style={styles.currencyLabel}>Zona horaria casa</Text>
+              <Text style={styles.currencyValue}>{timeZoneLabel}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+          </Pressable>
         </Card>
 
         {/* Modal CurrencyPicker - se activa con showCurrencyPicker */}
@@ -284,6 +317,15 @@ export default function SettingsScreen() {
             onChange={handleMonedaChange}
             modalOnly
             onClose={() => setShowCurrencyPicker(false)}
+          />
+        )}
+
+        {/* Modal TimeZonePicker - se activa con showTimeZonePicker */}
+        {showTimeZonePicker && (
+          <TimeZonePicker
+            value={homeTimeZone}
+            onChange={handleTimeZoneChange}
+            onClose={() => setShowTimeZonePicker(false)}
           />
         )}
 
