@@ -7,6 +7,7 @@ ui-debug.log
 google-services.json
 GoogleService-Info.plist
 functions/service-account.json
+functions/test-*.js
 
 # Node modules
 node_modules/
