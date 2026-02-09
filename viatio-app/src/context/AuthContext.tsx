@@ -109,11 +109,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // Cargar configuración del usuario autenticado
         useConfiguracionStore.getState().loadConfig(firebaseUser.uid);
+
+        // Registrar push token para notificaciones (no bloqueante)
+        import('@/services/pushTokenService').then(({ registerPushToken }) => {
+          registerPushToken().catch((error) => {
+            console.error('[AuthContext] Error al registrar push token:', error);
+          });
+        });
       } else {
         setUser(null);
 
         // Limpiar configuración al hacer logout
         useConfiguracionStore.getState().clearLocalConfig();
+
+        // Eliminar push token al hacer logout (no bloqueante)
+        import('@/services/pushTokenService').then(({ unregisterPushToken }) => {
+          unregisterPushToken().catch((error) => {
+            console.error('[AuthContext] Error al eliminar push token:', error);
+          });
+        });
       }
       setLoading(false);
     });

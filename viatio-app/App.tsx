@@ -8,10 +8,12 @@ import { RootNavigator } from '@/navigation';
 import { ErrorBoundary, PrimaryButton } from '@/components';
 import { GlobalModalProvider } from '@/components/GlobalModalProvider';
 import { AuthProvider } from '@/context';
+import { NotificationBannerProvider } from '@/context/NotificationBannerContext';
 import { initializeDatabase, clearDatabase } from '@/database';
 import { logError } from '@/utils';
 import { theme } from '@/config';
-import { requestNotificationPermissions } from '@/services/notificationsService';
+import { requestNotificationPermissions, addNotificationResponseReceivedListener } from '@/services/notificationsService';
+import { handleNotificationResponse, setNavigationRef } from '@/utils/notificationNavigation';
 
 // DEVELOPMENT: Cambiar a true para limpiar la BD al iniciar
 const CLEAR_DB_ON_START = false;
@@ -50,6 +52,20 @@ export default function App() {
     initDB();
   }, []);
 
+  // Configurar listener de notificaciones para deep linking
+  useEffect(() => {
+    if (!dbReady) return;
+
+    const subscription = addNotificationResponseReceivedListener((response) => {
+      console.log('[App] Notification tapped', response);
+      handleNotificationResponse(response);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [dbReady]);
+
   // Pantalla de error
   if (dbError) {
     return (
@@ -85,12 +101,15 @@ export default function App() {
           <AuthProvider>
             <GlobalModalProvider>
               <NavigationContainer
-                onStateChange={(state) => {
+                ref={(ref) => setNavigationRef(ref)}
+                onStateChange={() => {
                   // No persistir el estado de navegación
                   // Esto asegura que siempre se inicie desde la pantalla inicial
                 }}
               >
-                <RootNavigator />
+                <NotificationBannerProvider>
+                  <RootNavigator />
+                </NotificationBannerProvider>
                 <StatusBar style="auto" />
               </NavigationContainer>
             </GlobalModalProvider>

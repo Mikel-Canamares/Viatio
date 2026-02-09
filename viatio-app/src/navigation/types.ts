@@ -96,6 +96,7 @@ export type HomeStackParamList = {
   AddSharedExpense: { tripId: string; expenseId?: string };
   ExpenseDetail: { tripId: string; expenseId: string };
   JoinTripByCode: undefined;
+  TripChecklist: { viajeId: string };
 };
 
 // ============================================
@@ -116,7 +117,9 @@ export type ProfileStackParamList = {
   EditProfile: undefined;
   NotificationsSettings: undefined;
   NotificationsManagement: undefined;
+  NotificationDebug: undefined;
   Notifications: undefined;
+  DiagnosticoPush: undefined;
   Settings: undefined;
   CopilotSettings: undefined;
   Help: undefined;

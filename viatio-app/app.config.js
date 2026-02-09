@@ -22,6 +22,11 @@ export default {
     },
     android: {
       package: 'com.viatio.app',
+      googleServicesFile: './google-services.json',
+      permissions: [
+        'USE_EXACT_ALARM',      // Android 12+ para notificaciones programadas exactas
+        'POST_NOTIFICATIONS',   // Android 13+ para notificaciones push
+      ],
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
         backgroundColor: '#ffffff',

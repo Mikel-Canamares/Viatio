@@ -5,6 +5,10 @@ import {
   ConfiguracionApp,
   DEFAULT_PREFERENCIAS_NOTIFICACIONES,
   DEFAULT_CONFIGURACION_APP,
+  DEFAULT_PREFERENCIAS_GASTOS_COMPARTIDOS,
+  DEFAULT_HORARIO_SILENCIO,
+  ModoSilencio,
+  HorarioSilencio,
 } from '@/types/perfil';
 import { getViajesByUsuario } from './viajesService';
 import { getDatabase } from '@/database';
@@ -12,6 +16,7 @@ import { getDatabase } from '@/database';
 const STORAGE_KEYS = {
   PREFERENCIAS_NOTIFICACIONES: 'viatio_prefs_notif',
   CONFIGURACION_APP: 'viatio_config_app',
+  ULTIMO_UMBRAL_NOTIFICADO: 'viatio_ultimo_umbral_',
 };
 
 /**
@@ -83,6 +88,41 @@ export async function getEstadisticasUsuario(
 }
 
 /**
+ * Migra preferencias antiguas al nuevo formato
+ * Garantiza compatibilidad con versiones anteriores
+ */
+function migratePreferencias(
+  stored: Partial<PreferenciasNotificaciones>
+): PreferenciasNotificaciones {
+  return {
+    // Master switch (nuevo, default true)
+    notificacionesActivas: stored.notificacionesActivas ?? true,
+
+    // Viajes y reservas (existentes)
+    recordatoriosViaje: stored.recordatoriosViaje ?? true,
+    tiempoAvisoViaje: stored.tiempoAvisoViaje ?? '1d',
+    actualizacionesReservas: stored.actualizacionesReservas ?? true,
+    tiempoAvisoReserva: stored.tiempoAvisoReserva ?? '3h',
+    alertasDocumentos: stored.alertasDocumentos ?? true,
+
+    // Gastos (nuevos)
+    alertasPresupuesto: stored.alertasPresupuesto ?? true,
+    umbralAlertaPresupuesto: stored.umbralAlertaPresupuesto ?? 75,
+
+    // Gastos compartidos (nuevos, activados por defecto)
+    gastosCompartidos: stored.gastosCompartidos ?? DEFAULT_PREFERENCIAS_GASTOS_COMPARTIDOS,
+
+    // Control de silencio (nuevos)
+    modoSilencio: stored.modoSilencio ?? 'off',
+    horarioSilencio: stored.horarioSilencio ?? DEFAULT_HORARIO_SILENCIO,
+
+    // General (existentes)
+    resumenSemanal: stored.resumenSemanal ?? false,
+    promociones: stored.promociones ?? false,
+  };
+}
+
+/**
  * Obtiene las preferencias de notificaciones del usuario
  */
 export async function getPreferenciasNotificaciones(): Promise<PreferenciasNotificaciones> {
@@ -95,7 +135,9 @@ export async function getPreferenciasNotificaciones(): Promise<PreferenciasNotif
       return DEFAULT_PREFERENCIAS_NOTIFICACIONES;
     }
 
-    return JSON.parse(data);
+    // Migrar datos antiguos al nuevo formato
+    const stored = JSON.parse(data);
+    return migratePreferencias(stored);
   } catch (error) {
     console.error('Error obteniendo preferencias de notificaciones:', error);
     return DEFAULT_PREFERENCIAS_NOTIFICACIONES;
@@ -151,6 +193,110 @@ export async function setConfiguracionApp(
   } catch (error) {
     console.error('Error guardando configuración de la app:', error);
     throw new Error('No se pudo guardar la configuración');
+  }
+}
+
+/**
+ * Verifica si estamos dentro del horario de silencio
+ */
+export function isInSilentHours(horario: HorarioSilencio): boolean {
+  if (!horario.activo) return false;
+
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  const [inicioH, inicioM] = horario.inicio.split(':').map(Number);
+  const [finH, finM] = horario.fin.split(':').map(Number);
+
+  const inicioMinutes = inicioH * 60 + inicioM;
+  const finMinutes = finH * 60 + finM;
+
+  // Caso normal: inicio < fin (ej: 09:00 - 17:00)
+  if (inicioMinutes < finMinutes) {
+    return currentMinutes >= inicioMinutes && currentMinutes < finMinutes;
+  }
+
+  // Caso nocturno: inicio > fin (ej: 22:00 - 08:00)
+  return currentMinutes >= inicioMinutes || currentMinutes < finMinutes;
+}
+
+/**
+ * Verifica si las notificaciones están activas según las preferencias
+ */
+export async function shouldSendNotification(
+  tipo: 'viaje' | 'reserva' | 'presupuesto' | 'gasto_compartido' | 'liquidacion'
+): Promise<boolean> {
+  const prefs = await getPreferenciasNotificaciones();
+
+  // Master switch
+  if (!prefs.notificacionesActivas) return false;
+
+  // Modo silencio total
+  if (prefs.modoSilencio === 'all') return false;
+
+  // Horario de silencio
+  if (isInSilentHours(prefs.horarioSilencio)) return false;
+
+  // Modo solo urgentes: solo permitir viajes/reservas
+  if (prefs.modoSilencio === 'urgent_only') {
+    return tipo === 'viaje' || tipo === 'reserva';
+  }
+
+  // Verificar preferencia específica según tipo
+  switch (tipo) {
+    case 'viaje':
+      return prefs.recordatoriosViaje;
+    case 'reserva':
+      return prefs.actualizacionesReservas;
+    case 'presupuesto':
+      return prefs.alertasPresupuesto;
+    case 'gasto_compartido':
+      return prefs.gastosCompartidos.nuevoGasto;
+    case 'liquidacion':
+      return prefs.gastosCompartidos.liquidacionSolicitada;
+    default:
+      return true;
+  }
+}
+
+/**
+ * Obtiene el último umbral de presupuesto notificado para un viaje
+ */
+export async function getUltimoUmbralNotificado(viajeId: string): Promise<number | null> {
+  try {
+    const key = STORAGE_KEYS.ULTIMO_UMBRAL_NOTIFICADO + viajeId;
+    const data = await AsyncStorage.getItem(key);
+    return data ? parseInt(data, 10) : null;
+  } catch (error) {
+    console.error('Error obteniendo último umbral notificado:', error);
+    return null;
+  }
+}
+
+/**
+ * Guarda el último umbral de presupuesto notificado para un viaje
+ */
+export async function setUltimoUmbralNotificado(
+  viajeId: string,
+  umbral: number
+): Promise<void> {
+  try {
+    const key = STORAGE_KEYS.ULTIMO_UMBRAL_NOTIFICADO + viajeId;
+    await AsyncStorage.setItem(key, umbral.toString());
+  } catch (error) {
+    console.error('Error guardando último umbral notificado:', error);
+  }
+}
+
+/**
+ * Limpia el tracking de umbral notificado para un viaje
+ */
+export async function clearUmbralNotificado(viajeId: string): Promise<void> {
+  try {
+    const key = STORAGE_KEYS.ULTIMO_UMBRAL_NOTIFICADO + viajeId;
+    await AsyncStorage.removeItem(key);
+  } catch (error) {
+    console.error('Error limpiando umbral notificado:', error);
   }
 }
 

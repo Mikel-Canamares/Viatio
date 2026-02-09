@@ -11,6 +11,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer, PageHeader, PrimaryButton, Card } from '@/components';
 import { DatePickerInput } from '@/components/DatePickerInput';
+import { CurrencyPicker } from '@/components/CurrencyPicker';
 import { useSharedTripsStore } from '@/store/sharedTripsStore';
 import { useExpensesV2Store } from '@/store/expensesV2Store';
 import { useConfiguracionStore } from '@/store/useConfiguracionStore';
@@ -39,9 +40,15 @@ export default function RecordSettlementScreen() {
   const { currentTrip, members } = useSharedTripsStore();
   const { addSettlement } = useExpensesV2Store();
   const { config } = useConfiguracionStore();
-  const userCurrency = config.monedaDefault || 'EUR';
 
-  const [amount, setAmount] = useState((suggestedAmount / 100).toFixed(3));
+  // Moneda del viaje (para conversión interna)
+  const tripCurrency = currentTrip?.currency || 'EUR';
+
+  // Moneda del usuario (para mostrar al usuario)
+  const userCurrency = config.monedaDefault || 'EUR';
+  const [currency, setCurrency] = useState(userCurrency);
+
+  const [amount, setAmount] = useState((suggestedAmount / 100).toFixed(2));
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
@@ -65,11 +72,12 @@ export default function RecordSettlementScreen() {
           fromUid,
           toUid,
           amount: displayToCents(amountNum),
-          currency: userCurrency,
+          currency, // Moneda seleccionada por el usuario
           date,
           notes: notes.trim() || undefined,
         },
-        members
+        members,
+        tripCurrency // Moneda de referencia del viaje
       );
 
       if (settlement) {
@@ -154,12 +162,21 @@ export default function RecordSettlementScreen() {
               placeholder="0.00"
               placeholderTextColor={theme.colors.textTertiary}
             />
-            <Text style={styles.currency}>{userCurrency}</Text>
+            <Text style={styles.currency}>{currency}</Text>
           </View>
 
           <Text style={styles.suggestedText}>
-            Sugerido: {centsToDisplay(suggestedAmount, userCurrency)}
+            Sugerido: {centsToDisplay(suggestedAmount, currency)}
           </Text>
+        </Card>
+
+        {/* Moneda */}
+        <Card style={styles.card}>
+          <CurrencyPicker
+            label="Moneda del pago"
+            value={currency}
+            onChange={setCurrency}
+          />
         </Card>
 
         {/* Fecha */}

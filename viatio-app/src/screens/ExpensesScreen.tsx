@@ -139,8 +139,9 @@ export function ExpensesScreen() {
 
     if (isShared && firestoreId && members.length > 0) {
       // Suscribirse a Firestore con los miembros
-      subscribeExpenses(firestoreId, members);
-      subscribeSettlementsRealtime(firestoreId, members);
+      const tripCurrency = viaje.moneda || 'EUR';
+      subscribeExpenses(firestoreId, members, tripCurrency);
+      subscribeSettlementsRealtime(firestoreId, members, tripCurrency);
     } else if (!isShared) {
       // Cargar de SQLite
       fetchGastos(viajeId);
@@ -350,8 +351,11 @@ export function ExpensesScreen() {
         // 3. Convertir montos individuales de gastos
         const expenseConversions: Record<string, number | null> = {};
         for (const expense of sharedExpenses) {
-          const amountInUnits = expense.amount / 100;
-          const converted = await performConvert(amountInUnits, expense.currency, userCurrency);
+          // Usar monto y moneda originales si existen
+          const displayAmount = expense.originalAmount ?? expense.amount;
+          const displayCurrency = expense.originalCurrency ?? expense.currency;
+          const amountInUnits = displayAmount / 100;
+          const converted = await performConvert(amountInUnits, displayCurrency, userCurrency);
           expenseConversions[expense.id] = converted?.converted || null;
         }
 
@@ -461,12 +465,14 @@ export function ExpensesScreen() {
 
   if (loadingViaje) {
     return (
-      <ScreenContainer>
+      <View style={styles.container}>
         <PageHeader title="Gastos" onBack={handleBack} />
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptySubtitle}>Cargando...</Text>
-        </View>
-      </ScreenContainer>
+        <ScreenContainer>
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptySubtitle}>Cargando...</Text>
+          </View>
+        </ScreenContainer>
+      </View>
     );
   }
 
@@ -479,8 +485,9 @@ export function ExpensesScreen() {
 
   if (!isLoading && isEmpty) {
     return (
-      <ScreenContainer>
+      <View style={styles.container}>
         <PageHeader title="Gastos" onBack={handleBack} />
+        <ScreenContainer>
         <View style={styles.emptyContainer}>
           <Ionicons name="wallet-outline" size={64} color={theme.colors.textMuted} />
           <Text style={styles.emptyTitle}>No hay gastos registrados</Text>
@@ -496,7 +503,8 @@ export function ExpensesScreen() {
             Añadir gasto
           </PrimaryButton>
         </View>
-      </ScreenContainer>
+        </ScreenContainer>
+      </View>
     );
   }
 
@@ -506,8 +514,9 @@ export function ExpensesScreen() {
 
   if (isShared && firestoreId) {
     return (
-      <ScreenContainer>
+      <View style={styles.container}>
         <PageHeader title="Gastos compartidos" onBack={handleBack} />
+        <ScreenContainer>
 
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -520,8 +529,8 @@ export function ExpensesScreen() {
           <View style={styles.summaryCard}>
             <View style={styles.summaryRow}>
               <View style={styles.summaryColumn}>
-                <View style={styles.summaryIconContainer}>
-                  <Ionicons name="wallet" size={26} color={theme.colors.primary} />
+                <View style={[styles.summaryIconContainer, styles.myExpensesIconContainer]}>
+                  <Ionicons name="wallet" size={26} color="#4a87c8" />
                 </View>
                 <Text style={styles.summaryLabel}>Mis Gastos</Text>
                 <Text style={styles.summaryAmount}>
@@ -532,8 +541,8 @@ export function ExpensesScreen() {
               <View style={styles.summaryDivider} />
 
               <View style={styles.summaryColumn}>
-                <View style={styles.summaryIconContainer}>
-                  <Ionicons name="receipt" size={26} color={theme.colors.primary} />
+                <View style={[styles.summaryIconContainer, styles.totalExpensesIconContainer]}>
+                  <Ionicons name="receipt" size={26} color="#4a87c8" />
                 </View>
                 <Text style={styles.summaryLabel}>Gastos Totales</Text>
                 <Text style={styles.summaryAmount}>
@@ -624,6 +633,9 @@ export function ExpensesScreen() {
                 {/* Lista de gastos de esta categoría - Solo visible cuando está expandido */}
                 {isExpanded && gastosDeCategoria.map((expense) => {
                   const isPayer = expense.paidByUid === user?.uid;
+                  // Usar monto y moneda originales si existen, sino usar los normalizados
+                  const displayAmount = expense.originalAmount ?? expense.amount;
+                  const displayCurrency = expense.originalCurrency ?? expense.currency;
 
                   return (
                     <Pressable
@@ -645,11 +657,11 @@ export function ExpensesScreen() {
                       </View>
                       <View style={styles.expenseAmounts}>
                         <Text style={styles.expenseAmount}>
-                          {centsToDisplay(expense.amount, expense.currency)}
+                          {centsToDisplay(displayAmount, displayCurrency)}
                         </Text>
-                        {expenseAmountConversions[expense.id] !== undefined && expenseAmountConversions[expense.id] !== null && (
+                        {displayCurrency !== userCurrency && expenseAmountConversions[expense.id] !== undefined && expenseAmountConversions[expense.id] !== null && (
                           <Text style={styles.expenseConversion}>
-                            ≈ {formatCurrency(expenseAmountConversions[expense.id]!, userCurrency, { decimals: 3 })}
+                            ≈ {formatCurrency(expenseAmountConversions[expense.id]!, userCurrency, { decimals: 2 })}
                           </Text>
                         )}
                       </View>
@@ -712,7 +724,8 @@ export function ExpensesScreen() {
             Añadir gasto
           </PrimaryButton>
         </View>
-      </ScreenContainer>
+        </ScreenContainer>
+      </View>
     );
   }
 
@@ -721,8 +734,9 @@ export function ExpensesScreen() {
   // ============================================
 
   return (
-    <ScreenContainer>
+    <View style={styles.container}>
       <PageHeader title="Gastos" onBack={handleBack} />
+      <ScreenContainer>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -790,7 +804,8 @@ export function ExpensesScreen() {
           Añadir gasto
         </PrimaryButton>
       </View>
-    </ScreenContainer>
+      </ScreenContainer>
+    </View>
   );
 }
 
@@ -799,6 +814,9 @@ export function ExpensesScreen() {
 // ============================================
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   scrollContent: {
     padding: theme.spacing.lg,
     paddingBottom: 100,
@@ -835,6 +853,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: theme.spacing.sm,
+  },
+  myExpensesIconContainer: {
+    backgroundColor: '#3B82F615',
+  },
+  totalExpensesIconContainer: {
+    backgroundColor: '#8B5CF615',
   },
   summaryDivider: {
     width: 1,

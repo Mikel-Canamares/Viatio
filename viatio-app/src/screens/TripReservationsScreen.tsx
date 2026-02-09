@@ -14,17 +14,18 @@ import {
   ActivityIndicator,
   ScrollView,
   Pressable,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { parseLocalDate } from '@/utils/dateUtils';
 import {
   PageHeader,
   ReservationCard,
   PrimaryButton,
   ScreenContainer,
+  CustomModal,
 } from '@/components';
 import { theme } from '@/config';
 import { useReservasStore } from '@/store/reservasStore';
@@ -45,6 +46,10 @@ export default function TripReservationsScreen({ route, navigation }: Props) {
   const { viajeId } = route.params;
   const { reservas, loading, fetchReservas, removeReserva } = useReservasStore();
   const [filtroActivo, setFiltroActivo] = useState<CategoriaReserva | 'all'>('all');
+  const [deleteModal, setDeleteModal] = useState<{
+    visible: boolean;
+    reserva: Reserva | null;
+  }>({ visible: false, reserva: null });
 
   useEffect(() => {
     loadReservas();
@@ -94,7 +99,8 @@ export default function TripReservationsScreen({ route, navigation }: Props) {
   const formatFechaHeader = (fecha: string) => {
     if (fecha === 'Sin fecha') return 'Sin fecha';
     try {
-      return format(parseISO(fecha), "EEEE, d 'de' MMMM", { locale: es });
+      // FIX: Usar parseLocalDate para evitar problemas de zona horaria
+      return format(parseLocalDate(fecha), "EEEE, d 'de' MMMM", { locale: es });
     } catch {
       return fecha;
     }
@@ -109,21 +115,14 @@ export default function TripReservationsScreen({ route, navigation }: Props) {
   };
 
   const handleDeleteReservation = (reserva: Reserva) => {
-    Alert.alert(
-      'Eliminar reserva',
-      `¿Estás seguro de que quieres eliminar "${reserva.nombre}"?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: async () => {
-            await removeReserva(reserva.id);
-            await loadReservas();
-          },
-        },
-      ]
-    );
+    setDeleteModal({ visible: true, reserva });
+  };
+
+  const confirmDeleteReservation = async () => {
+    if (deleteModal.reserva) {
+      await removeReserva(deleteModal.reserva.id);
+      await loadReservas();
+    }
   };
 
   const handleAddReservation = () => {
@@ -149,19 +148,22 @@ export default function TripReservationsScreen({ route, navigation }: Props) {
 
   if (loading && reservas.length === 0) {
     return (
-      <ScreenContainer>
+      <View style={styles.container}>
         <PageHeader title="Reservas" onBack={() => navigation.goBack()} />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primaryLight} />
-          <Text style={styles.loadingText}>Cargando reservas...</Text>
-        </View>
-      </ScreenContainer>
+        <ScreenContainer>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.colors.primaryLight} />
+            <Text style={styles.loadingText}>Cargando reservas...</Text>
+          </View>
+        </ScreenContainer>
+      </View>
     );
   }
 
   return (
-    <ScreenContainer>
+    <View style={styles.container}>
       <PageHeader title="Reservas" onBack={() => navigation.goBack()} />
+      <ScreenContainer>
       <View style={styles.contentWrapper}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Todas las reservas</Text>
@@ -228,11 +230,33 @@ export default function TripReservationsScreen({ route, navigation }: Props) {
           </PrimaryButton>
         </View>
       </View>
-    </ScreenContainer>
+
+      {/* Modal de confirmación de eliminación */}
+      <CustomModal
+        visible={deleteModal.visible}
+        type="warning"
+        title="Eliminar reserva"
+        message={`¿Estás seguro de que quieres eliminar "${deleteModal.reserva?.nombre}"?`}
+        onClose={() => setDeleteModal({ visible: false, reserva: null })}
+        primaryButton={{
+          text: 'Eliminar',
+          onPress: confirmDeleteReservation,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {},
+        }}
+      />
+      </ScreenContainer>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   contentWrapper: {
     flex: 1,
     paddingHorizontal: 20,

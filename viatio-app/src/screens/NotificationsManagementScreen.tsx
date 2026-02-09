@@ -19,12 +19,11 @@ import {
   TouchableOpacity,
   RefreshControl,
   Switch,
-  Alert,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { ProfileStackParamList } from '@/navigation/types';
-import { ScreenContainer } from '@/components';
+import { ScreenContainer, CustomModal } from '@/components';
 import {
   getAllScheduledNotificationsInfo,
   getNotificationStats,
@@ -51,6 +50,22 @@ export default function NotificationsManagementScreen({ navigation }: Props) {
   });
   const [refreshing, setRefreshing] = useState(false);
   const [debugMode, setDebugModeState] = useState(false);
+
+  // Estado del modal
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState<{
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+    primaryButton: { text: string; onPress: () => void; destructive?: boolean };
+    secondaryButton?: { text: string; onPress: () => void };
+  }>({
+    type: 'info',
+    title: '',
+    message: '',
+    primaryButton: { text: 'OK', onPress: () => {} },
+    secondaryButton: undefined,
+  });
 
   const loadData = useCallback(async () => {
     try {
@@ -84,10 +99,14 @@ export default function NotificationsManagementScreen({ navigation }: Props) {
   const handleTestNotification = async () => {
     const success = await sendTestNotification();
     if (success) {
-      Alert.alert(
-        'Notificación programada',
-        'Recibirás una notificación de prueba en 3 segundos'
-      );
+      setModalConfig({
+        type: 'success',
+        title: 'Notificación programada',
+        message: 'Recibirás una notificación de prueba en 3 segundos',
+        primaryButton: { text: 'OK', onPress: () => {} },
+        secondaryButton: undefined,
+      });
+      setModalVisible(true);
     } else {
       showToast.error('Error', 'No se pudo enviar la notificación. Verifica que tienes permisos activados.'
       );
@@ -95,33 +114,47 @@ export default function NotificationsManagementScreen({ navigation }: Props) {
   };
 
   const handleCleanup = async () => {
-    Alert.alert(
-      'Limpiar notificaciones obsoletas',
-      '¿Deseas eliminar todas las notificaciones que ya han pasado?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Limpiar',
-          style: 'destructive',
-          onPress: async () => {
-            const count = await cleanupObsoleteNotifications();
-            Alert.alert('Limpieza completada', `Se eliminaron ${count} notificaciones obsoletas`);
-            await loadData();
-          },
+    setModalConfig({
+      type: 'warning',
+      title: 'Limpiar notificaciones obsoletas',
+      message: '¿Deseas eliminar todas las notificaciones que ya han pasado?',
+      primaryButton: {
+        text: 'Limpiar',
+        onPress: async () => {
+          const count = await cleanupObsoleteNotifications();
+          setModalConfig({
+            type: 'success',
+            title: 'Limpieza completada',
+            message: `Se eliminaron ${count} notificaciones obsoletas`,
+            primaryButton: { text: 'OK', onPress: () => {} },
+            secondaryButton: undefined,
+          });
+          setModalVisible(true);
+          await loadData();
         },
-      ]
-    );
+        destructive: true,
+      },
+      secondaryButton: {
+        text: 'Cancelar',
+        onPress: () => {},
+      },
+    });
+    setModalVisible(true);
   };
 
   const toggleDebugMode = async (value: boolean) => {
     await setDebugMode(value);
     setDebugModeState(value);
-    Alert.alert(
-      'Modo debug ' + (value ? 'activado' : 'desactivado'),
-      value
+    setModalConfig({
+      type: 'info',
+      title: 'Modo debug ' + (value ? 'activado' : 'desactivado'),
+      message: value
         ? 'Ahora verás logs detallados en la consola'
-        : 'Los logs de debug están desactivados'
-    );
+        : 'Los logs de debug están desactivados',
+      primaryButton: { text: 'OK', onPress: () => {} },
+      secondaryButton: undefined,
+    });
+    setModalVisible(true);
   };
 
   const formatTimeUntil = (minutesUntil: number): string => {
@@ -326,6 +359,17 @@ export default function NotificationsManagementScreen({ navigation }: Props) {
           )}
         </View>
       </ScrollView>
+
+      {/* Modal de confirmación */}
+      <CustomModal
+        visible={modalVisible}
+        type={modalConfig.type}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        onClose={() => setModalVisible(false)}
+        primaryButton={modalConfig.primaryButton}
+        secondaryButton={modalConfig.secondaryButton}
+      />
     </ScreenContainer>
   );
 }

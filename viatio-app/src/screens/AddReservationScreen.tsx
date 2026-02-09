@@ -15,7 +15,6 @@ import {
   Platform,
   Pressable,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -33,11 +32,13 @@ import {
   Dropdown,
   DropdownOption,
   ParticipantCheckboxList,
+  CustomModal,
 } from '@/components';
 import { DatePickerInput } from '@/components/DatePickerInput';
 import { ReservationCurrencyPicker } from '@/components/ReservationCurrencyPicker';
 import { SharesEditor } from '@/components/shared/SharesEditor';
 import { theme } from '@/config';
+import { getCategoryColor } from '@/config/categories';
 import { showToast } from '@/utils/toast';
 import { useReservasStore } from '@/store/reservasStore';
 import { useDocumentosStore } from '@/store/documentosStore';
@@ -97,15 +98,6 @@ export default function AddReservationScreen({ route, navigation }: Props) {
   const { handlePlaceMatch } = useHandlePlaceMatch();
   const { config } = useConfiguracionStore();
 
-  // Debug: Log de datos recibidos
-  console.log('[AddReservation] viajeId:', viajeId);
-  console.log('[AddReservation] prefillData exists:', !!prefillData);
-  if (prefillData) {
-    console.log('[AddReservation] prefillData.categoria:', prefillData.categoria);
-    console.log('[AddReservation] prefillData.nombre:', prefillData.nombre);
-  }
-  console.log('[AddReservation] scannedFiles count:', scannedFiles?.length || 0);
-
   const [mode, setMode] = useState<ScreenMode>(
     prefillData || scannedFiles ? 'manual' : 'select'
   );
@@ -120,6 +112,15 @@ export default function AddReservationScreen({ route, navigation }: Props) {
   );
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [pickingFile, setPickingFile] = useState(false);
+  const [documentWarningModal, setDocumentWarningModal] = useState<{
+    visible: boolean;
+    documentoIds: string[];
+  }>({ visible: false, documentoIds: [] });
+  const [deleteFileModal, setDeleteFileModal] = useState<{
+    visible: boolean;
+    index: number | null;
+  }>({ visible: false, index: null });
+  const [discardModal, setDiscardModal] = useState(false);
 
   // Hook para obtener miembros del viaje compartido
   const { members, loading: loadingMembers } = useTripMembers(viaje?.firestoreId || null);
@@ -129,6 +130,11 @@ export default function AddReservationScreen({ route, navigation }: Props) {
   const [participantUids, setParticipantUids] = useState<string[]>([]);
   const [shares, setShares] = useState<Omit<ExpenseShare, 'calculatedAmount'>[]>([]);
   const [paidDate, setPaidDate] = useState<string>(new Date().toISOString().split('T')[0]);
+
+  // Estados para fechas límite
+  const [fechaLimitePago, setFechaLimitePago] = useState<string>('');
+  const [cancelacionGratuita, setCancelacionGratuita] = useState<boolean>(false);
+  const [fechaLimiteCancelacion, setFechaLimiteCancelacion] = useState<string>('');
 
   // Opciones para dropdowns de pago
   const paidByOptions: DropdownOption[] = members.length > 0
@@ -159,7 +165,6 @@ export default function AddReservationScreen({ route, navigation }: Props) {
   // Sincronizar formData con prefillData cuando cambia
   useEffect(() => {
     if (prefillData) {
-      console.log('[AddReservation] Sincronizando formData con prefillData');
       setFormData(prefillData);
     }
   }, [prefillData]);
@@ -352,12 +357,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
         console.log('[AddReservation] Total documentos creados exitosamente:', documentoIds.length);
 
         if (documentoIds.length === 0 && allFiles.length > 0) {
-          Alert.alert('Advertencia', 'No se pudieron guardar los documentos adjuntos. ¿Deseas continuar creando la reserva sin documentos?',
-            [
-              { text: 'Cancelar', style: 'cancel', onPress: () => {} },
-              { text: 'Continuar', onPress: () => proceedWithReservation(documentoIds) }
-            ]
-          );
+          setDocumentWarningModal({ visible: true, documentoIds });
           return;
         }
       }
@@ -385,6 +385,14 @@ export default function AddReservationScreen({ route, navigation }: Props) {
       console.log('[AddReservation] Tipo de metadatos:', typeof formData.metadatos);
 
       // Crear la reserva (sin documentoId, ya que usaremos la tabla intermedia)
+      // Preparar metadatos con fechas límite
+      const metadatosCompletos = {
+        ...formData.metadatos,
+        fechaLimitePago: fechaLimitePago || undefined,
+        cancelacionGratuita: cancelacionGratuita || undefined,
+        fechaLimiteCancelacion: cancelacionGratuita ? (fechaLimiteCancelacion || undefined) : undefined,
+      };
+
       const input: CreateReservaInput = {
         viajeId,
         categoria: formData.categoria,
@@ -405,7 +413,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
         participantUids: participantUids.length > 0 ? participantUids : undefined,
         shares: shares.length > 0 ? shares : undefined,
         notas: formData.notas,
-        metadatos: formData.metadatos,
+        metadatos: metadatosCompletos,
       };
 
       const result = await addReserva(input);
@@ -521,18 +529,13 @@ export default function AddReservationScreen({ route, navigation }: Props) {
   };
 
   const handleRemoveFile = (index: number) => {
-    Alert.alert(
-      'Eliminar archivo',
-      '¿Deseas eliminar este archivo?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: () => setAttachedFiles((prev: AttachedFile[]) => prev.filter((_: AttachedFile, i: number) => i !== index))
-        },
-      ]
-    );
+    setDeleteFileModal({ visible: true, index });
+  };
+
+  const confirmDeleteFile = () => {
+    if (deleteFileModal.index !== null) {
+      setAttachedFiles((prev: AttachedFile[]) => prev.filter((_: AttachedFile, i: number) => i !== deleteFileModal.index));
+    }
   };
 
   if (mode === 'select') {
@@ -644,25 +647,36 @@ export default function AddReservationScreen({ route, navigation }: Props) {
                     formData.categoria === cat.value && styles.categoriaOptionActive,
                   ]}
                 >
-                  <Ionicons
-                    name={
-                      cat.value === 'transport'
-                        ? 'airplane'
-                        : cat.value === 'accommodation'
-                        ? 'bed'
-                        : cat.value === 'food'
-                        ? 'restaurant'
-                        : cat.value === 'activity'
-                        ? 'ticket'
-                        : 'ellipsis-horizontal'
-                    }
-                    size={24}
-                    color={
-                      formData.categoria === cat.value
-                        ? theme.colors.primaryLight
-                        : theme.colors.textMuted
-                    }
-                  />
+                  <View
+                    style={[
+                      styles.categoriaIconCircle,
+                      {
+                        backgroundColor: formData.categoria === cat.value
+                          ? getCategoryColor(cat.value) + '20'
+                          : theme.colors.secondary
+                      }
+                    ]}
+                  >
+                    <Ionicons
+                      name={
+                        cat.value === 'transport'
+                          ? 'airplane'
+                          : cat.value === 'accommodation'
+                          ? 'bed'
+                          : cat.value === 'food'
+                          ? 'restaurant'
+                          : cat.value === 'activity'
+                          ? 'ticket'
+                          : 'ellipsis-horizontal'
+                      }
+                      size={32}
+                      color={
+                        formData.categoria === cat.value
+                          ? getCategoryColor(cat.value)
+                          : theme.colors.textMuted
+                      }
+                    />
+                  </View>
                   <Text
                     style={[
                       styles.categoriaOptionText,
@@ -712,6 +726,42 @@ export default function AddReservationScreen({ route, navigation }: Props) {
                 value={formData.metadatos?.subtipoAlojamiento}
                 onSelect={(value) => updateMetadata('subtipoAlojamiento', value as SubtipoAlojamiento)}
               />
+            )}
+
+            {/* Cancelación gratuita - Solo para accommodation */}
+            {formData.categoria === 'accommodation' && (
+              <>
+                <Pressable
+                  onPress={() => {
+                    const newValue = !cancelacionGratuita;
+                    setCancelacionGratuita(newValue);
+                    if (!newValue) {
+                      setFechaLimiteCancelacion('');
+                    }
+                  }}
+                  style={styles.checkboxRow}
+                >
+                  <View style={[
+                    styles.checkbox,
+                    cancelacionGratuita && styles.checkboxSelected
+                  ]}>
+                    {cancelacionGratuita && (
+                      <Ionicons name="checkmark" size={16} color="#fff" />
+                    )}
+                  </View>
+                  <Text style={styles.checkboxLabel}>Cancelación gratuita</Text>
+                </Pressable>
+
+                {cancelacionGratuita && (
+                  <DatePickerInput
+                    label="Fecha límite de cancelación"
+                    value={fechaLimiteCancelacion}
+                    onChange={setFechaLimiteCancelacion}
+                    minDate={new Date()}
+                    maxDate={formData.fechaInicio ? new Date(formData.fechaInicio) : undefined}
+                  />
+                )}
+              </>
             )}
 
             {formData.categoria === 'activity' && (
@@ -915,6 +965,16 @@ export default function AddReservationScreen({ route, navigation }: Props) {
                 </View>
               </View>
 
+              {/* Fecha límite de pago - Solo si está pendiente */}
+              {formData.estadoPago === 'pending' && (
+                <DatePickerInput
+                  label="Fecha límite de pago (opcional)"
+                  value={fechaLimitePago}
+                  onChange={setFechaLimitePago}
+                  minDate={new Date()}
+                />
+              )}
+
               {/* Selector de quién pagó - Solo en viajes compartidos y si el estado es pagado o parcial */}
               {viaje?.isShared && members.length > 0 && (formData.estadoPago === 'paid' || formData.estadoPago === 'partial') && (
                 <>
@@ -959,6 +1019,7 @@ export default function AddReservationScreen({ route, navigation }: Props) {
                         showAmounts={true}
                         amounts={calculateAmounts()}
                         currency={formData.moneda || 'EUR'}
+                        userCurrency={config.monedaDefault}
                         editable={splitMethod === 'exact'}
                         onAmountChange={handleAmountChange}
                       />
@@ -1083,6 +1144,41 @@ export default function AddReservationScreen({ route, navigation }: Props) {
           </ScrollView>
         </KeyboardAvoidingView>
       </ScreenContainer>
+
+      {/* Modal de advertencia de documentos */}
+      <CustomModal
+        visible={documentWarningModal.visible}
+        type="warning"
+        title="Advertencia"
+        message="No se pudieron guardar los documentos adjuntos. ¿Deseas continuar creando la reserva sin documentos?"
+        onClose={() => setDocumentWarningModal({ visible: false, documentoIds: [] })}
+        primaryButton={{
+          text: 'Continuar',
+          onPress: () => proceedWithReservation(documentWarningModal.documentoIds),
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {},
+        }}
+      />
+
+      {/* Modal de confirmación de eliminar archivo */}
+      <CustomModal
+        visible={deleteFileModal.visible}
+        type="warning"
+        title="Eliminar archivo"
+        message="¿Deseas eliminar este archivo?"
+        onClose={() => setDeleteFileModal({ visible: false, index: null })}
+        primaryButton={{
+          text: 'Eliminar',
+          onPress: confirmDeleteFile,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {},
+        }}
+      />
     </View>
   );
 }
@@ -1219,27 +1315,34 @@ const styles = StyleSheet.create({
   },
   categoriaOption: {
     width: '30%',
-    aspectRatio: 1,
+    paddingVertical: theme.spacing.md,
     borderRadius: 12,
     backgroundColor: '#FFFFFF',
     borderWidth: 2,
     borderColor: '#E5E7EB',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: theme.spacing.xs,
+    gap: theme.spacing.sm,
   },
   categoriaOptionActive: {
-    backgroundColor: '#EFF6FF',
-    borderColor: theme.colors.primaryLight,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E5E7EB',
+  },
+  categoriaIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   categoriaOptionText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '500',
     color: theme.colors.textSecondary,
     textAlign: 'center',
   },
   categoriaOptionTextActive: {
-    color: theme.colors.primaryLight,
+    color: theme.colors.text,
     fontWeight: '600',
   },
   categoriaChip: {
@@ -1369,5 +1472,30 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: theme.colors.text,
     marginBottom: theme.spacing.xs,
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  checkboxSelected: {
+    backgroundColor: theme.colors.accent,
+    borderColor: theme.colors.accent,
+  },
+  checkboxLabel: {
+    fontSize: 15,
+    color: theme.colors.text,
+    fontWeight: '500',
   },
 });

@@ -6,11 +6,11 @@ import {
   ScrollView,
   Pressable,
   Image,
-  Alert,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer, PageHeader, Card } from '@/components';
+import { CustomModal } from '@/components/CustomModal';
 import { useSharedTripsStore } from '@/store/sharedTripsStore';
 import { useExpensesV2Store } from '@/store/expensesV2Store';
 import { useAuth } from '@/context/AuthContext';
@@ -43,6 +43,9 @@ export default function SharedTripDetailScreen() {
   const { summary, fetchExpenses } = useExpensesV2Store();
 
   const [loading, setLoading] = useState(true);
+  const [showOwnerWarningModal, setShowOwnerWarningModal] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     loadTrip();
@@ -103,53 +106,30 @@ export default function SharedTripDetailScreen() {
 
   const handleLeaveTrip = () => {
     if (isOwner) {
-      Alert.alert(
-        'No puedes salir',
-        'Eres el propietario del viaje. Transfiere la propiedad a otro miembro antes de salir.',
-        [{ text: 'Entendido' }]
-      );
+      setShowOwnerWarningModal(true);
       return;
     }
+    setShowLeaveModal(true);
+  };
 
-    Alert.alert(
-      'Salir del viaje',
-      '¿Estás seguro de que quieres salir de este viaje?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Salir',
-          style: 'destructive',
-          onPress: async () => {
-            const success = await leaveCurrentTrip();
-            if (success) {
-              showToast.info('Has salido del viaje');
-              navigation.goBack();
-            }
-          },
-        },
-      ]
-    );
+  const confirmLeaveTrip = async () => {
+    const success = await leaveCurrentTrip();
+    if (success) {
+      showToast.info('Has salido del viaje');
+      navigation.goBack();
+    }
   };
 
   const handleDeleteTrip = () => {
-    Alert.alert(
-      'Eliminar viaje',
-      '¿Estás seguro de que quieres eliminar este viaje? Esta acción no se puede deshacer.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: async () => {
-            const success = await deleteTrip(tripId);
-            if (success) {
-              showToast.success('Viaje eliminado');
-              navigation.goBack();
-            }
-          },
-        },
-      ]
-    );
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteTrip = async () => {
+    const success = await deleteTrip(tripId);
+    if (success) {
+      showToast.success('Viaje eliminado');
+      navigation.goBack();
+    }
   };
 
   if (!currentTrip) {
@@ -372,6 +352,52 @@ export default function SharedTripDetailScreen() {
           )}
         </View>
       </ScrollView>
+
+      <CustomModal
+        visible={showOwnerWarningModal}
+        type="info"
+        title="No puedes salir"
+        message="Eres el propietario del viaje. Transfiere la propiedad a otro miembro antes de salir."
+        onClose={() => setShowOwnerWarningModal(false)}
+        primaryButton={{
+          text: 'Entendido',
+          onPress: () => setShowOwnerWarningModal(false),
+        }}
+      />
+
+      <CustomModal
+        visible={showLeaveModal}
+        type="warning"
+        title="Salir del viaje"
+        message="¿Estás seguro de que quieres salir de este viaje?"
+        onClose={() => setShowLeaveModal(false)}
+        primaryButton={{
+          text: 'Salir',
+          onPress: confirmLeaveTrip,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => setShowLeaveModal(false),
+        }}
+      />
+
+      <CustomModal
+        visible={showDeleteModal}
+        type="warning"
+        title="Eliminar viaje"
+        message="¿Estás seguro de que quieres eliminar este viaje? Esta acción no se puede deshacer."
+        onClose={() => setShowDeleteModal(false)}
+        primaryButton={{
+          text: 'Eliminar',
+          onPress: confirmDeleteTrip,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => setShowDeleteModal(false),
+        }}
+      />
     </ScreenContainer>
   );
 }

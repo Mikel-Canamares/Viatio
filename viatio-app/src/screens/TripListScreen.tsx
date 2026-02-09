@@ -5,8 +5,8 @@
  * Incluye búsqueda, filtros y FAB para crear nuevo viaje.
  */
 
-import { useEffect, useState, useCallback } from 'react';
-import { View, FlatList, StyleSheet, ActivityIndicator, Text, Pressable, Alert } from 'react-native';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { View, FlatList, StyleSheet, ActivityIndicator, Text, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -15,6 +15,7 @@ import {
   PageHeader,
   TripCard,
   PrimaryButton,
+  CustomModal,
 } from '@/components';
 import { useViajesStore } from '@/store';
 import { useAuth } from '@/context';
@@ -22,14 +23,39 @@ import { theme } from '@/config';
 import type { HomeStackParamList } from '@/navigation/types';
 import { repairViajesSinDias, getViajeRelatedCounts } from '@/services';
 import { showToast } from '@/utils/toast';
+import type { Viaje } from '@/types/viaje';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'TripList'>;
+
+type FilterType = 'activos' | 'completados';
+
+/**
+ * Determina si un viaje está completado (archivado o fecha fin pasada)
+ */
+function isViajeCompletado(viaje: Viaje): boolean {
+  if (viaje.archived === 1) return true;
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const fechaFin = new Date(viaje.fechaFin);
+  fechaFin.setHours(0, 0, 0, 0);
+
+  return fechaFin < hoy;
+}
 
 export default function TripListScreen({ navigation }: Props) {
   const { viajes, loading, fetchViajes, archiveViaje, deleteViajeCompletely } =
     useViajesStore();
   const { user } = useAuth();
   const [repairExecuted, setRepairExecuted] = useState(false);
+  const [filterType, setFilterType] = useState<FilterType>('activos');
+  const [deleteModal, setDeleteModal] = useState<{
+    visible: boolean;
+    viajeId: string | null;
+    destino: string;
+    message: string;
+  }>({ visible: false, viajeId: null, destino: '', message: '' });
 
   useEffect(() => {
     if (user?.uid) {
@@ -92,39 +118,41 @@ export default function TripListScreen({ navigation }: Props) {
           ? `Se eliminarán:\n• ${counts.reservas} reserva(s)\n• ${counts.lugares} lugar(es)\n• ${counts.documentos} documento(s)\n• ${counts.gastos} gasto(s)\n\nEsta acción no se puede deshacer.`
           : 'Esta acción no se puede deshacer.';
 
-      Alert.alert(
-        '¿Eliminar viaje?',
-        `Vas a eliminar "${destino}".\n\n${message}`,
-        [
-          {
-            text: 'Cancelar',
-            style: 'cancel',
-          },
-          {
-            text: 'Eliminar',
-            style: 'destructive',
-            onPress: async () => {
-              try {
-                await deleteViajeCompletely(viajeId);
-              } catch (error) {
-                showToast.error('Error', 'No se pudo eliminar el viaje');
-              }
-            },
-          },
-        ]
-      );
+      setDeleteModal({
+        visible: true,
+        viajeId,
+        destino,
+        message: `Vas a eliminar "${destino}".\n\n${message}`,
+      });
     } catch (error) {
       showToast.error('Error', 'No se pudo obtener información del viaje');
     }
   };
 
-  const handleNavigateToArchived = () => {
-    navigation.navigate('ArchivedTrips');
+  const confirmDeleteTrip = async () => {
+    if (deleteModal.viajeId) {
+      try {
+        await deleteViajeCompletely(deleteModal.viajeId);
+        setDeleteModal({ visible: false, viajeId: null, destino: '', message: '' });
+      } catch (error) {
+        setDeleteModal({ visible: false, viajeId: null, destino: '', message: '' });
+        showToast.error('Error', 'No se pudo eliminar el viaje');
+      }
+    }
   };
 
   const handleJoinTrip = () => {
     navigation.navigate('JoinTripByCode');
   };
+
+  // Filtrar viajes según el filtro activo
+  const viajesFiltrados = useMemo(() => {
+    if (filterType === 'activos') {
+      return viajes.filter((v) => !isViajeCompletado(v));
+    } else {
+      return viajes.filter((v) => isViajeCompletado(v));
+    }
+  }, [viajes, filterType]);
 
   // Estado de carga
   if (loading && viajes.length === 0) {
@@ -148,27 +176,19 @@ export default function TripListScreen({ navigation }: Props) {
         <PageHeader
           title="Mis Viajes"
           rightElement={
-            <View style={styles.headerButtons}>
-              <Pressable
-                onPress={handleJoinTrip}
-                style={styles.headerButton}
-              >
-                <Ionicons name="qr-code-outline" size={24} color={theme.colors.primaryForeground} />
-              </Pressable>
-              <Pressable
-                onPress={handleNavigateToArchived}
-                style={styles.headerButton}
-              >
-                <Ionicons name="archive-outline" size={24} color={theme.colors.primaryForeground} />
-              </Pressable>
-            </View>
+            <Pressable
+              onPress={handleJoinTrip}
+              style={styles.headerButton}
+            >
+              <Ionicons name="qr-code-outline" size={24} color={theme.colors.primaryForeground} />
+            </Pressable>
           }
         />
         <ScreenContainer>
           <View style={styles.emptyContainer}>
             <Ionicons
               name="airplane-outline"
-              size={80}
+              size={120}
               color={theme.colors.textMuted}
               style={styles.emptyIcon}
             />
@@ -176,11 +196,19 @@ export default function TripListScreen({ navigation }: Props) {
             <Text style={styles.emptyDescription}>
               Crea tu primer viaje o únete a uno compartido con un código de invitación
             </Text>
-            <PrimaryButton onPress={handleCreateTrip}>
-              Crear viaje
-            </PrimaryButton>
+            <View style={styles.emptyButtonContainer}>
+              <Pressable
+                onPress={handleCreateTrip}
+                style={({ pressed }) => [
+                  styles.createButton,
+                  pressed && styles.createButtonPressed,
+                ]}
+              >
+                <Text style={styles.createButtonText}>Crear viaje</Text>
+              </Pressable>
+            </View>
             <Pressable onPress={handleJoinTrip} style={styles.joinButton}>
-              <Ionicons name="qr-code-outline" size={18} color={theme.colors.primary} />
+              <Ionicons name="qr-code-outline" size={20} color={theme.colors.primary} />
               <Text style={styles.joinButtonText}>Tengo un código de invitación</Text>
             </Pressable>
           </View>
@@ -195,38 +223,86 @@ export default function TripListScreen({ navigation }: Props) {
       <PageHeader
         title="Mis Viajes"
         rightElement={
-          <View style={styles.headerButtons}>
-            <Pressable
-              onPress={handleJoinTrip}
-              style={styles.headerButton}
-            >
-              <Ionicons name="qr-code-outline" size={24} color={theme.colors.primaryForeground} />
-            </Pressable>
-            <Pressable
-              onPress={handleNavigateToArchived}
-              style={styles.headerButton}
-            >
-              <Ionicons name="archive-outline" size={24} color={theme.colors.primaryForeground} />
-            </Pressable>
-          </View>
+          <Pressable
+            onPress={handleJoinTrip}
+            style={styles.headerButton}
+          >
+            <Ionicons name="qr-code-outline" size={24} color={theme.colors.primaryForeground} />
+          </Pressable>
         }
       />
-      <FlatList
-        data={viajes}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <TripCard
-            viaje={item}
-            onPress={() => handleTripPress(item.id)}
-            onArchive={() => handleArchiveTrip(item.id)}
-            onDelete={() => handleDeleteTrip(item.id, item.destino)}
-            isArchived={false}
+
+      {/* Filtros de viajes */}
+      <View style={styles.filtersContainer}>
+        <Pressable
+          onPress={() => setFilterType('activos')}
+          style={[
+            styles.filterButton,
+            filterType === 'activos' && styles.filterButtonActive,
+          ]}
+        >
+          <Text
+            style={[
+              styles.filterButtonText,
+              filterType === 'activos' && styles.filterButtonTextActive,
+            ]}
+          >
+            Activos
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setFilterType('completados')}
+          style={[
+            styles.filterButton,
+            filterType === 'completados' && styles.filterButtonActive,
+          ]}
+        >
+          <Text
+            style={[
+              styles.filterButtonText,
+              filterType === 'completados' && styles.filterButtonTextActive,
+            ]}
+          >
+            Completados
+          </Text>
+        </Pressable>
+      </View>
+
+      {viajesFiltrados.length === 0 ? (
+        <View style={styles.emptyFilterContainer}>
+          <Ionicons
+            name={filterType === 'activos' ? 'airplane-outline' : 'checkmark-circle-outline'}
+            size={80}
+            color={theme.colors.textMuted}
+            style={styles.emptyIcon}
           />
-        )}
-        contentContainerStyle={styles.listContent}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        style={styles.list}
-      />
+          <Text style={styles.emptyFilterTitle}>
+            {filterType === 'activos' ? 'No tienes viajes activos' : 'No tienes viajes completados'}
+          </Text>
+          <Text style={styles.emptyFilterDescription}>
+            {filterType === 'activos'
+              ? 'Crea un nuevo viaje para comenzar'
+              : 'Los viajes archivados o finalizados aparecerán aquí'}
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={viajesFiltrados}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <TripCard
+              viaje={item}
+              onPress={() => handleTripPress(item.id)}
+              onArchive={() => handleArchiveTrip(item.id)}
+              onDelete={() => handleDeleteTrip(item.id, item.destino)}
+              isArchived={false}
+            />
+          )}
+          contentContainerStyle={styles.listContent}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          style={styles.list}
+        />
+      )}
 
       {/* Botón fijo en la parte inferior */}
       <View style={styles.buttonContainer}>
@@ -234,6 +310,23 @@ export default function TripListScreen({ navigation }: Props) {
           Añadir viaje
         </PrimaryButton>
       </View>
+
+      <CustomModal
+        visible={deleteModal.visible}
+        type="warning"
+        title="¿Eliminar viaje?"
+        message={deleteModal.message}
+        onClose={() => setDeleteModal({ visible: false, viajeId: null, destino: '', message: '' })}
+        primaryButton={{
+          text: 'Eliminar',
+          onPress: confirmDeleteTrip,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {},
+        }}
+      />
     </View>
   );
 }
@@ -260,21 +353,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.xl,
   },
   emptyIcon: {
-    marginBottom: theme.spacing.lg,
+    marginBottom: theme.spacing.xl,
+    opacity: 0.4,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: '700',
     color: theme.colors.text,
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
     textAlign: 'center',
   },
   emptyDescription: {
-    fontSize: 14,
+    fontSize: 15,
     color: theme.colors.textSecondary,
     textAlign: 'center',
-    marginBottom: theme.spacing.xl,
-    lineHeight: 20,
+    marginBottom: theme.spacing.xl * 1.5,
+    lineHeight: 22,
+    paddingHorizontal: theme.spacing.sm,
+  },
+  emptyButtonContainer: {
+    width: '100%',
+    marginBottom: theme.spacing.md,
+  },
+  createButton: {
+    width: '100%',
+    backgroundColor: theme.colors.accent,
+    paddingVertical: 18,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  createButtonPressed: {
+    backgroundColor: theme.colors.accentHover,
+  },
+  createButtonText: {
+    color: '#1A1A1A',
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   list: {
     flex: 1,
@@ -307,12 +423,58 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: theme.spacing.lg,
-    paddingVertical: theme.spacing.sm,
+    marginTop: theme.spacing.sm,
+    paddingVertical: theme.spacing.md,
   },
   joinButtonText: {
-    fontSize: 14,
+    fontSize: 15,
     color: theme.colors.primary,
-    fontWeight: '500',
+    fontWeight: '600',
+  },
+  filtersContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    gap: theme.spacing.sm,
+    backgroundColor: theme.colors.background,
+  },
+  filterButton: {
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  filterButtonActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  filterButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.textSecondary,
+  },
+  filterButtonTextActive: {
+    color: theme.colors.primaryForeground,
+  },
+  emptyFilterContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.xl,
+  },
+  emptyFilterTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: theme.colors.text,
+    marginBottom: theme.spacing.sm,
+    textAlign: 'center',
+  },
+  emptyFilterDescription: {
+    fontSize: 15,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
   },
 });

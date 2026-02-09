@@ -20,34 +20,39 @@ import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ScreenContainer, Card, CopilotFAB, MembersSection, ShareTripModal } from '@/components';
-import { getViajeById, getViajeStats } from '@/services';
-import type { Viaje, ViajeStats } from '@/types/viaje';
+import { ScreenContainer, Card, MembersSection, ShareTripModal, DualTimeDisplay } from '@/components';
+import { getViajeById } from '@/services'; // getViajeStats temporalmente desactivado
+import type { Viaje } from '@/types/viaje'; // ViajeStats temporalmente desactivado
 import { theme } from '@/config';
 import type { HomeStackParamList } from '@/navigation/types';
 import { parseLocalDate } from '@/utils';
 import { showToast } from '@/utils/toast';
 import { useRealtimeSync } from '@/hooks';
+import { useConfiguracionStore } from '@/store/useConfiguracionStore';
+import { getDeviceTimeZone } from '@/services/timezoneService';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'TripDetail'>;
 
 export default function TripDetailScreen({ navigation, route }: Props) {
   const { viajeId } = route.params;
   const [viaje, setViaje] = useState<Viaje | null>(null);
-  const [stats, setStats] = useState<ViajeStats | null>(null);
+  // const [stats, setStats] = useState<ViajeStats | null>(null); // TEMPORALMENTE DESACTIVADO
   const [loading, setLoading] = useState(true);
   const [showShareModal, setShowShareModal] = useState(false);
+  const { config } = useConfiguracionStore();
 
   // Memoizar loadData para evitar recrearlo en cada render
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [viajeData, statsData] = await Promise.all([
-        getViajeById(viajeId),
-        getViajeStats(viajeId),
-      ]);
+      const viajeData = await getViajeById(viajeId);
+      // Stats temporalmente desactivadas
+      // const [viajeData, statsData] = await Promise.all([
+      //   getViajeById(viajeId),
+      //   getViajeStats(viajeId),
+      // ]);
       setViaje(viajeData);
-      setStats(statsData);
+      // setStats(statsData);
     } catch (error) {
       console.error('Error loading trip detail:', error);
     } finally {
@@ -65,16 +70,48 @@ export default function TripDetailScreen({ navigation, route }: Props) {
     firestoreIdRef.current = viaje?.firestoreId || null;
   }, [viaje]);
 
-  // Callbacks memoizados para evitar recrearlos
+  // Refs para debounce de recarga de stats
+  const reloadStatsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Callbacks memoizados con debounce para evitar recargas múltiples
   const handleReservationsChange = useCallback(() => {
-    console.log('[TripDetail] Reservas actualizadas, recargando stats...');
-    getViajeStats(viajeId).then(setStats).catch(console.error);
+    console.log('[TripDetail] Reservas actualizadas, programando recarga de stats...');
+
+    // Cancelar timeout pendiente si existe
+    if (reloadStatsTimeoutRef.current) {
+      clearTimeout(reloadStatsTimeoutRef.current);
+    }
+
+    // Programar recarga con debounce de 500ms
+    reloadStatsTimeoutRef.current = setTimeout(() => {
+      console.log('[TripDetail] Ejecutando recarga de stats');
+      // getViajeStats(viajeId).then(setStats).catch(console.error); // TEMPORALMENTE DESACTIVADO
+    }, 500);
   }, [viajeId]);
 
   const handlePlacesChange = useCallback(() => {
-    console.log('[TripDetail] Lugares actualizados, recargando stats...');
-    getViajeStats(viajeId).then(setStats).catch(console.error);
+    console.log('[TripDetail] Lugares actualizados, programando recarga de stats...');
+
+    // Cancelar timeout pendiente si existe
+    if (reloadStatsTimeoutRef.current) {
+      clearTimeout(reloadStatsTimeoutRef.current);
+    }
+
+    // Programar recarga con debounce de 500ms
+    reloadStatsTimeoutRef.current = setTimeout(() => {
+      console.log('[TripDetail] Ejecutando recarga de stats');
+      // getViajeStats(viajeId).then(setStats).catch(console.error); // TEMPORALMENTE DESACTIVADO
+    }, 500);
   }, [viajeId]);
+
+  // Cleanup del timeout al desmontar
+  useEffect(() => {
+    return () => {
+      if (reloadStatsTimeoutRef.current) {
+        clearTimeout(reloadStatsTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Sincronización en tiempo real para viajes compartidos
   // Solo usar valores derivados del viaje una vez cargado
@@ -115,6 +152,9 @@ export default function TripDetailScreen({ navigation, route }: Props) {
         break;
       case 'expenses':
         navigation.navigate('Expenses', { viajeId });
+        break;
+      case 'checklist':
+        navigation.navigate('TripChecklist', { viajeId });
         break;
       default:
         console.log('Unknown screen:', screen);
@@ -165,6 +205,11 @@ export default function TripDetailScreen({ navigation, route }: Props) {
 
   const fechasFormateadas = `${format(parseLocalDate(viaje.fechaInicio), 'd MMM', { locale: es })} – ${format(parseLocalDate(viaje.fechaFin), 'd MMM', { locale: es })}`;
 
+  // Obtener timezones para mostrar dual time
+  const tripTimeZone = viaje.tripTimeZone;
+  const homeTimeZone = config.homeTimeZone || getDeviceTimeZone();
+  const showDualTime = tripTimeZone && homeTimeZone && tripTimeZone !== homeTimeZone;
+
   return (
     <ScreenContainer>
       <ScrollView style={styles.scroll}>
@@ -205,8 +250,17 @@ export default function TripDetailScreen({ navigation, route }: Props) {
 
         {/* Contenido */}
         <View style={styles.content}>
-          {/* Estadísticas */}
-          {stats && (
+          {/* Dual Time Display - Mostrar solo si hay timezone del viaje y es diferente a la home */}
+          {showDualTime && (
+            <DualTimeDisplay
+              tripTimeZone={tripTimeZone!}
+              homeTimeZone={homeTimeZone}
+              style={styles.dualTimeContainer}
+            />
+          )}
+
+          {/* Estadísticas - TEMPORALMENTE OCULTAS */}
+          {/* {stats && (
             <View style={styles.statsRow}>
               <Card style={styles.statCard} padding={16}>
                 <Text style={styles.statNumber}>{stats.diasTotales}</Text>
@@ -221,15 +275,7 @@ export default function TripDetailScreen({ navigation, route }: Props) {
                 <Text style={styles.statLabel}>lugares</Text>
               </Card>
             </View>
-          )}
-
-          {/* Sección de miembros / compartir viaje */}
-          <MembersSection
-            viaje={viaje}
-            onShareTrip={handleShareTrip}
-            onViewMembers={handleViewMembers}
-            onInvite={handleInvite}
-          />
+          )} */}
 
           {/* Menú de navegación */}
           <View style={styles.menuContainer}>
@@ -302,15 +348,45 @@ export default function TripDetailScreen({ navigation, route }: Props) {
                 <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
               </View>
             </Card>
+
+            {/* Checklist */}
+            <Card onPress={() => handleNavigate('checklist')} style={styles.menuCard}>
+              <View style={styles.menuRow}>
+                <View style={[styles.iconContainer, styles.iconChecklist]}>
+                  <Ionicons name="checkbox-outline" size={24} color="#10B981" />
+                </View>
+                <View style={styles.menuTextContainer}>
+                  <Text style={styles.menuTitle}>Checklist</Text>
+                  <Text style={styles.menuDescription}>Cosas pendientes del viaje</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+              </View>
+            </Card>
+
+            {/* Asistente */}
+            <Card onPress={() => navigation.navigate('Assistant', { viajeId })} style={styles.menuCard}>
+              <View style={styles.menuRow}>
+                <View style={[styles.iconContainer, styles.iconAsistente]}>
+                  <Ionicons name="sparkles" size={24} color="#6366F1" />
+                </View>
+                <View style={styles.menuTextContainer}>
+                  <Text style={styles.menuTitle}>Asistente</Text>
+                  <Text style={styles.menuDescription}>Tu copiloto de viaje IA</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+              </View>
+            </Card>
           </View>
+
+          {/* Sección de miembros / compartir viaje */}
+          <MembersSection
+            viaje={viaje}
+            onShareTrip={handleShareTrip}
+            onViewMembers={handleViewMembers}
+            onInvite={handleInvite}
+          />
         </View>
       </ScrollView>
-
-      {/* COPILOT TEMPORALMENTE DESACTIVADO - Mantener implementación pero ocultar acceso
-      <CopilotFAB
-        onPress={() => navigation.navigate('Assistant', { viajeId })}
-      />
-      */}
 
       {/* Modal de compartir viaje */}
       <ShareTripModal
@@ -392,6 +468,9 @@ const styles = StyleSheet.create({
   content: {
     padding: theme.spacing.lg,
   },
+  dualTimeContainer: {
+    marginBottom: theme.spacing.lg,
+  },
   statsRow: {
     flexDirection: 'row',
     gap: theme.spacing.sm,
@@ -444,6 +523,12 @@ const styles = StyleSheet.create({
   },
   iconGastos: {
     backgroundColor: 'rgba(255, 192, 67, 0.1)', // Amarillo
+  },
+  iconChecklist: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)', // Verde checklist
+  },
+  iconAsistente: {
+    backgroundColor: 'rgba(99, 102, 241, 0.1)', // Índigo
   },
   menuTextContainer: {
     flex: 1,

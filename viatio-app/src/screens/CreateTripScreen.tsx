@@ -31,6 +31,8 @@ import { useViajesStore } from '@/store';
 import { useAuth } from '@/context';
 import { theme } from '@/config';
 import { showToast } from '@/utils/toast';
+import { getPlaceDetails } from '@/services/googlePlacesService';
+import { getTimeZoneFromCoordinates } from '@/services/timezoneService';
 import type { HomeStackParamList } from '@/navigation/types';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'CreateTrip'>;
@@ -42,6 +44,7 @@ export default function CreateTripScreen({ navigation }: Props) {
   // Form state
   const [destino, setDestino] = useState('');
   const [destinoPlaceId, setDestinoPlaceId] = useState<string | undefined>(undefined);
+  const [tripTimeZone, setTripTimeZone] = useState<string | undefined>(undefined);
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin, setFechaFin] = useState('');
   const [moneda, setMoneda] = useState('EUR');
@@ -81,9 +84,29 @@ export default function CreateTripScreen({ navigation }: Props) {
   };
 
   // Manejar selección de lugar desde el autocompletado
-  const handlePlaceSelect = (placeId: string, description: string) => {
+  const handlePlaceSelect = async (placeId: string, description: string) => {
     setDestinoPlaceId(placeId);
     console.log('[CreateTrip] Lugar seleccionado:', description, 'ID:', placeId);
+
+    // Obtener detalles del lugar para derivar la timezone
+    try {
+      const placeDetails = await getPlaceDetails(placeId);
+
+      if (placeDetails && placeDetails.latitude && placeDetails.longitude) {
+        // Derivar timezone IANA desde las coordenadas usando tz-lookup
+        const tz = getTimeZoneFromCoordinates(placeDetails.latitude, placeDetails.longitude);
+
+        if (tz) {
+          setTripTimeZone(tz);
+          console.log('[CreateTrip] Timezone detectada:', tz);
+        } else {
+          console.warn('[CreateTrip] No se pudo derivar timezone para el lugar');
+        }
+      }
+    } catch (error) {
+      console.error('[CreateTrip] Error obteniendo detalles del lugar:', error);
+      // No es un error crítico, continuar sin timezone
+    }
   };
 
   const handleCreate = async () => {
@@ -103,6 +126,7 @@ export default function CreateTripScreen({ navigation }: Props) {
       {
         destino: destino.trim(),
         destinoPlaceId: destinoPlaceId,
+        tripTimeZone: tripTimeZone,
         fechaInicio,
         fechaFin,
         moneda,
@@ -121,9 +145,9 @@ export default function CreateTripScreen({ navigation }: Props) {
   };
 
   return (
-    <>
+    <View style={styles.container}>
+      <PageHeader title="Nuevo viaje" onBack={() => navigation.goBack()} />
       <ScreenContainer>
-        <PageHeader title="Nuevo viaje" onBack={() => navigation.goBack()} />
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -180,13 +204,15 @@ export default function CreateTripScreen({ navigation }: Props) {
           </ScrollView>
         </KeyboardAvoidingView>
       </ScreenContainer>
-
       <LoadingOverlay visible={loading} message="Creando viaje..." />
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   scroll: {
     flex: 1,
   },

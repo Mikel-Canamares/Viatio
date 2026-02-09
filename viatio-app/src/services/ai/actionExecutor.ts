@@ -3,12 +3,22 @@
  *
  * Ejecuta las acciones propuestas por el Copilot.
  * Cada tipo de acción tiene su handler específico.
+ *
+ * NOTA: Este módulo es un servicio (no un componente React).
+ * Actualmente usa Alert.alert para confirmaciones, pero esto debería
+ * refactorizarse para usar callbacks o eventos que permitan a los
+ * componentes que lo usen mostrar CustomModal en su lugar.
+ *
+ * TODO: Refactorizar para pasar callbacks de confirmación como parámetros
+ * del ActionExecutorContext, permitiendo que los componentes muestren
+ * modales personalizados en lugar de usar Alert.alert directamente.
  */
 
 import { Alert } from 'react-native';
 import { createEvento } from '@/services/eventosService';
 import { createLugar } from '@/services/lugaresService';
 import { searchPlacesByText, searchNearbyPlaces } from '@/services/googlePlacesService';
+import { envConfig } from '@/config/env';
 import type {
   AgentAction,
   CreateAgendaItemParams,
@@ -89,7 +99,7 @@ async function executeCreateAgendaItem(
 
 /**
  * Buscar lugares con Google Places
- * NOTA: Esta acción ahora también puede mostrar resultados en el mapa automáticamente
+ * NOTA: Muestra solo datos verificados de Places API (sin inventar horarios/precios)
  */
 async function executeSearchPlaces(
   params: SearchPlacesParams,
@@ -127,16 +137,64 @@ async function executeSearchPlaces(
       });
     }
 
+    // Formatear resultados con timestamp y datos verificados
+    const timestamp = new Date().toLocaleString('es-ES', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    // Limitar a 8 mejores resultados (ya están rankeados por googlePlacesService)
+    const topResults = results.slice(0, 8);
+
+    let formattedMessage = `Encontrados ${results.length} lugares`;
+    if (topResults.length > 0) {
+      formattedMessage += ` (mostrando top ${topResults.length}):\n\n`;
+
+      topResults.forEach((place: any, idx: number) => {
+        formattedMessage += `${idx + 1}. ${place.displayName || place.name || 'Sin nombre'}\n`;
+
+        // Rating
+        if (place.rating !== undefined && place.rating !== null) {
+          formattedMessage += `   ⭐ ${place.rating.toFixed(1)}`;
+          if (place.userRatingCount) {
+            formattedMessage += ` (${place.userRatingCount} opiniones)`;
+          }
+          formattedMessage += '\n';
+        } else {
+          formattedMessage += '   ⭐ Sin valoraciones\n';
+        }
+
+        // Dirección
+        if (place.formattedAddress || place.shortFormattedAddress) {
+          const addr = place.shortFormattedAddress || place.formattedAddress;
+          formattedMessage += `   📍 ${addr}\n`;
+        }
+
+        // Estado de apertura (si está disponible)
+        if (place.currentOpeningHours?.openNow !== undefined) {
+          const openStatus = place.currentOpeningHours.openNow ? '🟢 Abierto' : '🔴 Cerrado';
+          formattedMessage += `   ${openStatus}\n`;
+        }
+
+        formattedMessage += '\n';
+      });
+
+      formattedMessage += `\n📅 Consultado en Google Places el ${timestamp}`;
+    }
+
     return {
       success: true,
-      message: `Encontrados ${results.length} lugares`,
+      message: formattedMessage,
       data: results,
     };
   } catch (error) {
     console.error('[ActionExecutor] Error buscando lugares:', error);
     return {
       success: false,
-      message: 'No se pudieron buscar lugares',
+      message: 'No se pudieron buscar lugares. Verifica tu conexión.',
     };
   }
 }
@@ -231,6 +289,7 @@ async function executeShowOnMap(
     };
   }
 }
+
 
 // ============================================
 // EXECUTOR PRINCIPAL

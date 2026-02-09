@@ -14,6 +14,8 @@ import { getViajeById } from './viajesService';
 import {
   scheduleReservaNotification,
   cancelReservaNotifications,
+  schedulePaymentDeadlineNotification,
+  scheduleCancellationDeadlineNotification,
 } from './notificationsService';
 import { deleteLugar } from './lugaresService';
 import { deleteDocumento, getDocumentosByReservaId } from './documentosService';
@@ -145,7 +147,8 @@ export async function createReserva(
           notes: reserva.notas,
         };
 
-        await createExpense(viaje.firestoreId, expenseInput, members);
+        const tripCurrency = viaje.moneda || 'EUR';
+        await createExpense(viaje.firestoreId, expenseInput, members, tripCurrency);
         console.log('[ReservasService] Gasto compartido auto-creado para reserva:', reserva.id);
       } else {
         // Viaje no compartido o sin datos de reparto: crear gasto local normal
@@ -212,6 +215,20 @@ export async function createReserva(
     });
   } catch (error) {
     console.warn('[ReservasService] Error al obtener viaje para notificación:', error);
+  }
+
+  // Programar notificación de fecha límite de pago (no bloqueante)
+  if (reserva.metadatos?.fechaLimitePago && reserva.estadoPago === 'pending') {
+    schedulePaymentDeadlineNotification(reserva, reserva.metadatos.fechaLimitePago).catch((error) => {
+      console.warn('[ReservasService] Error al programar notificación de pago:', error);
+    });
+  }
+
+  // Programar notificación de fecha límite de cancelación (no bloqueante)
+  if (reserva.metadatos?.cancelacionGratuita && reserva.metadatos?.fechaLimiteCancelacion) {
+    scheduleCancellationDeadlineNotification(reserva, reserva.metadatos.fechaLimiteCancelacion).catch((error) => {
+      console.warn('[ReservasService] Error al programar notificación de cancelación:', error);
+    });
   }
 
   // Sincronizar con Firestore si es viaje compartido (no bloqueante)
@@ -285,7 +302,7 @@ export async function getReservasByViajeId(viajeId: string): Promise<Reserva[]> 
       CAST(shares AS TEXT) as shares,
       notas,
       CAST(metadatos AS TEXT) as metadatos,
-      documentoId, lugarId, createdAt, updatedAt
+      documentoId, lugarId, firestoreId, createdAt, updatedAt
     FROM reservas
     WHERE viajeId = ?
     ORDER BY fechaInicio ASC, horaInicio ASC`,
@@ -319,7 +336,7 @@ export async function getReservasByCategoria(
       CAST(shares AS TEXT) as shares,
       notas,
       CAST(metadatos AS TEXT) as metadatos,
-      documentoId, lugarId, createdAt, updatedAt
+      documentoId, lugarId, firestoreId, createdAt, updatedAt
     FROM reservas
     WHERE viajeId = ? AND categoria = ?
     ORDER BY fechaInicio ASC, horaInicio ASC`,
@@ -350,7 +367,7 @@ export async function getReservaById(id: string): Promise<Reserva | null> {
       CAST(shares AS TEXT) as shares,
       notas,
       CAST(metadatos AS TEXT) as metadatos,
-      documentoId, lugarId, createdAt, updatedAt
+      documentoId, lugarId, firestoreId, createdAt, updatedAt
     FROM reservas WHERE id = ?`,
     [id]
   );
@@ -556,6 +573,28 @@ export async function updateReserva(
     }
   }
 
+  // Reprogramar notificaciones de fechas límite si cambiaron
+  try {
+    const reservaActualizada = await getReservaById(id);
+    if (reservaActualizada) {
+      // Notificación de pago
+      if (reservaActualizada.metadatos?.fechaLimitePago && reservaActualizada.estadoPago === 'pending') {
+        schedulePaymentDeadlineNotification(reservaActualizada, reservaActualizada.metadatos.fechaLimitePago).catch((error) => {
+          console.warn('[ReservasService] Error al reprogramar notificación de pago:', error);
+        });
+      }
+
+      // Notificación de cancelación
+      if (reservaActualizada.metadatos?.cancelacionGratuita && reservaActualizada.metadatos?.fechaLimiteCancelacion) {
+        scheduleCancellationDeadlineNotification(reservaActualizada, reservaActualizada.metadatos.fechaLimiteCancelacion).catch((error) => {
+          console.warn('[ReservasService] Error al reprogramar notificación de cancelación:', error);
+        });
+      }
+    }
+  } catch (error) {
+    console.warn('[ReservasService] Error al reprogramar notificaciones de fechas límite:', error);
+  }
+
   // Sincronizar con Firestore si es viaje compartido (no bloqueante)
   const reservaActualizadaParaSync = await getReservaById(id);
   if (reservaActualizadaParaSync) {
@@ -652,9 +691,20 @@ export async function deleteReserva(id: string): Promise<boolean> {
 
   // 6. Sincronizar eliminación con Firestore si es viaje compartido (antes de eliminar)
   if (reserva.firestoreId) {
-    syncDeleteIfShared(reserva.viajeId, 'reservations', reserva.firestoreId).catch((error) => {
-      console.warn('[ReservasService] Error al sincronizar eliminación:', error);
+    console.log('[ReservasService] Iniciando sincronización de eliminación:', {
+      reservaId: id,
+      firestoreId: reserva.firestoreId,
+      viajeId: reserva.viajeId,
     });
+    try {
+      await syncDeleteIfShared(reserva.viajeId, 'reservations', reserva.firestoreId);
+      console.log('[ReservasService] ✅ Eliminación sincronizada con Firestore');
+    } catch (error) {
+      console.error('[ReservasService] ❌ Error al sincronizar eliminación con Firestore:', error);
+      // Continuar con la eliminación local aunque falle la sincronización
+    }
+  } else {
+    console.log('[ReservasService] Reserva sin firestoreId, solo eliminación local');
   }
 
   // 7. Finalmente, eliminar la reserva

@@ -2,8 +2,7 @@
  * CONTEXT PACK BUILDER
  *
  * Construye el ContextPack completo para enviar al Copilot.
- * Recopila información del viaje, agenda, lugares, documentos, etc.
- * NOTA: Los gastos/presupuesto NO se incluyen - ese módulo es independiente.
+ * Recopila información del viaje, agenda, lugares, documentos, gastos/presupuesto, etc.
  */
 
 import { Platform } from 'react-native';
@@ -16,6 +15,7 @@ import { getDocumentosByViajeId } from '@/services/documentosService';
 import { getDiasByViajeId } from '@/services/diasViajeService';
 import { getEventosByDiaId } from '@/services/eventosService';
 import { getPlaceDetails } from '@/services/googlePlacesService';
+import { getResumenGastos } from '@/services/gastosService';
 import { useCopilotStore } from '@/store/useCopilotStore';
 import type {
   ContextPack,
@@ -169,14 +169,15 @@ export async function buildContextPack(
     return baseContextPack;
   }
 
-  // Cargar datos del viaje
+  // Cargar datos del viaje (incluir gastos/presupuesto)
   try {
-    const [viaje, reservas, lugares, documentos, dias] = await Promise.all([
+    const [viaje, reservas, lugares, documentos, dias, resumenGastos] = await Promise.all([
       getViajeById(tripId),
       getReservasByViajeId(tripId),
       getLugaresByViajeId(tripId),
       getDocumentosByViajeId(tripId),
       getDiasByViajeId(tripId),
+      getResumenGastos(tripId),
     ]);
 
     if (!viaje) {
@@ -210,6 +211,24 @@ export async function buildContextPack(
       }
     }
 
+    // Buscar alojamiento principal en las reservas
+    let lodgingBase: { name: string; lat: number; lng: number } | undefined;
+    const hotelReservation = reservas.find((r: Reserva) =>
+      r.categoria === 'accommodation' &&
+      r.latitud !== null &&
+      r.latitud !== undefined &&
+      r.longitud !== null &&
+      r.longitud !== undefined
+    );
+
+    if (hotelReservation && hotelReservation.latitud && hotelReservation.longitud) {
+      lodgingBase = {
+        name: hotelReservation.nombre,
+        lat: hotelReservation.latitud,
+        lng: hotelReservation.longitud,
+      };
+    }
+
     // Construir datos del viaje
     const totalDays = daysBetween(viaje.fechaInicio, viaje.fechaFin) + 1;
     const tripInfo: ContextPack['trip'] = {
@@ -222,6 +241,7 @@ export async function buildContextPack(
       totalDays,
       daysUntilTrip: daysUntilTrip(viaje.fechaInicio),
       party: { adults: viaje.numViajeros || 1, kids: 0 },
+      lodgingBase, // Alojamiento principal con coordenadas
     };
 
     // Construir agenda con eventos
@@ -291,9 +311,16 @@ export async function buildContextPack(
       byCategory: docsByCategory,
     };
 
-    // NOTA: Los gastos NO se incluyen - el módulo de presupuesto es independiente del asistente
+    // Construir información de gastos/presupuesto
+    const budgetInfo: ContextPack['budget'] = {
+      total: resumenGastos.presupuesto,
+      spent: resumenGastos.total,
+      remaining: resumenGastos.restante,
+      currency: resumenGastos.moneda,
+      byCategory: resumenGastos.porCategoria,
+    };
 
-    // Retornar ContextPack completo (sin expenses)
+    // Retornar ContextPack completo (con expenses/budget)
     return {
       ...baseContextPack,
       trip: tripInfo,
@@ -301,6 +328,7 @@ export async function buildContextPack(
       reservations: reservationsInfo,
       places: placesInfo,
       documents: documentsInfo,
+      budget: budgetInfo,
     };
   } catch (error) {
     console.error('[ContextPackBuilder] Error cargando datos del viaje:', error);
@@ -391,7 +419,19 @@ export function contextPackToPromptString(pack: ContextPack): string {
     lines.push(`\nLUGARES GUARDADOS: ${pack.places.totalSaved}`);
   }
 
-  // NOTA: Los gastos NO se incluyen - módulo independiente
+  // Gastos/presupuesto
+  if (pack.budget) {
+    if (pack.budget.total) {
+      lines.push(`\nPRESUPUESTO: ${pack.budget.total} ${pack.budget.currency}`);
+      lines.push(`  Gastado: ${pack.budget.spent} ${pack.budget.currency}`);
+      if (pack.budget.remaining !== undefined) {
+        lines.push(`  Restante: ${pack.budget.remaining} ${pack.budget.currency}`);
+      }
+    } else {
+      lines.push(`\nPRESUPUESTO: No definido`);
+      lines.push(`  Gastado: ${pack.budget.spent} ${pack.budget.currency}`);
+    }
+  }
 
   // Preferencias del usuario
   lines.push(`\nPREFERENCIAS DEL USUARIO:`);

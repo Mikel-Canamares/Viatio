@@ -6,14 +6,16 @@ import {
   ScrollView,
   Pressable,
   Image,
-  Alert,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer, PageHeader, Card } from '@/components';
+import { CustomModal } from '@/components/CustomModal';
 import { useSharedTripsStore } from '@/store/sharedTripsStore';
 import { useExpensesV2Store } from '@/store/expensesV2Store';
+import { useConfiguracionStore } from '@/store/useConfiguracionStore';
+import { useCurrencyStore } from '@/store/currencyStore';
 import { useAuth } from '@/context/AuthContext';
 import { SharedExpense, centsToDisplay, hasPermission } from '@/types/shared';
 import { GASTO_CATEGORIAS } from '@/types/gasto';
@@ -34,9 +36,16 @@ export default function ExpenseDetailScreen() {
 
   const { currentTrip, members } = useSharedTripsStore();
   const { getExpenseById, removeExpense } = useExpensesV2Store();
+  const { config } = useConfiguracionStore();
+  const { convert } = useCurrencyStore();
 
   const [expense, setExpense] = useState<SharedExpense | null>(null);
   const [loading, setLoading] = useState(true);
+  const [convertedAmount, setConvertedAmount] = useState<number | null>(null);
+  const [convertedShares, setConvertedShares] = useState<Record<string, number>>({});
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  const userCurrency = config.monedaDefault || 'EUR';
 
   const currentUserRole = currentTrip?.currentUserRole;
   const isCreator = expense?.createdBy === user?.uid;
@@ -57,31 +66,67 @@ export default function ExpenseDetailScreen() {
     }, [loadExpense])
   );
 
+  // Convertir monto y shares cuando sea necesario
+  useEffect(() => {
+    if (!expense) return;
+
+    const originalCurrency = expense.originalCurrency ?? expense.currency;
+
+    // Solo convertir si la moneda original es diferente a la del perfil
+    if (originalCurrency !== userCurrency) {
+      const originalAmount = expense.originalAmount ?? expense.amount;
+
+      // Convertir monto principal
+      convert(originalAmount / 100, originalCurrency, userCurrency).then((result) => {
+        if (result) {
+          setConvertedAmount(result.converted * 100);
+        }
+      });
+
+      // Convertir shares
+      const convertShares = async () => {
+        const converted: Record<string, number> = {};
+        for (const share of expense.shares) {
+          // Calcular el monto en la moneda original
+          let displayAmount = share.calculatedAmount;
+          if (expense.originalCurrency && expense.originalAmount &&
+              expense.originalCurrency !== expense.currency) {
+            const shareRatio = share.calculatedAmount / expense.amount;
+            displayAmount = Math.round(expense.originalAmount * shareRatio);
+          }
+
+          // Convertir a moneda del perfil
+          const result = await convert(displayAmount / 100, originalCurrency, userCurrency);
+          if (result) {
+            converted[share.uid] = result.converted * 100;
+          }
+        }
+        setConvertedShares(converted);
+      };
+
+      convertShares();
+    } else {
+      setConvertedAmount(null);
+      setConvertedShares({});
+    }
+  }, [expense, userCurrency]);
+
   const handleEdit = () => {
     navigation.navigate('AddSharedExpense', { tripId, expenseId });
   };
 
   const handleDelete = () => {
-    Alert.alert(
-      'Eliminar gasto',
-      '¿Estás seguro de que quieres eliminar este gasto?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: async () => {
-            const success = await removeExpense(tripId, expenseId, members);
-            if (success) {
-              showToast.success('Gasto eliminado', 'Los balances se han actualizado');
-              navigation.goBack();
-            } else {
-              showToast.error('Error', 'No se pudo eliminar el gasto');
-            }
-          },
-        },
-      ]
-    );
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    const success = await removeExpense(tripId, expenseId, members);
+    if (success) {
+      showToast.success('Gasto eliminado', 'Los balances se han actualizado');
+      navigation.goBack();
+    } else {
+      showToast.error('Error', 'No se pudo eliminar el gasto');
+    }
   };
 
   if (loading || !expense) {
@@ -119,8 +164,18 @@ export default function ExpenseDetailScreen() {
 
           <Text style={styles.description}>{expense.description}</Text>
           <Text style={styles.amount}>
-            {centsToDisplay(expense.amount, expense.currency)}
+            {centsToDisplay(
+              expense.originalAmount ?? expense.amount,
+              expense.originalCurrency ?? expense.currency
+            )}
           </Text>
+
+          {/* Mostrar conversión si se pagó en moneda diferente a la del perfil */}
+          {convertedAmount && (expense.originalCurrency ?? expense.currency) !== userCurrency && (
+            <Text style={styles.convertedAmount}>
+              ≈ {centsToDisplay(convertedAmount, userCurrency)}
+            </Text>
+          )}
 
           <View style={styles.categoryBadge}>
             <Text style={[styles.categoryText, { color: categoria.color }]}>
@@ -177,6 +232,20 @@ export default function ExpenseDetailScreen() {
             const member = members.find(m => m.uid === share.uid);
             const isCurrentUser = share.uid === user?.uid;
 
+            // Calcular el monto en la moneda original si existe
+            const displayCurrency = expense.originalCurrency ?? expense.currency;
+            let displayAmount = share.calculatedAmount;
+
+            // Si hay moneda original diferente, necesitamos calcular proporcionalmente
+            if (expense.originalCurrency && expense.originalAmount &&
+                expense.originalCurrency !== expense.currency) {
+              // Calcular el ratio del share respecto al total
+              const shareRatio = share.calculatedAmount / expense.amount;
+              displayAmount = Math.round(expense.originalAmount * shareRatio);
+            }
+
+            const hasConversion = displayCurrency !== userCurrency && convertedShares[share.uid];
+
             return (
               <View key={share.uid} style={styles.shareRow}>
                 {member?.photoURL ? (
@@ -194,9 +263,16 @@ export default function ExpenseDetailScreen() {
                   {isCurrentUser && <Text style={styles.youLabel}> (tú)</Text>}
                 </Text>
 
-                <Text style={styles.shareAmount}>
-                  {centsToDisplay(share.calculatedAmount, expense.currency)}
-                </Text>
+                <View style={styles.shareAmountContainer}>
+                  <Text style={styles.shareAmount}>
+                    {centsToDisplay(displayAmount, displayCurrency)}
+                  </Text>
+                  {hasConversion && (
+                    <Text style={styles.shareConversion}>
+                      ≈ {centsToDisplay(convertedShares[share.uid], userCurrency)}
+                    </Text>
+                  )}
+                </View>
               </View>
             );
           })}
@@ -243,6 +319,23 @@ export default function ExpenseDetailScreen() {
           )}
         </View>
       )}
+
+      <CustomModal
+        visible={showDeleteModal}
+        type="warning"
+        title="Eliminar gasto"
+        message="¿Estás seguro de que quieres eliminar este gasto?"
+        onClose={() => setShowDeleteModal(false)}
+        primaryButton={{
+          text: 'Eliminar',
+          onPress: confirmDelete,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => setShowDeleteModal(false),
+        }}
+      />
     </ScreenContainer>
   );
 }
@@ -279,7 +372,13 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: '700',
     color: theme.colors.textPrimary,
+    marginBottom: 4,
+  },
+  convertedAmount: {
+    fontSize: 16,
+    color: theme.colors.textSecondary,
     marginBottom: 12,
+    fontStyle: 'italic',
   },
   categoryBadge: {
     paddingHorizontal: 12,
@@ -370,10 +469,19 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontWeight: '400',
   },
+  shareAmountContainer: {
+    alignItems: 'flex-end',
+  },
   shareAmount: {
     fontSize: 15,
     fontWeight: '600',
     color: theme.colors.textPrimary,
+  },
+  shareConversion: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    fontStyle: 'italic',
+    marginTop: 2,
   },
   notes: {
     fontSize: 15,

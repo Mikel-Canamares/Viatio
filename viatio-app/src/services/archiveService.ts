@@ -11,6 +11,7 @@ import { logError } from '@/utils';
 import type { Viaje } from '@/types/viaje';
 import { getDocumentosByViajeId } from './documentosService';
 import { deleteDiasByViajeId } from './diasViajeService';
+import { cancelViajeNotifications, cancelReservaNotifications } from './notificationsService';
 
 // ============================================
 // ARCHIVADO
@@ -156,9 +157,10 @@ export async function deleteViajeFiles(viajeId: string): Promise<void> {
 
 /**
  * Elimina un viaje de forma permanente, incluyendo:
- * 1. Archivos físicos (documentos)
- * 2. Días del viaje
- * 3. Todas las entidades relacionadas vía CASCADE (reservas, lugares, gastos, documentos)
+ * 1. Notificaciones programadas (viaje y reservas)
+ * 2. Archivos físicos (documentos)
+ * 3. Días del viaje
+ * 4. Todas las entidades relacionadas vía CASCADE (reservas, lugares, gastos, documentos)
  */
 export async function deleteViajeCompletely(id: string): Promise<boolean> {
   try {
@@ -175,14 +177,37 @@ export async function deleteViajeCompletely(id: string): Promise<boolean> {
       return false;
     }
 
-    // PASO 1: Eliminar archivos físicos ANTES de eliminar registros en BD
+    // PASO 1: Cancelar notificaciones del viaje
+    await cancelViajeNotifications(id).catch((error) => {
+      console.warn('[ArchiveService] Error al cancelar notificaciones del viaje:', error);
+    });
+
+    // PASO 2: Cancelar notificaciones de todas las reservas del viaje
+    try {
+      const reservas = await db.getAllAsync<{ id: string }>(
+        'SELECT id FROM reservas WHERE viajeId = ?',
+        [id]
+      );
+
+      for (const reserva of reservas) {
+        await cancelReservaNotifications(reserva.id).catch((error) => {
+          console.warn(`[ArchiveService] Error al cancelar notificaciones de reserva ${reserva.id}:`, error);
+        });
+      }
+
+      console.log(`[ArchiveService] Notificaciones canceladas para ${reservas.length} reserva(s)`);
+    } catch (error) {
+      console.warn('[ArchiveService] Error al cancelar notificaciones de reservas:', error);
+    }
+
+    // PASO 3: Eliminar archivos físicos ANTES de eliminar registros en BD
     await deleteViajeFiles(id);
 
-    // PASO 2: Eliminar días del viaje (esto desvincula reservas, lugares y gastos)
+    // PASO 4: Eliminar días del viaje (esto desvincula reservas, lugares y gastos)
     await deleteDiasByViajeId(id);
     console.log('[ArchiveService] Días eliminados para viaje:', id);
 
-    // PASO 3: Eliminar viaje (CASCADE eliminará automáticamente: reservas, lugares, documentos, gastos)
+    // PASO 5: Eliminar viaje (CASCADE eliminará automáticamente: reservas, lugares, documentos, gastos)
     const result = await db.runAsync('DELETE FROM viajes WHERE id = ?', [id]);
 
     console.log('[ArchiveService] Viaje eliminado completamente:', id);

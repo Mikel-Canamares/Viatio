@@ -6,10 +6,10 @@
  */
 
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context';
-import { ScreenContainer, Card, PrimaryButton, SecondaryButton } from '@/components';
+import { ScreenContainer, Card, PrimaryButton, SecondaryButton, CustomModal } from '@/components';
 import { theme } from '@/config';
 import { showToast } from '@/utils/toast';
 
@@ -17,6 +17,9 @@ export default function VerifyEmailScreen() {
   const { user, resendVerificationEmail, logout, refreshUser } = useAuth();
   const [resending, setResending] = useState(false);
   const [countdown, setCountdown] = useState(0);
+
+  // Estado del modal
+  const [modalVisible, setModalVisible] = useState(false);
 
   // Polling para verificar si el email fue verificado
   useEffect(() => {
@@ -50,14 +53,7 @@ export default function VerifyEmailScreen() {
   };
 
   const handleLogout = () => {
-    Alert.alert(
-      'Cerrar sesión',
-      '¿Deseas usar otra cuenta?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Salir', onPress: logout, style: 'destructive' },
-      ]
-    );
+    setModalVisible(true);
   };
 
   return (
@@ -111,6 +107,24 @@ export default function VerifyEmailScreen() {
           <Text style={styles.helpLink}>Contacta soporte</Text>
         </Text>
       </View>
+
+      {/* Modal de confirmación de logout */}
+      <CustomModal
+        visible={modalVisible}
+        type="warning"
+        title="Cerrar sesión"
+        message="¿Deseas usar otra cuenta?"
+        onClose={() => setModalVisible(false)}
+        primaryButton={{
+          text: 'Salir',
+          onPress: logout,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {},
+        }}
+      />
     </ScreenContainer>
   );
 }

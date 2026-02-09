@@ -43,25 +43,25 @@ interface ExpensesV2State {
   _unsubscribeSettlements: (() => void) | null;
 
   // Acciones de gastos
-  fetchExpenses: (tripId: string, members: TripMember[]) => Promise<void>;
-  subscribeExpenses: (tripId: string, members: TripMember[]) => void;
+  fetchExpenses: (tripId: string, members: TripMember[], tripCurrency?: string) => Promise<void>;
+  subscribeExpenses: (tripId: string, members: TripMember[], tripCurrency?: string) => void;
   unsubscribeExpenses: () => void;
-  subscribeSettlementsRealtime: (tripId: string, members: TripMember[]) => void;
+  subscribeSettlementsRealtime: (tripId: string, members: TripMember[], tripCurrency?: string) => void;
   unsubscribeSettlementsRealtime: () => void;
-  addExpense: (tripId: string, input: CreateExpenseInput, members: TripMember[]) => Promise<SharedExpense | null>;
-  editExpense: (tripId: string, expenseId: string, updates: Partial<CreateExpenseInput>, members: TripMember[]) => Promise<boolean>;
-  removeExpense: (tripId: string, expenseId: string, members: TripMember[]) => Promise<boolean>;
+  addExpense: (tripId: string, input: CreateExpenseInput, members: TripMember[], tripCurrency: string) => Promise<SharedExpense | null>;
+  editExpense: (tripId: string, expenseId: string, updates: Partial<CreateExpenseInput>, members: TripMember[], tripCurrency: string) => Promise<boolean>;
+  removeExpense: (tripId: string, expenseId: string, members: TripMember[], tripCurrency?: string) => Promise<boolean>;
   selectExpense: (expense: SharedExpense | null) => void;
   getExpenseById: (tripId: string, expenseId: string) => Promise<SharedExpense | null>;
 
   // Recalcular balances
-  recalculateBalances: (members: TripMember[]) => void;
+  recalculateBalances: (members: TripMember[], tripCurrency?: string) => void;
 
   // Liquidaciones
   fetchSettlements: (tripId: string) => Promise<void>;
-  addSettlement: (tripId: string, input: Parameters<typeof createSettlement>[1], members: TripMember[]) => Promise<Settlement | null>;
-  markSettlementComplete: (tripId: string, settlementId: string, members: TripMember[]) => Promise<boolean>;
-  removeSettlement: (tripId: string, settlementId: string, members: TripMember[]) => Promise<boolean>;
+  addSettlement: (tripId: string, input: Parameters<typeof createSettlement>[1], members: TripMember[], tripCurrency: string) => Promise<Settlement | null>;
+  markSettlementComplete: (tripId: string, settlementId: string, members: TripMember[], tripCurrency?: string) => Promise<boolean>;
+  removeSettlement: (tripId: string, settlementId: string, members: TripMember[], tripCurrency?: string) => Promise<boolean>;
 
   // Reset
   reset: () => void;
@@ -84,12 +84,12 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
   // ACCIONES DE GASTOS
   // ============================================
 
-  fetchExpenses: async (tripId, members) => {
+  fetchExpenses: async (tripId, members, tripCurrency) => {
     set({ loading: true, error: null });
     try {
       const expenses = await getTripExpenses(tripId);
       const { settlements } = get();
-      const balances = calculateBalances(expenses, members, settlements);
+      const balances = calculateBalances(expenses, members, settlements, tripCurrency);
       const settlementSuggestions = calculateSettlementSuggestions(balances, settlements);
       const summary = calculateExpensesSummary(expenses);
 
@@ -106,7 +106,7 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
     }
   },
 
-  subscribeExpenses: (tripId, members) => {
+  subscribeExpenses: (tripId, members, tripCurrency) => {
     const { _unsubscribe } = get();
     if (_unsubscribe) {
       _unsubscribe();
@@ -116,7 +116,7 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
       tripId,
       (expenses) => {
         const { settlements } = get();
-        const balances = calculateBalances(expenses, members, settlements);
+        const balances = calculateBalances(expenses, members, settlements, tripCurrency);
         const settlementSuggestions = calculateSettlementSuggestions(balances, settlements);
         const summary = calculateExpensesSummary(expenses);
 
@@ -141,7 +141,7 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
     }
   },
 
-  subscribeSettlementsRealtime: (tripId, members) => {
+  subscribeSettlementsRealtime: (tripId, members, tripCurrency) => {
     const { _unsubscribeSettlements } = get();
     if (_unsubscribeSettlements) {
       _unsubscribeSettlements();
@@ -151,7 +151,7 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
       tripId,
       (settlements) => {
         const { expenses } = get();
-        const balances = calculateBalances(expenses, members, settlements);
+        const balances = calculateBalances(expenses, members, settlements, tripCurrency);
         const settlementSuggestions = calculateSettlementSuggestions(balances, settlements);
 
         set({
@@ -174,14 +174,14 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
     }
   },
 
-  addExpense: async (tripId, input, members) => {
+  addExpense: async (tripId, input, members, tripCurrency) => {
     set({ loading: true, error: null });
     try {
-      const expense = await createExpense(tripId, input, members);
+      const expense = await createExpense(tripId, input, members, tripCurrency);
       if (expense) {
         set((state) => {
           const newExpenses = [expense, ...state.expenses];
-          const balances = calculateBalances(newExpenses, members, state.settlements);
+          const balances = calculateBalances(newExpenses, members, state.settlements, tripCurrency);
           const settlementSuggestions = calculateSettlementSuggestions(balances, state.settlements);
           const summary = calculateExpensesSummary(newExpenses);
 
@@ -202,15 +202,15 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
     }
   },
 
-  editExpense: async (tripId, expenseId, updates, members) => {
+  editExpense: async (tripId, expenseId, updates, members, tripCurrency) => {
     try {
-      const updated = await updateExpense(tripId, expenseId, updates, members);
+      const updated = await updateExpense(tripId, expenseId, updates, members, tripCurrency);
       if (updated) {
         set((state) => {
           const newExpenses = state.expenses.map((e) =>
             e.id === expenseId ? updated : e
           );
-          const balances = calculateBalances(newExpenses, members, state.settlements);
+          const balances = calculateBalances(newExpenses, members, state.settlements, tripCurrency);
           const settlementSuggestions = calculateSettlementSuggestions(balances, state.settlements);
           const summary = calculateExpensesSummary(newExpenses);
 
@@ -232,7 +232,7 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
     }
   },
 
-  removeExpense: async (tripId, expenseId, members) => {
+  removeExpense: async (tripId, expenseId, members, tripCurrency) => {
     try {
       const success = await deleteExpense(tripId, expenseId);
       if (success) {
@@ -240,7 +240,7 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
           const newExpenses = state.expenses.filter((e) => e.id !== expenseId);
 
           // Recalcular balances y sugerencias con los gastos actualizados
-          const balances = calculateBalances(newExpenses, members, state.settlements);
+          const balances = calculateBalances(newExpenses, members, state.settlements, tripCurrency);
           const settlementSuggestions = calculateSettlementSuggestions(balances, state.settlements);
           const summary = calculateExpensesSummary(newExpenses);
 
@@ -273,9 +273,9 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
     }
   },
 
-  recalculateBalances: (members) => {
+  recalculateBalances: (members, tripCurrency) => {
     const { expenses, settlements } = get();
-    const balances = calculateBalances(expenses, members, settlements);
+    const balances = calculateBalances(expenses, members, settlements, tripCurrency);
     const settlementSuggestions = calculateSettlementSuggestions(balances, settlements);
     set({ balances, settlementSuggestions });
   },
@@ -301,7 +301,7 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
     }
   },
 
-  addSettlement: async (tripId, input, members) => {
+  addSettlement: async (tripId, input, members, tripCurrency) => {
     try {
       // Validar que no exista un settlement pendiente idéntico
       const { settlements } = get();
@@ -316,13 +316,13 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
         throw new Error('Ya existe un pago pendiente idéntico');
       }
 
-      const settlement = await createSettlement(tripId, input, members);
+      const settlement = await createSettlement(tripId, input, members, tripCurrency);
       if (settlement) {
         set((state) => {
           const updatedSettlements = [settlement, ...state.settlements];
 
           // Recalcular balances con el nuevo settlement
-          const balances = calculateBalances(state.expenses, members, updatedSettlements);
+          const balances = calculateBalances(state.expenses, members, updatedSettlements, tripCurrency);
           const settlementSuggestions = calculateSettlementSuggestions(balances, updatedSettlements);
 
           return {
@@ -340,7 +340,7 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
     }
   },
 
-  markSettlementComplete: async (tripId, settlementId, members) => {
+  markSettlementComplete: async (tripId, settlementId, members, tripCurrency) => {
     try {
       const success = await completeSettlement(tripId, settlementId);
       if (success) {
@@ -353,7 +353,7 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
           );
 
           // Recalcular balances con los settlements actualizados
-          const balances = calculateBalances(state.expenses, members, updatedSettlements);
+          const balances = calculateBalances(state.expenses, members, updatedSettlements, tripCurrency);
           const settlementSuggestions = calculateSettlementSuggestions(balances, updatedSettlements);
 
           return {
@@ -371,7 +371,7 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
     }
   },
 
-  removeSettlement: async (tripId, settlementId, members) => {
+  removeSettlement: async (tripId, settlementId, members, tripCurrency) => {
     try {
       const success = await cancelSettlement(tripId, settlementId);
       if (success) {
@@ -379,7 +379,7 @@ export const useExpensesV2Store = create<ExpensesV2State>((set, get) => ({
           const updatedSettlements = state.settlements.filter((s) => s.id !== settlementId);
 
           // Recalcular balances y sugerencias
-          const balances = calculateBalances(state.expenses, members, updatedSettlements);
+          const balances = calculateBalances(state.expenses, members, updatedSettlements, tripCurrency);
           const settlementSuggestions = calculateSettlementSuggestions(balances, updatedSettlements);
 
           return {

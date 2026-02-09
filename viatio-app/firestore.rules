@@ -167,6 +167,17 @@ service cloud.firestore {
       }
 
       // ============================================
+      // SUBCOLECCION: checklist
+      // ============================================
+
+      match /checklist/{docId} {
+        allow read: if isTripMember(tripId);
+        allow create: if canWrite(tripId);
+        allow update: if canWrite(tripId);
+        allow delete: if canWrite(tripId);
+      }
+
+      // ============================================
       // SUBCOLECCION: documents
       // ============================================
 

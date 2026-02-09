@@ -6,8 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import {View, Text, StyleSheet, ScrollView, Pressable,
-  Alert} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/ScreenContainer';
@@ -16,6 +15,7 @@ import { Card } from '@/components/Card';
 import { SectionTitle } from '@/components/SectionTitle';
 import { SwitchItem } from '@/components/SwitchItem';
 import { SelectItem, SelectOption } from '@/components/SelectItem';
+import { CustomModal } from '@/components';
 import { useCopilotStore } from '@/store/useCopilotStore';
 import {
   COPILOT_TONE_OPTIONS,
@@ -49,6 +49,10 @@ export default function CopilotSettingsScreen() {
     setBudgetLevel,
     resetPreferences,
   } = useCopilotStore();
+
+  // Estado del modal
+  const [modalVisible, setModalVisible] = useState(false);
+  const [resetModalVisible, setResetModalVisible] = useState(false);
 
   // Cargar preferencias al montar
   useEffect(() => {
@@ -88,38 +92,31 @@ export default function CopilotSettingsScreen() {
 
   // Handler para reset
   const handleReset = () => {
-    Alert.alert(
-      'Restablecer configuración',
-      '¿Seguro que quieres restablecer la configuración del Copilot a los valores por defecto?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Restablecer',
-          style: 'destructive',
-          onPress: async () => {
-            await resetPreferences();
-            Alert.alert('Listo', 'Configuración restablecida');
-          },
-        },
-      ]
-    );
+    setResetModalVisible(true);
+  };
+
+  const confirmReset = async () => {
+    await resetPreferences();
+    setModalVisible(true);
   };
 
   if (isLoading) {
     return (
-      <ScreenContainer>
+      <View style={styles.container}>
         <PageHeader title="Configurar Copilot" onBack={() => navigation.goBack()} />
+        <ScreenContainer>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Cargando configuración...</Text>
         </View>
-      </ScreenContainer>
+        </ScreenContainer>
+      </View>
     );
   }
 
   return (
-    <ScreenContainer>
+    <View style={styles.container}>
       <PageHeader title="Configurar Copilot" onBack={() => navigation.goBack()} />
-
+      <ScreenContainer>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Header con icono */}
         <View style={styles.header}>
@@ -280,11 +277,46 @@ export default function CopilotSettingsScreen() {
         {/* Espaciado inferior */}
         <View style={styles.bottomSpacing} />
       </ScrollView>
-    </ScreenContainer>
+
+      {/* Modal de confirmación de reset */}
+      <CustomModal
+        visible={resetModalVisible}
+        type="warning"
+        title="Restablecer configuración"
+        message="¿Seguro que quieres restablecer la configuración del Copilot a los valores por defecto?"
+        onClose={() => setResetModalVisible(false)}
+        primaryButton={{
+          text: 'Restablecer',
+          onPress: confirmReset,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {},
+        }}
+      />
+
+      {/* Modal de éxito */}
+      <CustomModal
+        visible={modalVisible}
+        type="success"
+        title="Listo"
+        message="Configuración restablecida"
+        onClose={() => setModalVisible(false)}
+        primaryButton={{
+          text: 'OK',
+          onPress: () => {},
+        }}
+      />
+      </ScreenContainer>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   content: {
     flex: 1,
   },

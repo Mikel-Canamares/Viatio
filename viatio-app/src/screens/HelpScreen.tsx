@@ -13,7 +13,6 @@ import {
   TextInput,
   Pressable,
   Linking,
-  Alert,
   FlatList,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -26,6 +25,7 @@ import { ProfileMenuItem } from '@/components/ProfileMenuItem';
 import { CategoryAccordion } from '@/components/CategoryAccordion';
 import { FAQCard } from '@/components/FAQCard';
 import { SearchHighlight } from '@/components/SearchHighlight';
+import { CustomModal } from '@/components';
 import { theme } from '@/config';
 import { showToast } from '@/utils/toast';
 import { faqCategories, searchFAQs, FAQItem } from '@/data/helpContent';
@@ -36,6 +36,14 @@ export default function HelpScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
+
+  // Estado del modal
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    type: 'info' as const,
+    title: '',
+    message: '',
+  });
 
   // Determinar si estamos en modo búsqueda
   const isSearching = searchQuery.trim().length > 0;
@@ -94,25 +102,21 @@ export default function HelpScreen() {
   };
 
   const handleChatSupport = () => {
-    Alert.alert(
-      'Chat de soporte',
-      'El chat en vivo estará disponible próximamente. Por ahora, puedes contactarnos por email.',
-      [{ text: 'OK' }]
-    );
+    setModalConfig({
+      type: 'info',
+      title: 'Chat de soporte',
+      message: 'El chat en vivo estará disponible próximamente. Por ahora, puedes contactarnos por email.',
+    });
+    setModalVisible(true);
   };
 
   const handleReportProblem = () => {
-    Alert.alert(
-      'Reportar un problema',
-      'Describe el problema que has encontrado y te contactaremos por email.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Enviar email',
-          onPress: handleSendEmail,
-        },
-      ]
-    );
+    setModalConfig({
+      type: 'info',
+      title: 'Reportar un problema',
+      message: 'Describe el problema que has encontrado y te contactaremos por email.',
+    });
+    setModalVisible(true);
   };
 
   // Abrir enlaces externos
@@ -189,9 +193,9 @@ export default function HelpScreen() {
   );
 
   return (
-    <ScreenContainer>
+    <View style={styles.container}>
       <PageHeader title="Centro de ayuda" onBack={() => navigation.goBack()} />
-
+      <ScreenContainer>
       <View style={styles.content}>
         {/* Input de búsqueda */}
         <View style={styles.searchContainer}>
@@ -371,11 +375,32 @@ export default function HelpScreen() {
           />
         )}
       </View>
-    </ScreenContainer>
+
+      {/* Modal de información */}
+      <CustomModal
+        visible={modalVisible}
+        type={modalConfig.type}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        onClose={() => setModalVisible(false)}
+        primaryButton={{
+          text: modalConfig.title === 'Reportar un problema' ? 'Enviar email' : 'OK',
+          onPress: modalConfig.title === 'Reportar un problema' ? handleSendEmail : () => {},
+        }}
+        secondaryButton={modalConfig.title === 'Reportar un problema' ? {
+          text: 'Cancelar',
+          onPress: () => {},
+        } : undefined}
+      />
+      </ScreenContainer>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   content: {
     flex: 1,
     paddingTop: theme.spacing.lg,

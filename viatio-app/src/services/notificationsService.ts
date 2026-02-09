@@ -17,6 +17,7 @@ import { Viaje } from '@/types/viaje';
 import { Reserva } from '@/types/reserva';
 import { getPreferenciasNotificaciones } from './perfilService';
 import { TIEMPOS_ANTELACION, TiempoAntelacion } from '@/types/perfil';
+import { persistLog } from '@/utils/notificationLogger';
 
 // ============================================
 // CONSTANTES
@@ -101,6 +102,26 @@ const DEFAULT_TEMPLATES: NotificationTemplate[] = [
     vibrate: true,
     priority: 'high',
   },
+  {
+    id: 'payment_deadline',
+    type: 'reserva',
+    enabled: true,
+    title: '💳 Pago pendiente: {nombre}',
+    body: 'El pago vence el {fecha}. No olvides completar tu reserva.',
+    sound: 'default',
+    vibrate: true,
+    priority: 'high',
+  },
+  {
+    id: 'cancellation_deadline',
+    type: 'reserva',
+    enabled: true,
+    title: '❌ Última oportunidad para cancelar: {nombre}',
+    body: 'Puedes cancelar gratis hasta el {fecha}. Después se aplicarán cargos.',
+    sound: 'default',
+    vibrate: true,
+    priority: 'high',
+  },
 ];
 
 // ============================================
@@ -108,9 +129,14 @@ const DEFAULT_TEMPLATES: NotificationTemplate[] = [
 // ============================================
 
 /**
- * Logger centralizado con timestamps y niveles
+ * Logger centralizado con timestamps, niveles y persistencia
  */
-function log(level: 'info' | 'warn' | 'error' | 'debug', message: string, data?: any) {
+function log(
+  level: 'info' | 'warn' | 'error' | 'debug',
+  message: string,
+  data?: any,
+  source: string = 'general'
+) {
   const timestamp = new Date().toISOString();
   const prefix = `[Notifications ${level.toUpperCase()}] ${timestamp}:`;
 
@@ -128,6 +154,14 @@ function log(level: 'info' | 'warn' | 'error' | 'debug', message: string, data?:
       break;
     default:
       console.log(prefix, message, data || '');
+  }
+
+  // Persistir log en AsyncStorage (sin bloquear)
+  // Solo persistir logs importantes (no debug, a menos que debugMode esté activo)
+  if (level !== 'debug' || debugMode) {
+    persistLog(level, message, source, data).catch((error) => {
+      console.error('[Notifications] Error persisting log:', error);
+    });
   }
 }
 
@@ -247,6 +281,13 @@ export async function requestNotificationPermissions(): Promise<boolean> {
       return false;
     }
 
+    // Verificar permisos de alarma exacta (Android 12+)
+    const canScheduleExact = await canScheduleExactAlarms();
+    if (!canScheduleExact) {
+      log('warn', 'Cannot schedule exact alarms - notifications may be delayed');
+      // Continuar pero advertir al usuario
+    }
+
     await setupAndroidChannels();
     log('info', 'Notification permissions granted');
     return true;
@@ -267,6 +308,28 @@ export async function hasNotificationPermissions(): Promise<boolean> {
     log('error', 'Error checking permissions', error);
     return false;
   }
+}
+
+/**
+ * Verifica si se pueden programar alarmas exactas (Android 12+)
+ */
+async function canScheduleExactAlarms(): Promise<boolean> {
+  if (Platform.OS !== 'android') return true;
+
+  // Android 12+ (API 31+) requiere permiso especial
+  if (Platform.Version >= 31) {
+    try {
+      // En Android 12+, necesitamos verificar el permiso
+      // Si falla, guiar al usuario a configuración
+      const { status } = await Notifications.getPermissionsAsync();
+      return status === 'granted';
+    } catch (error) {
+      log('warn', 'Could not check exact alarm permission', error);
+      return false;
+    }
+  }
+
+  return true;
 }
 
 // ============================================
@@ -486,11 +549,25 @@ function calculateNotificationDate(
   const now = Date.now();
   const oneMinute = 60 * 1000;
 
+  // Logging detallado para debug
+  log('debug', 'Calculating notification date', {
+    eventDateISO: eventDate.toISOString(),
+    eventDateLocal: eventDate.toString(),
+    eventTimestamp: eventDate.getTime(),
+    nowTimestamp: now,
+    secondsBeforeEvent: segundosAntelacion,
+    notificationDateISO: notificationDate.toISOString(),
+    notificationDateLocal: notificationDate.toString(),
+    notificationTimestamp: notificationDate.getTime(),
+    minutesUntilNotification: Math.floor((notificationDate.getTime() - now) / 1000 / 60),
+  });
+
   if (notificationDate.getTime() <= now - oneMinute) {
     const minutesAgo = Math.floor((now - notificationDate.getTime()) / 1000 / 60);
-    log('debug', 'Notification date is in the past', {
+    log('warn', 'Notification date is in the past', {
       notificationDate: notificationDate.toISOString(),
       minutesAgo,
+      eventDate: eventDate.toISOString(),
     });
     return {
       notificationDate,
@@ -499,7 +576,7 @@ function calculateNotificationDate(
     };
   }
 
-  log('debug', 'Notification date calculated', {
+  log('info', 'Notification date calculated successfully', {
     eventDate: eventDate.toISOString(),
     notificationDate: notificationDate.toISOString(),
     secondsBeforeEvent: segundosAntelacion,
@@ -515,7 +592,11 @@ function calculateNotificationDate(
 function parseReservaDateTime(fechaInicio: string, horaInicio: string): Date {
   try {
     const [hours, minutes] = horaInicio.split(':').map(Number);
-    const fecha = new Date(fechaInicio);
+
+    // Parsear la fecha en hora local, no UTC
+    // fechaInicio viene en formato 'YYYY-MM-DD'
+    const [year, month, day] = fechaInicio.split('-').map(Number);
+    const fecha = new Date(year, month - 1, day, hours, minutes, 0, 0);
 
     // Validar que los componentes sean válidos
     if (isNaN(fecha.getTime()) || isNaN(hours) || isNaN(minutes)) {
@@ -523,12 +604,11 @@ function parseReservaDateTime(fechaInicio: string, horaInicio: string): Date {
       return new Date(NaN);
     }
 
-    fecha.setHours(hours, minutes, 0, 0);
-
     log('debug', 'Parsed reserva datetime', {
       fechaInicio,
       horaInicio,
-      result: fecha.toISOString(),
+      parsedLocalTime: fecha.toString(),
+      isoString: fecha.toISOString(),
     });
 
     return fecha;
@@ -623,15 +703,20 @@ export async function scheduleViajeNotification(viaje: Viaje): Promise<boolean> 
     // Guardar metadata
     await saveNotificationId(notificationId, 'viaje', viaje.id, notificationDate, title, body);
 
-    log('info', `✅ Notification scheduled successfully for viaje ${viaje.id}`, {
-      notificationId,
-      scheduledFor: notificationDate.toISOString(),
-      title,
-    });
+    log(
+      'info',
+      `✅ Notification scheduled successfully for viaje ${viaje.id}`,
+      {
+        notificationId,
+        scheduledFor: notificationDate.toISOString(),
+        title,
+      },
+      'scheduleNotification'
+    );
 
     return true;
   } catch (error) {
-    log('error', 'Error scheduling viaje notification', error);
+    log('error', 'Error scheduling viaje notification', error, 'scheduleNotification');
     return false;
   }
 }
@@ -732,7 +817,106 @@ export async function scheduleReservaNotification(
     // Guardar metadata
     await saveNotificationId(notificationId, 'reserva', reserva.id, notificationDate, title, body);
 
-    log('info', `✅ Notification scheduled successfully for reserva ${reserva.id}`, {
+    log(
+      'info',
+      `✅ Notification scheduled successfully for reserva ${reserva.id}`,
+      {
+        notificationId,
+        scheduledFor: notificationDate.toISOString(),
+        title,
+      },
+      'scheduleNotification'
+    );
+
+    return true;
+  } catch (error) {
+    log('error', 'Error scheduling reserva notification', error, 'scheduleNotification');
+    return false;
+  }
+}
+
+/**
+ * Programa una notificación para fecha límite de pago
+ */
+export async function schedulePaymentDeadlineNotification(
+  reserva: Reserva,
+  fechaLimite: string,
+  tiempoAntelacion: TiempoAntelacion = '3d'
+): Promise<boolean> {
+  try {
+    log('info', `Attempting to schedule payment deadline notification for reserva: ${reserva.id}`);
+    initializeNotificationHandler();
+
+    // Verificar permisos
+    const hasPermissions = await hasNotificationPermissions();
+    if (!hasPermissions) {
+      log('warn', 'No notification permissions');
+      return false;
+    }
+
+    // Obtener preferencias
+    const preferencias = await getPreferenciasNotificaciones();
+
+    if (!preferencias.actualizacionesReservas) {
+      log('info', 'Reserva reminders disabled in preferences');
+      return false;
+    }
+
+    // Parsear fecha límite
+    const fechaLimiteDate = new Date(fechaLimite);
+    const calculation = calculateNotificationDate(fechaLimiteDate, tiempoAntelacion);
+
+    if (!calculation.isValid) {
+      log('info', `Cannot schedule payment deadline notification: ${calculation.reason}`);
+      return false;
+    }
+
+    const { notificationDate } = calculation;
+
+    // Obtener template
+    const templates = await getNotificationTemplates();
+    const template = templates.find(t => t.id === 'payment_deadline') || DEFAULT_TEMPLATES[2];
+
+    // Renderizar contenido
+    const variables = {
+      nombre: reserva.nombre,
+      fecha: fechaLimiteDate.toLocaleDateString('es-ES', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }),
+    };
+
+    const title = renderTemplate(template.title, variables);
+    const body = renderTemplate(template.body, variables);
+
+    // Programar notificación
+    const notificationId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        sound: template.sound,
+        priority:
+          template.priority === 'max'
+            ? Notifications.AndroidNotificationPriority.MAX
+            : Notifications.AndroidNotificationPriority.HIGH,
+        data: {
+          type: 'reserva',
+          id: reserva.id,
+          viajeId: reserva.viajeId,
+          scheduledFor: notificationDate.toISOString(),
+        } as NotificationData,
+      },
+      trigger: {
+        date: notificationDate,
+        channelId: 'reservas',
+      },
+    });
+
+    // Guardar metadata
+    await saveNotificationId(notificationId, 'reserva', reserva.id, notificationDate, title, body);
+
+    log('info', `✅ Payment deadline notification scheduled successfully for reserva ${reserva.id}`, {
       notificationId,
       scheduledFor: notificationDate.toISOString(),
       title,
@@ -740,7 +924,101 @@ export async function scheduleReservaNotification(
 
     return true;
   } catch (error) {
-    log('error', 'Error scheduling reserva notification', error);
+    log('error', 'Error scheduling payment deadline notification', error);
+    return false;
+  }
+}
+
+/**
+ * Programa una notificación para fecha límite de cancelación
+ */
+export async function scheduleCancellationDeadlineNotification(
+  reserva: Reserva,
+  fechaLimite: string,
+  tiempoAntelacion: TiempoAntelacion = '3d'
+): Promise<boolean> {
+  try {
+    log('info', `Attempting to schedule cancellation deadline notification for reserva: ${reserva.id}`);
+    initializeNotificationHandler();
+
+    // Verificar permisos
+    const hasPermissions = await hasNotificationPermissions();
+    if (!hasPermissions) {
+      log('warn', 'No notification permissions');
+      return false;
+    }
+
+    // Obtener preferencias
+    const preferencias = await getPreferenciasNotificaciones();
+
+    if (!preferencias.actualizacionesReservas) {
+      log('info', 'Reserva reminders disabled in preferences');
+      return false;
+    }
+
+    // Parsear fecha límite
+    const fechaLimiteDate = new Date(fechaLimite);
+    const calculation = calculateNotificationDate(fechaLimiteDate, tiempoAntelacion);
+
+    if (!calculation.isValid) {
+      log('info', `Cannot schedule cancellation deadline notification: ${calculation.reason}`);
+      return false;
+    }
+
+    const { notificationDate } = calculation;
+
+    // Obtener template
+    const templates = await getNotificationTemplates();
+    const template = templates.find(t => t.id === 'cancellation_deadline') || DEFAULT_TEMPLATES[3];
+
+    // Renderizar contenido
+    const variables = {
+      nombre: reserva.nombre,
+      fecha: fechaLimiteDate.toLocaleDateString('es-ES', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }),
+    };
+
+    const title = renderTemplate(template.title, variables);
+    const body = renderTemplate(template.body, variables);
+
+    // Programar notificación
+    const notificationId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        sound: template.sound,
+        priority:
+          template.priority === 'max'
+            ? Notifications.AndroidNotificationPriority.MAX
+            : Notifications.AndroidNotificationPriority.HIGH,
+        data: {
+          type: 'reserva',
+          id: reserva.id,
+          viajeId: reserva.viajeId,
+          scheduledFor: notificationDate.toISOString(),
+        } as NotificationData,
+      },
+      trigger: {
+        date: notificationDate,
+        channelId: 'reservas',
+      },
+    });
+
+    // Guardar metadata
+    await saveNotificationId(notificationId, 'reserva', reserva.id, notificationDate, title, body);
+
+    log('info', `✅ Cancellation deadline notification scheduled successfully for reserva ${reserva.id}`, {
+      notificationId,
+      scheduledFor: notificationDate.toISOString(),
+      title,
+    });
+
+    return true;
+  } catch (error) {
+    log('error', 'Error scheduling cancellation deadline notification', error);
     return false;
   }
 }
@@ -761,9 +1039,14 @@ export async function cancelViajeNotifications(viajeId: string): Promise<void> {
     }
 
     await removeNotificationIdsForEntity('viaje', viajeId);
-    log('info', `Cancelled ${notificationIds.length} notifications for viaje ${viajeId}`);
+    log(
+      'info',
+      `Cancelled ${notificationIds.length} notifications for viaje ${viajeId}`,
+      { count: notificationIds.length, viajeId },
+      'cancelNotification'
+    );
   } catch (error) {
-    log('error', 'Error cancelling viaje notifications', error);
+    log('error', 'Error cancelling viaje notifications', error, 'cancelNotification');
   }
 }
 
@@ -779,9 +1062,14 @@ export async function cancelReservaNotifications(reservaId: string): Promise<voi
     }
 
     await removeNotificationIdsForEntity('reserva', reservaId);
-    log('info', `Cancelled ${notificationIds.length} notifications for reserva ${reservaId}`);
+    log(
+      'info',
+      `Cancelled ${notificationIds.length} notifications for reserva ${reservaId}`,
+      { count: notificationIds.length, reservaId },
+      'cancelNotification'
+    );
   } catch (error) {
-    log('error', 'Error cancelling reserva notifications', error);
+    log('error', 'Error cancelling reserva notifications', error, 'cancelNotification');
   }
 }
 
@@ -792,9 +1080,9 @@ export async function cancelAllNotifications(): Promise<void> {
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
     await AsyncStorage.removeItem(NOTIFICATION_IDS_STORAGE_KEY);
-    log('info', 'All notifications cancelled');
+    log('info', 'All notifications cancelled', undefined, 'cancelNotification');
   } catch (error) {
-    log('error', 'Error cancelling all notifications', error);
+    log('error', 'Error cancelling all notifications', error, 'cancelNotification');
   }
 }
 

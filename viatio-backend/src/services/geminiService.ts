@@ -325,7 +325,7 @@ export const geminiService = {
         history,
         generationConfig: {
           maxOutputTokens: 1000,
-          temperature: 0.7,
+          temperature: 1.0, // Recomendación oficial para Gemini 2.0+
         },
       });
 

@@ -434,7 +434,14 @@ export interface ContextPack {
     byCategory: Record<string, number>;
   };
 
-  // NOTA: Los gastos/presupuesto NO se incluyen - el módulo de gastos es independiente del Copilot
+  // Presupuesto y gastos del viaje
+  budget?: {
+    total?: number;           // Presupuesto total del viaje
+    spent: number;            // Monto gastado hasta ahora
+    remaining?: number;       // Presupuesto restante (total - spent)
+    currency: string;         // Moneda del viaje
+    byCategory: Record<string, number>;  // Gastos por categoría
+  };
 
   // Capacidades disponibles (qué acciones puede ejecutar)
   capabilities: {

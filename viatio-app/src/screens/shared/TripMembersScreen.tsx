@@ -8,11 +8,11 @@ import {
   Image,
   TextInput,
   Modal,
-  Alert,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer, PageHeader, PrimaryButton } from '@/components';
+import { CustomModal } from '@/components/CustomModal';
 import { useSharedTripsStore } from '@/store/sharedTripsStore';
 import { useAuth } from '@/context/AuthContext';
 import { TripMember, TripRole, ROLE_LABELS, hasPermission } from '@/types/shared';
@@ -48,6 +48,16 @@ export default function TripMembersScreen() {
   const [inviteRole, setInviteRole] = useState<TripRole>('member');
   const [loading, setLoading] = useState(false);
 
+  const [showCancelInviteModal, setShowCancelInviteModal] = useState(false);
+  const [inviteToCancel, setInviteToCancel] = useState<{ id: string; email: string } | null>(null);
+
+  const [showChangeRoleModal, setShowChangeRoleModal] = useState(false);
+  const [memberToChangeRole, setMemberToChangeRole] = useState<TripMember | null>(null);
+  const [newRole, setNewRole] = useState<TripRole>('member');
+
+  const [showRemoveMemberModal, setShowRemoveMemberModal] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState<TripMember | null>(null);
+
   const currentUserRole = currentTrip?.currentUserRole;
   const canInvite = hasPermission(currentUserRole, 'canInviteMembers');
   const canManageMembers = hasPermission(currentUserRole, 'canRemoveMembers');
@@ -79,21 +89,15 @@ export default function TripMembersScreen() {
   };
 
   const handleCancelInvite = (inviteId: string, email: string) => {
-    Alert.alert(
-      'Cancelar invitación',
-      `¿Cancelar la invitación a ${email}?`,
-      [
-        { text: 'No', style: 'cancel' },
-        {
-          text: 'Sí, cancelar',
-          style: 'destructive',
-          onPress: async () => {
-            await cancelInvite(tripId, inviteId);
-            showToast.info('Invitación cancelada');
-          },
-        },
-      ]
-    );
+    setInviteToCancel({ id: inviteId, email });
+    setShowCancelInviteModal(true);
+  };
+
+  const confirmCancelInvite = async () => {
+    if (inviteToCancel) {
+      await cancelInvite(tripId, inviteToCancel.id);
+      showToast.info('Invitación cancelada');
+    }
   };
 
   const handleChangeRole = (member: TripMember) => {
@@ -102,24 +106,18 @@ export default function TripMembersScreen() {
       return;
     }
 
-    const roles: TripRole[] = ['admin', 'member', 'read_only'];
+    setMemberToChangeRole(member);
+    setNewRole(member.role);
+    setShowChangeRoleModal(true);
+  };
 
-    Alert.alert(
-      'Cambiar rol',
-      `Selecciona el nuevo rol para ${member.displayName}`,
-      [
-        ...roles.map(role => ({
-          text: ROLE_LABELS[role] + (role === member.role ? ' ✓' : ''),
-          onPress: async () => {
-            const success = await changeMemberRole(tripId, member.uid, role);
-            if (success) {
-              showToast.success('Rol actualizado');
-            }
-          },
-        })),
-        { text: 'Cancelar', style: 'cancel' as const },
-      ]
-    );
+  const confirmChangeRole = async () => {
+    if (memberToChangeRole && newRole !== memberToChangeRole.role) {
+      const success = await changeMemberRole(tripId, memberToChangeRole.uid, newRole);
+      if (success) {
+        showToast.success('Rol actualizado');
+      }
+    }
   };
 
   const handleRemoveMember = (member: TripMember) => {
@@ -128,23 +126,17 @@ export default function TripMembersScreen() {
       return;
     }
 
-    Alert.alert(
-      'Eliminar miembro',
-      `¿Eliminar a ${member.displayName} del viaje?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: async () => {
-            const success = await removeMember(tripId, member.uid);
-            if (success) {
-              showToast.success('Eliminado', `${member.displayName} ha sido eliminado`);
-            }
-          },
-        },
-      ]
-    );
+    setMemberToRemove(member);
+    setShowRemoveMemberModal(true);
+  };
+
+  const confirmRemoveMember = async () => {
+    if (memberToRemove) {
+      const success = await removeMember(tripId, memberToRemove.uid);
+      if (success) {
+        showToast.success('Eliminado', `${memberToRemove.displayName} ha sido eliminado`);
+      }
+    }
   };
 
   const renderMember = ({ item: member }: { item: TripMember }) => {
@@ -305,6 +297,112 @@ export default function TripMembersScreen() {
           </View>
         </View>
       </Modal>
+
+      <CustomModal
+        visible={showCancelInviteModal}
+        type="warning"
+        title="Cancelar invitación"
+        message={inviteToCancel ? `¿Cancelar la invitación a ${inviteToCancel.email}?` : ''}
+        onClose={() => {
+          setShowCancelInviteModal(false);
+          setInviteToCancel(null);
+        }}
+        primaryButton={{
+          text: 'Sí, cancelar',
+          onPress: confirmCancelInvite,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'No',
+          onPress: () => {
+            setShowCancelInviteModal(false);
+            setInviteToCancel(null);
+          },
+        }}
+      />
+
+      <Modal visible={showChangeRoleModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Cambiar rol</Text>
+              <Pressable onPress={() => setShowChangeRoleModal(false)}>
+                <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            <Text style={styles.inputLabel}>
+              Selecciona el nuevo rol para {memberToChangeRole?.displayName}
+            </Text>
+
+            <View style={styles.roleSelector}>
+              {(['admin', 'member', 'read_only'] as TripRole[]).map((role) => (
+                <Pressable
+                  key={role}
+                  style={[
+                    styles.roleOption,
+                    newRole === role && styles.roleOptionSelected,
+                  ]}
+                  onPress={() => setNewRole(role)}
+                >
+                  <Text
+                    style={[
+                      styles.roleOptionText,
+                      newRole === role && styles.roleOptionTextSelected,
+                    ]}
+                  >
+                    {ROLE_LABELS[role]}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <View style={styles.modalButtons}>
+              <Pressable
+                style={styles.modalButtonCancel}
+                onPress={() => {
+                  setShowChangeRoleModal(false);
+                  setMemberToChangeRole(null);
+                }}
+              >
+                <Text style={styles.modalButtonCancelText}>Cancelar</Text>
+              </Pressable>
+              <PrimaryButton
+                title="Actualizar"
+                onPress={() => {
+                  confirmChangeRole();
+                  setShowChangeRoleModal(false);
+                  setMemberToChangeRole(null);
+                }}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <CustomModal
+        visible={showRemoveMemberModal}
+        type="warning"
+        title="Eliminar miembro"
+        message={memberToRemove ? `¿Eliminar a ${memberToRemove.displayName} del viaje?` : ''}
+        onClose={() => {
+          setShowRemoveMemberModal(false);
+          setMemberToRemove(null);
+        }}
+        primaryButton={{
+          text: 'Eliminar',
+          onPress: confirmRemoveMember,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {
+            setShowRemoveMemberModal(false);
+            setMemberToRemove(null);
+          },
+        }}
+      />
     </ScreenContainer>
   );
 }

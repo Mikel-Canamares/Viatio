@@ -117,6 +117,7 @@ export async function migrateTripToFirestore(
       name: viaje.destino,
       description: viaje.descripcion || '',
       destination: viaje.destino,
+      destinationPlaceId: viaje.destinoPlaceId,
       startDate: viaje.fechaInicio,
       endDate: viaje.fechaFin,
       currency: viaje.moneda || 'EUR',

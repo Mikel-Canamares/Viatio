@@ -232,29 +232,34 @@ export function AddExpenseScreen() {
   // Mostrar loading mientras carga el viaje
   if (loadingViaje) {
     return (
-      <ScreenContainer>
+      <View style={styles.container}>
         <PageHeader title="Añadir gasto" onBack={handleBack} />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primaryLight} />
-        </View>
-      </ScreenContainer>
+        <ScreenContainer>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.colors.primaryLight} />
+          </View>
+        </ScreenContainer>
+      </View>
     );
   }
 
   if (!viaje) {
     return (
-      <ScreenContainer>
+      <View style={styles.container}>
         <PageHeader title="Añadir gasto" onBack={handleBack} />
-        <View style={styles.loadingContainer}>
-          <Text style={styles.errorText}>No se encontró el viaje</Text>
-        </View>
-      </ScreenContainer>
+        <ScreenContainer>
+          <View style={styles.loadingContainer}>
+            <Text style={styles.errorText}>No se encontró el viaje</Text>
+          </View>
+        </ScreenContainer>
+      </View>
     );
   }
 
   return (
-    <ScreenContainer>
+    <View style={styles.container}>
       <PageHeader title="Añadir gasto" onBack={handleBack} />
+      <ScreenContainer>
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -463,7 +468,8 @@ export function AddExpenseScreen() {
           </View>
         </Pressable>
       </Modal>
-    </ScreenContainer>
+      </ScreenContainer>
+    </View>
   );
 }
 
@@ -472,6 +478,9 @@ export function AddExpenseScreen() {
 // ============================================
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',

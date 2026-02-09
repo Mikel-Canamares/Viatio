@@ -13,6 +13,7 @@ export interface Viaje {
   usuarioId: string;
   destino: string;
   destinoPlaceId?: string;
+  tripTimeZone?: string; // Timezone IANA del destino (ej: "Asia/Manila")
   fechaInicio: string;
   fechaFin: string;
   descripcion?: string;
@@ -35,6 +36,7 @@ export interface Viaje {
 export interface CreateViajeInput {
   destino: string;
   destinoPlaceId?: string;
+  tripTimeZone?: string; // Timezone IANA del destino
   fechaInicio: string;
   fechaFin: string;
   descripcion?: string;
@@ -49,6 +51,7 @@ export interface CreateViajeInput {
  */
 export interface UpdateViajeInput {
   destino?: string;
+  tripTimeZone?: string;
   fechaInicio?: string;
   fechaFin?: string;
   descripcion?: string;

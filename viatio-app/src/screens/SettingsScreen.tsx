@@ -6,8 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import {View, Text, StyleSheet, ScrollView,
-  Alert, Pressable} from 'react-native';
+import {View, Text, StyleSheet, ScrollView, Pressable} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { ProfileStackParamList } from '@/navigation/types';
@@ -19,6 +18,7 @@ import { SectionTitle } from '@/components/SectionTitle';
 import { SelectItem, SelectOption } from '@/components/SelectItem';
 import { ProfileMenuItem } from '@/components/ProfileMenuItem';
 import { CurrencyPicker } from '@/components/CurrencyPicker';
+import { CustomModal, TimeZonePicker } from '@/components';
 import { useConfiguracionStore } from '@/store/useConfiguracionStore';
 import { IDIOMAS_DISPONIBLES } from '@/types/perfil';
 import { ALL_CURRENCIES } from '@/config/currencies';
@@ -27,6 +27,7 @@ import { showToast } from '@/utils/toast';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { deepCleanDatabase } from '@/database';
 import { useAuth } from '@/context/AuthContext';
+import { getDeviceTimeZone } from '@/services/timezoneService';
 
 // Opciones de configuración
 const TEMAS_DISPONIBLES: SelectOption[] = [
@@ -53,6 +54,13 @@ export default function SettingsScreen() {
   const { user } = useAuth();
   const { config, isLoading, loadConfig, updateConfig } = useConfiguracionStore();
   const [cacheSize, setCacheSize] = useState<string>('Calculando...');
+  const [exportModal, setExportModal] = useState(false);
+  const [clearCacheModal, setClearCacheModal] = useState(false);
+  const [deepCleanModal, setDeepCleanModal] = useState(false);
+  const [deleteAccountModal, setDeleteAccountModal] = useState(false);
+  const [deleteAccountConfirmModal, setDeleteAccountConfirmModal] = useState(false);
+  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
+  const [showTimeZonePicker, setShowTimeZonePicker] = useState(false);
 
   // Cargar configuración al montar (sincroniza con Firebase si hay usuario)
   useEffect(() => {
@@ -127,118 +135,59 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleTimeZoneChange = async (homeTimeZone: string) => {
+    try {
+      await updateConfig({ homeTimeZone }, user?.uid);
+      showToast.success('Éxito', 'Timezone actualizada correctamente');
+    } catch (error) {
+      showToast.error('Error', 'No se pudo cambiar la timezone');
+    }
+  };
+
   // Exportar datos
   const handleExportData = () => {
-    Alert.alert(
-      'Exportar datos',
-      'Esta función estará disponible próximamente. Podrás exportar todos tus viajes, reservas y gastos en formato JSON.',
-      [{ text: 'OK' }]
-    );
+    setExportModal(true);
   };
 
   // Limpiar caché
   const handleClearCache = () => {
-    Alert.alert(
-      'Limpiar caché',
-      `Se eliminarán ${cacheSize} de datos en caché. La configuración y tus viajes no se verán afectados.`,
-      [
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
-        {
-          text: 'Limpiar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Aquí podrías limpiar cachés específicas
-              // Por ahora solo recalculamos el tamaño
-              await calculateCacheSize();
-              showToast.success('Éxito', 'Caché limpiada correctamente');
-            } catch (error) {
-              showToast.error('Error', 'No se pudo limpiar la caché');
-            }
-          },
-        },
-      ]
-    );
+    setClearCacheModal(true);
+  };
+
+  const confirmClearCache = async () => {
+    try {
+      // Aquí podrías limpiar cachés específicas
+      // Por ahora solo recalculamos el tamaño
+      await calculateCacheSize();
+      showToast.success('Éxito', 'Caché limpiada correctamente');
+    } catch (error) {
+      showToast.error('Error', 'No se pudo limpiar la caché');
+    }
   };
 
   // Limpiar base de datos completamente (DESARROLLO)
   const handleDeepCleanDatabase = () => {
-    Alert.alert(
-      '🔥 LIMPIEZA PROFUNDA DE BASE DE DATOS',
-      '⚠️ ADVERTENCIA: Esta acción es IRREVERSIBLE.\n\nSe eliminará COMPLETAMENTE:\n• Todos tus viajes\n• Todas tus reservas\n• Todos tus lugares\n• Todos tus gastos\n• Todos tus documentos\n\nLa base de datos se recreará desde cero.\n\n¿Continuar?',
-      [
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
-        {
-          text: 'LIMPIAR TODO',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              showToast.info('Limpiando...', 'Esto puede tardar unos segundos');
-              await deepCleanDatabase();
-              showToast.success('✅ Completado', 'Base de datos limpiada y recreada exitosamente');
+    setDeepCleanModal(true);
+  };
 
-              // Instrucciones post-limpieza
-              Alert.alert(
-                '✅ Base de datos limpia',
-                'La base de datos se ha recreado completamente.\n\nPara mejores resultados:\n1. Cierra la app completamente\n2. Vuelve a abrirla\n3. Prueba creando un nuevo viaje',
-                [{ text: 'Entendido' }]
-              );
-            } catch (error) {
-              showToast.error('Error', 'No se pudo limpiar la base de datos');
-              console.error('[Settings] Error en deepClean:', error);
-            }
-          },
-        },
-      ]
-    );
+  const confirmDeepClean = async () => {
+    try {
+      showToast.info('Limpiando...', 'Esto puede tardar unos segundos');
+      await deepCleanDatabase();
+      showToast.success('Completado', 'Base de datos limpiada y recreada exitosamente');
+    } catch (error) {
+      showToast.error('Error', 'No se pudo limpiar la base de datos');
+      console.error('[Settings] Error en deepClean:', error);
+    }
   };
 
   // Eliminar cuenta
   const handleDeleteAccount = () => {
-    Alert.alert(
-      '⚠️ Eliminar cuenta',
-      'Esta acción es IRREVERSIBLE. Se eliminarán permanentemente:\n\n• Todos tus viajes\n• Todas tus reservas\n• Todos tus documentos\n• Todos tus gastos\n• Tu cuenta de usuario\n\n¿Estás completamente seguro?',
-      [
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
-        {
-          text: 'Eliminar cuenta',
-          style: 'destructive',
-          onPress: () => {
-            // Segunda confirmación
-            Alert.alert(
-              'Confirmación final',
-              'Escribe "ELIMINAR" para confirmar',
-              [
-                {
-                  text: 'Cancelar',
-                  style: 'cancel',
-                },
-                {
-                  text: 'Confirmar',
-                  style: 'destructive',
-                  onPress: () => {
-                    // TODO: Implementar eliminación de cuenta
-                    Alert.alert(
-                      'Función no disponible',
-                      'La eliminación de cuenta estará disponible en una próxima versión.'
-                    );
-                  },
-                },
-              ]
-            );
-          },
-        },
-      ]
-    );
+    setDeleteAccountModal(true);
+  };
+
+  const confirmDeleteAccount = () => {
+    setDeleteAccountConfirmModal(true);
   };
 
   // Convertir opciones de idioma al formato SelectOption
@@ -253,23 +202,27 @@ export default function SettingsScreen() {
     ? `${selectedCurrency.flag || ''} ${selectedCurrency.code} - ${selectedCurrency.name}`
     : config.monedaDefault;
 
-  // Estado para controlar el modal del CurrencyPicker
-  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
+  // Obtener timezone home (detectar del dispositivo si no está configurada)
+  const homeTimeZone = config.homeTimeZone || getDeviceTimeZone();
+  const timeZoneLabel = homeTimeZone ? `${homeTimeZone.split('/').pop()?.replace(/_/g, ' ')} (${homeTimeZone})` : 'No configurada';
 
   if (isLoading) {
     return (
-      <ScreenContainer>
+      <View style={styles.container}>
         <PageHeader title="Configuración" onBack={() => navigation.goBack()} />
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Cargando configuración...</Text>
-        </View>
-      </ScreenContainer>
+        <ScreenContainer>
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Cargando configuración...</Text>
+          </View>
+        </ScreenContainer>
+      </View>
     );
   }
 
   return (
-    <ScreenContainer scroll>
+    <View style={styles.container}>
       <PageHeader title="Configuración" onBack={() => navigation.goBack()} />
+      <ScreenContainer scroll>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* APARIENCIA */}
@@ -337,6 +290,24 @@ export default function SettingsScreen() {
             onSelect={handleFormatoFechaChange}
             icon="calendar-outline"
           />
+
+          {/* Selector de timezone casa */}
+          <Pressable
+            onPress={() => setShowTimeZonePicker(true)}
+            style={({ pressed }) => [
+              styles.currencyItem,
+              pressed && styles.currencyItemPressed,
+            ]}
+          >
+            <View style={styles.currencyIconContainer}>
+              <Ionicons name="time-outline" size={20} color={theme.colors.primaryLight} />
+            </View>
+            <View style={styles.currencyContent}>
+              <Text style={styles.currencyLabel}>Zona horaria casa</Text>
+              <Text style={styles.currencyValue}>{timeZoneLabel}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+          </Pressable>
         </Card>
 
         {/* Modal CurrencyPicker - se activa con showCurrencyPicker */}
@@ -346,6 +317,15 @@ export default function SettingsScreen() {
             onChange={handleMonedaChange}
             modalOnly
             onClose={() => setShowCurrencyPicker(false)}
+          />
+        )}
+
+        {/* Modal TimeZonePicker - se activa con showTimeZonePicker */}
+        {showTimeZonePicker && (
+          <TimeZonePicker
+            value={homeTimeZone}
+            onChange={handleTimeZoneChange}
+            onClose={() => setShowTimeZonePicker(false)}
           />
         )}
 
@@ -369,6 +349,12 @@ export default function SettingsScreen() {
         <SectionTitle title="🛠️ Desarrollo (Temporal)" />
         <Card padding={0} style={styles.card}>
           <ProfileMenuItem
+            icon="notifications-outline"
+            label="🔔 Diagnóstico Push Notifications"
+            value="Probar notificaciones push"
+            onPress={() => navigation.navigate('DiagnosticoPush')}
+          />
+          <ProfileMenuItem
             icon="refresh-outline"
             label="🔥 Limpiar base de datos"
             value="Resetear SQLite completamente"
@@ -391,11 +377,100 @@ export default function SettingsScreen() {
         {/* Espaciado inferior */}
         <View style={styles.bottomSpacing} />
       </ScrollView>
-    </ScreenContainer>
+
+      {/* Modales */}
+      <CustomModal
+        visible={exportModal}
+        type="info"
+        title="Exportar datos"
+        message="Esta función estará disponible próximamente. Podrás exportar todos tus viajes, reservas y gastos en formato JSON."
+        onClose={() => setExportModal(false)}
+        primaryButton={{
+          text: 'OK',
+          onPress: () => {},
+        }}
+      />
+
+      <CustomModal
+        visible={clearCacheModal}
+        type="warning"
+        title="Limpiar caché"
+        message={`Se eliminarán ${cacheSize} de datos en caché. La configuración y tus viajes no se verán afectados.`}
+        onClose={() => setClearCacheModal(false)}
+        primaryButton={{
+          text: 'Limpiar',
+          onPress: confirmClearCache,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {},
+        }}
+      />
+
+      <CustomModal
+        visible={deepCleanModal}
+        type="warning"
+        title="LIMPIEZA PROFUNDA DE BASE DE DATOS"
+        message="ADVERTENCIA: Esta acción es IRREVERSIBLE.\n\nSe eliminará COMPLETAMENTE:\n• Todos tus viajes\n• Todas tus reservas\n• Todos tus lugares\n• Todos tus gastos\n• Todos tus documentos\n\nLa base de datos se recreará desde cero.\n\n¿Continuar?"
+        onClose={() => setDeepCleanModal(false)}
+        primaryButton={{
+          text: 'LIMPIAR TODO',
+          onPress: confirmDeepClean,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {},
+        }}
+      />
+
+      <CustomModal
+        visible={deleteAccountModal}
+        type="warning"
+        title="Eliminar cuenta"
+        message="Esta acción es IRREVERSIBLE. Se eliminarán permanentemente:\n\n• Todos tus viajes\n• Todas tus reservas\n• Todos tus documentos\n• Todos tus gastos\n• Tu cuenta de usuario\n\n¿Estás completamente seguro?"
+        onClose={() => setDeleteAccountModal(false)}
+        primaryButton={{
+          text: 'Eliminar cuenta',
+          onPress: confirmDeleteAccount,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {},
+        }}
+      />
+
+      <CustomModal
+        visible={deleteAccountConfirmModal}
+        type="info"
+        title="Función no disponible"
+        message="La eliminación de cuenta estará disponible en una próxima versión."
+        onClose={() => setDeleteAccountConfirmModal(false)}
+        primaryButton={{
+          text: 'OK',
+          onPress: () => {},
+        }}
+      />
+
+      {showCurrencyPicker && (
+        <CurrencyPicker
+          value={config.monedaDefault}
+          onChange={handleMonedaChange}
+          modalOnly
+          onClose={() => setShowCurrencyPicker(false)}
+        />
+      )}
+      </ScreenContainer>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   content: {
     flex: 1,
     paddingTop: theme.spacing.lg,

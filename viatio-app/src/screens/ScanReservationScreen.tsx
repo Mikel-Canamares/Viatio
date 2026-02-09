@@ -14,7 +14,6 @@ import {
   ActivityIndicator,
   ScrollView,
   Pressable,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -24,6 +23,7 @@ import {
   Card,
   PrimaryButton,
   SecondaryButton,
+  CustomModal,
 } from '@/components';
 import { theme } from '@/config';
 import { pickImage, pickDocument, readFileAsBase64, isImageFile, extractReservaFromImage } from '@/services';
@@ -62,6 +62,9 @@ export default function ScanReservationScreen({ route, navigation }: Props) {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [result, setResult] = useState<OcrResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Estado del modal
+  const [modalVisible, setModalVisible] = useState(false);
 
   // ============================================
   // HANDLERS
@@ -234,27 +237,18 @@ export default function ScanReservationScreen({ route, navigation }: Props) {
       navigation.goBack();
     } else if (step === 'preview') {
       if (files.length > 0) {
-        Alert.alert(
-          'Descartar archivos',
-          '¿Quieres volver atrás y descartar los archivos seleccionados?',
-          [
-            { text: 'Cancelar', style: 'cancel' },
-            {
-              text: 'Descartar',
-              style: 'destructive',
-              onPress: () => {
-                setStep('select');
-                setFiles([]);
-              },
-            },
-          ]
-        );
+        setModalVisible(true);
       } else {
         setStep('select');
       }
     } else {
       handleRetry();
     }
+  };
+
+  const handleDiscardFiles = () => {
+    setStep('select');
+    setFiles([]);
   };
 
   // ============================================
@@ -513,7 +507,27 @@ export default function ScanReservationScreen({ route, navigation }: Props) {
     );
   }
 
-  return null;
+  return (
+    <>
+      {/* Modal de confirmación para descartar archivos */}
+      <CustomModal
+        visible={modalVisible}
+        type="warning"
+        title="Descartar archivos"
+        message="¿Quieres volver atrás y descartar los archivos seleccionados?"
+        onClose={() => setModalVisible(false)}
+        primaryButton={{
+          text: 'Descartar',
+          onPress: handleDiscardFiles,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {},
+        }}
+      />
+    </>
+  );
 }
 
 const styles = StyleSheet.create({

@@ -142,6 +142,14 @@ export async function runMigrations(
     await migrateToV18(db);
   }
 
+  if (currentVersion < 19) {
+    await migrateToV19(db);
+  }
+
+  if (currentVersion < 20) {
+    await migrateToV20(db);
+  }
+
   console.log('[Migrations] Migraciones completadas exitosamente');
 }
 
@@ -940,6 +948,88 @@ async function migrateToV18(db: SQLite.SQLiteDatabase): Promise<void> {
     console.log('[Migrations] Migración a v18 completada');
   } catch (error) {
     console.error('[Migrations] Error en migración a v18:', error);
+    throw error;
+  }
+}
+
+/**
+ * Migración a versión 19: Crear tabla checklist_items
+ * Permite a los usuarios crear checklists personales y grupales para sus viajes
+ */
+async function migrateToV19(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migrations] Ejecutando migración a v19: Creación de tabla checklist_items...');
+
+  try {
+    // Crear tabla checklist_items
+    console.log('[Migrations] Creando tabla checklist_items...');
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS checklist_items (
+        id TEXT PRIMARY KEY NOT NULL,
+        viajeId TEXT NOT NULL,
+        usuarioId TEXT NOT NULL,
+        texto TEXT NOT NULL,
+        completado INTEGER NOT NULL DEFAULT 0,
+        orden INTEGER NOT NULL DEFAULT 0,
+        seccion TEXT NOT NULL,
+        firestoreId TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        FOREIGN KEY (viajeId) REFERENCES viajes(id) ON DELETE CASCADE
+      );
+    `);
+
+    // Crear índices
+    console.log('[Migrations] Creando índices para checklist_items...');
+    await db.execAsync('CREATE INDEX IF NOT EXISTS idx_checklist_viajeId ON checklist_items(viajeId);');
+    await db.execAsync('CREATE INDEX IF NOT EXISTS idx_checklist_usuarioId ON checklist_items(usuarioId);');
+    await db.execAsync('CREATE INDEX IF NOT EXISTS idx_checklist_seccion ON checklist_items(seccion);');
+
+    // Registrar migración
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'INSERT INTO _migrations (version, appliedAt) VALUES (?, ?)',
+      [19, now]
+    );
+
+    console.log('[Migrations] Migración a v19 completada');
+  } catch (error) {
+    console.error('[Migrations] Error en migración a v19:', error);
+    throw error;
+  }
+}
+
+/**
+ * Migración a versión 20: Añadir campo tripTimeZone a tabla viajes
+ * Permite almacenar la timezone IANA del destino para mostrar hora local del viaje
+ */
+async function migrateToV20(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migrations] Ejecutando migración a v20: Añadir tripTimeZone a viajes...');
+
+  try {
+    // Verificar si la columna tripTimeZone ya existe
+    const viajesInfo = await db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(viajes);'
+    );
+
+    const columnExists = viajesInfo.some(col => col.name === 'tripTimeZone');
+
+    if (!columnExists) {
+      console.log('[Migrations] Añadiendo columna tripTimeZone a viajes...');
+      await db.execAsync('ALTER TABLE viajes ADD COLUMN tripTimeZone TEXT;');
+    } else {
+      console.log('[Migrations] Columna tripTimeZone ya existe, omitiendo...');
+    }
+
+    // Registrar migración
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'INSERT INTO _migrations (version, appliedAt) VALUES (?, ?)',
+      [20, now]
+    );
+
+    console.log('[Migrations] Migración a v20 completada');
+  } catch (error) {
+    console.error('[Migrations] Error en migración a v20:', error);
     throw error;
   }
 }

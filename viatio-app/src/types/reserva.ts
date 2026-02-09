@@ -59,6 +59,11 @@ export interface ReservaMetadatos {
   email?: string;
   web?: string;
   politicaCancelacion?: string;
+
+  // Payment & Cancellation deadlines
+  fechaLimitePago?: string; // ISO date (YYYY-MM-DD)
+  cancelacionGratuita?: boolean;
+  fechaLimiteCancelacion?: string; // ISO date (YYYY-MM-DD)
 }
 
 export interface Reserva {

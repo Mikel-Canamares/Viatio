@@ -137,6 +137,7 @@ export async function createViaje(
       usuarioId,
       destino: input.destino,
       destinoPlaceId: input.destinoPlaceId,
+      tripTimeZone: input.tripTimeZone,
       fechaInicio: input.fechaInicio,
       fechaFin: input.fechaFin,
       descripcion: input.descripcion,
@@ -152,14 +153,15 @@ export async function createViaje(
 
     await db.runAsync(
       `INSERT INTO viajes (
-        id, usuarioId, destino, destinoPlaceId, fechaInicio, fechaFin, descripcion,
+        id, usuarioId, destino, destinoPlaceId, tripTimeZone, fechaInicio, fechaFin, descripcion,
         imagenUrl, presupuesto, moneda, numViajeros, archived, isShared, createdAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         viaje.id,
         viaje.usuarioId,
         viaje.destino,
         viaje.destinoPlaceId ?? null,
+        viaje.tripTimeZone ?? null,
         viaje.fechaInicio,
         viaje.fechaFin,
         viaje.descripcion ?? null,
@@ -264,6 +266,10 @@ export async function updateViaje(
     if (input.destino !== undefined) {
       updates.push('destino = ?');
       values.push(input.destino);
+    }
+    if (input.tripTimeZone !== undefined) {
+      updates.push('tripTimeZone = ?');
+      values.push(input.tripTimeZone);
     }
     if (input.fechaInicio !== undefined) {
       updates.push('fechaInicio = ?');

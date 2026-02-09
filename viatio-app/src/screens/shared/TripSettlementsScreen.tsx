@@ -5,10 +5,10 @@ import {
   StyleSheet,
   FlatList,
   RefreshControl,
-  Alert,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { ScreenContainer, PageHeader } from '@/components';
+import { CustomModal } from '@/components/CustomModal';
 import { SettlementSuggestions, SettlementsList } from '@/components/shared';
 import { useSharedTripsStore } from '@/store/sharedTripsStore';
 import { useExpensesV2Store } from '@/store/expensesV2Store';
@@ -49,6 +49,9 @@ export default function TripSettlementsScreen() {
   const [convertedSuggestions, setConvertedSuggestions] = useState<SettlementSuggestion[]>([]);
   const [convertedSettlements, setConvertedSettlements] = useState<Settlement[]>([]);
 
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [settlementToComplete, setSettlementToComplete] = useState<Settlement | null>(null);
+
   useEffect(() => {
     fetchSettlements(tripId);
     loadViaje();
@@ -63,12 +66,19 @@ export default function TripSettlementsScreen() {
     }
   };
 
-  // Convertir sugerencias de liquidación
+  // Convertir sugerencias de liquidación de moneda del viaje a moneda del perfil
   useEffect(() => {
     const convertSuggestions = async () => {
-      if (!viaje || settlementSuggestions.length === 0) return;
+      if (!viaje || settlementSuggestions.length === 0) {
+        setConvertedSuggestions([]);
+        return;
+      }
 
       const tripCurrency = viaje.moneda || 'EUR';
+
+      console.log('[TripSettlementsScreen] Raw suggestions:', settlementSuggestions);
+      console.log('[TripSettlementsScreen] Settlements count:', settlements.length);
+      console.log('[TripSettlementsScreen] Settlements details:', settlements);
 
       if (tripCurrency === userCurrency) {
         setConvertedSuggestions(settlementSuggestions);
@@ -82,7 +92,7 @@ export default function TripSettlementsScreen() {
 
           return {
             ...suggestion,
-            amount: convertedAmount ? convertedAmount.converted * 100 : suggestion.amount,
+            amount: convertedAmount ? Math.round(convertedAmount.converted * 100) : suggestion.amount,
           };
         })
       );
@@ -141,22 +151,17 @@ export default function TripSettlementsScreen() {
   };
 
   const handleMarkComplete = (settlement: Settlement) => {
-    Alert.alert(
-      'Completar pago',
-      '¿Confirmas que este pago se ha realizado?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Confirmar',
-          onPress: async () => {
-            const success = await markSettlementComplete(tripId, settlement.id, members);
-            if (success) {
-              showToast.success('Pago completado', 'Los balances se han actualizado');
-            }
-          },
-        },
-      ]
-    );
+    setSettlementToComplete(settlement);
+    setShowCompleteModal(true);
+  };
+
+  const confirmMarkComplete = async () => {
+    if (settlementToComplete) {
+      const success = await markSettlementComplete(tripId, settlementToComplete.id, members);
+      if (success) {
+        showToast.success('Pago completado', 'Los balances se han actualizado');
+      }
+    }
   };
 
   const pendingSettlements = convertedSettlements.filter(s => s.status === 'pending');
@@ -211,6 +216,28 @@ export default function TripSettlementsScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
+      />
+
+      <CustomModal
+        visible={showCompleteModal}
+        type="success"
+        title="Completar pago"
+        message="¿Confirmas que este pago se ha realizado?"
+        onClose={() => {
+          setShowCompleteModal(false);
+          setSettlementToComplete(null);
+        }}
+        primaryButton={{
+          text: 'Confirmar',
+          onPress: confirmMarkComplete,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {
+            setShowCompleteModal(false);
+            setSettlementToComplete(null);
+          },
+        }}
       />
     </ScreenContainer>
   );

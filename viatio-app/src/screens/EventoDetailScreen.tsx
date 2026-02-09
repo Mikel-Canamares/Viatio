@@ -13,7 +13,6 @@ import {
   ScrollView,
   ActivityIndicator,
   Pressable,
-  Alert,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -23,6 +22,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { SecondaryButton } from '@/components/SecondaryButton';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { SectionHeader } from '@/components/SectionHeader';
+import { CustomModal } from '@/components';
 import { useEventosStore } from '@/store/eventosStore';
 import {
   EventoPersonalizado,
@@ -58,6 +58,7 @@ export function EventoDetailScreen() {
 
   const [evento, setEvento] = useState<EventoPersonalizado | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deleteModal, setDeleteModal] = useState(false);
 
   // Cargar evento
   useEffect(() => {
@@ -96,58 +97,53 @@ export function EventoDetailScreen() {
   };
 
   const handleDelete = () => {
-    Alert.alert(
-      'Eliminar evento',
-      '¿Estás seguro de que quieres eliminar este evento?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: async () => {
-            const success = await removeEvento(eventoId);
-            if (success) {
-              navigation.goBack();
-            } else {
-              showToast.error('Error', 'No se pudo eliminar el evento');
-            }
-          },
-        },
-      ]
-    );
+    setDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    const success = await removeEvento(eventoId);
+    if (success) {
+      navigation.goBack();
+    } else {
+      showToast.error('Error', 'No se pudo eliminar el evento');
+    }
   };
 
   if (loading) {
     return (
-      <ScreenContainer>
+      <View style={styles.container}>
         <PageHeader title="Detalle del evento" onBack={handleBack} />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-        </View>
-      </ScreenContainer>
+        <ScreenContainer>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+          </View>
+        </ScreenContainer>
+      </View>
     );
   }
 
   if (!evento) {
     return (
-      <ScreenContainer>
+      <View style={styles.container}>
         <PageHeader title="Detalle del evento" onBack={handleBack} />
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Evento no encontrado</Text>
-        </View>
-      </ScreenContainer>
+        <ScreenContainer>
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>Evento no encontrado</Text>
+          </View>
+        </ScreenContainer>
+      </View>
     );
   }
 
   const categoriaConfig = EVENTO_CATEGORIAS[evento.categoria];
 
   return (
-    <ScreenContainer>
+    <View style={styles.container}>
       <PageHeader
         title="Detalle del evento"
         onBack={handleBack}
       />
-
+      <ScreenContainer>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -241,7 +237,25 @@ export function EventoDetailScreen() {
           </SecondaryButton>
         </View>
       </ScrollView>
-    </ScreenContainer>
+
+      <CustomModal
+        visible={deleteModal}
+        type="warning"
+        title="Eliminar evento"
+        message="¿Estás seguro de que quieres eliminar este evento?"
+        onClose={() => setDeleteModal(false)}
+        primaryButton={{
+          text: 'Eliminar',
+          onPress: confirmDelete,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {},
+        }}
+      />
+      </ScreenContainer>
+    </View>
   );
 }
 
@@ -250,6 +264,9 @@ export function EventoDetailScreen() {
 // ============================================
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   scrollView: {
     flex: 1,
   },

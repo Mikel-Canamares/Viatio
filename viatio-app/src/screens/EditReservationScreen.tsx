@@ -15,7 +15,6 @@ import {
   Pressable,
   ActivityIndicator,
   Image,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -31,7 +30,9 @@ import {
   SectionHeader,
   PrimaryButton,
   SubtypeSelector,
+  CustomModal,
 } from '@/components';
+import { DatePickerInput } from '@/components/DatePickerInput';
 import { MemberChipsSelector } from '@/components/shared/MemberChipsSelector';
 import { SplitMethodSelector } from '@/components/shared/SplitMethodSelector';
 import { SharesEditor } from '@/components/shared/SharesEditor';
@@ -109,6 +110,18 @@ export default function EditReservationScreen({ route, navigation }: Props) {
   const [splitMethod, setSplitMethod] = useState<SplitMethod>('equal');
   const [participantUids, setParticipantUids] = useState<string[]>([]);
   const [shares, setShares] = useState<Omit<ExpenseShare, 'calculatedAmount'>[]>([]);
+
+  // Estados para fechas límite
+  const [fechaLimitePago, setFechaLimitePago] = useState<string>('');
+  const [cancelacionGratuita, setCancelacionGratuita] = useState<boolean>(false);
+  const [fechaLimiteCancelacion, setFechaLimiteCancelacion] = useState<string>('');
+
+  // Estados para modales
+  const [permissionModal, setPermissionModal] = useState(false);
+  const [deleteDocModal, setDeleteDocModal] = useState<{
+    visible: boolean;
+    documentoId: string | null;
+  }>({ visible: false, documentoId: null });
 
   useEffect(() => {
     loadData();
@@ -206,6 +219,17 @@ export default function EditReservationScreen({ route, navigation }: Props) {
           }))
         );
       }
+
+      // Cargar fechas límite desde metadatos
+      if (reservaData.metadatos?.fechaLimitePago) {
+        setFechaLimitePago(reservaData.metadatos.fechaLimitePago);
+      }
+      if (reservaData.metadatos?.cancelacionGratuita) {
+        setCancelacionGratuita(reservaData.metadatos.cancelacionGratuita);
+      }
+      if (reservaData.metadatos?.fechaLimiteCancelacion) {
+        setFechaLimiteCancelacion(reservaData.metadatos.fechaLimiteCancelacion);
+      }
     } catch (error) {
       console.error('[EditReservationScreen] Error al cargar datos:', error);
       showToast.error('Error', 'No se pudo cargar la reserva');
@@ -256,7 +280,7 @@ export default function EditReservationScreen({ route, navigation }: Props) {
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permiso denegado', 'Se necesita acceso a la galería para seleccionar imágenes');
+      setPermissionModal(true);
       return;
     }
 
@@ -284,23 +308,17 @@ export default function EditReservationScreen({ route, navigation }: Props) {
   };
 
   const handleDeleteExistingDocument = (documentoId: string) => {
-    Alert.alert(
-      'Eliminar documento',
-      '¿Deseas eliminar el documento asociado? Se eliminará al guardar los cambios.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: () => {
-            // Añadir a lista de documentos a eliminar
-            setDocumentsToDelete((prev) => [...prev, documentoId]);
-            // Remover de lista de documentos existentes
-            setExistingDocuments((prev) => prev.filter((d) => d.id !== documentoId));
-          },
-        },
-      ]
-    );
+    setDeleteDocModal({ visible: true, documentoId });
+  };
+
+  const confirmDeleteDocument = () => {
+    if (deleteDocModal.documentoId) {
+      // Añadir a lista de documentos a eliminar
+      setDocumentsToDelete((prev) => [...prev, deleteDocModal.documentoId!]);
+      // Remover de lista de documentos existentes
+      setExistingDocuments((prev) => prev.filter((d) => d.id !== deleteDocModal.documentoId));
+      setDeleteDocModal({ visible: false, documentoId: null });
+    }
   };
 
   const handleRemoveAttachedFile = () => {
@@ -359,6 +377,14 @@ export default function EditReservationScreen({ route, navigation }: Props) {
       }
 
       // 4. Actualizar la reserva
+      // Preparar metadatos con fechas límite
+      const metadatosCompletos = {
+        ...formData.metadatos,
+        fechaLimitePago: fechaLimitePago || undefined,
+        cancelacionGratuita: cancelacionGratuita || undefined,
+        fechaLimiteCancelacion: cancelacionGratuita ? (fechaLimiteCancelacion || undefined) : undefined,
+      };
+
       const input: Partial<CreateReservaInput> = {
         categoria: formData.categoria,
         nombre: formData.nombre,
@@ -378,7 +404,7 @@ export default function EditReservationScreen({ route, navigation }: Props) {
         participantUids: participantUids.length > 0 ? participantUids : undefined,
         shares: shares.length > 0 ? shares : undefined,
         notas: formData.notas,
-        metadatos: formData.metadatos,
+        metadatos: metadatosCompletos,
       };
 
       await updateReserva(reservaId, input);
@@ -501,6 +527,38 @@ export default function EditReservationScreen({ route, navigation }: Props) {
                   value={formData.metadatos?.subtipoAlojamiento}
                   onSelect={(value) => updateMetadata('subtipoAlojamiento', value as SubtipoAlojamiento)}
                 />
+
+                {/* Cancelación gratuita - Solo para accommodation */}
+                <Pressable
+                  onPress={() => {
+                    const newValue = !cancelacionGratuita;
+                    setCancelacionGratuita(newValue);
+                    if (!newValue) {
+                      setFechaLimiteCancelacion('');
+                    }
+                  }}
+                  style={styles.checkboxRow}
+                >
+                  <View style={[
+                    styles.checkbox,
+                    cancelacionGratuita && styles.checkboxSelected
+                  ]}>
+                    {cancelacionGratuita && (
+                      <Ionicons name="checkmark" size={16} color="#fff" />
+                    )}
+                  </View>
+                  <Text style={styles.checkboxLabel}>Cancelación gratuita</Text>
+                </Pressable>
+
+                {cancelacionGratuita && (
+                  <DatePickerInput
+                    label="Fecha límite de cancelación"
+                    value={fechaLimiteCancelacion}
+                    onChange={setFechaLimiteCancelacion}
+                    minDate={new Date()}
+                    maxDate={formData.fechaInicio ? new Date(formData.fechaInicio) : undefined}
+                  />
+                )}
               </>
             )}
 
@@ -704,6 +762,16 @@ export default function EditReservationScreen({ route, navigation }: Props) {
                 </View>
               </View>
 
+              {/* Fecha límite de pago - Solo si está pendiente */}
+              {formData.estadoPago === 'pending' && (
+                <DatePickerInput
+                  label="Fecha límite de pago (opcional)"
+                  value={fechaLimitePago}
+                  onChange={setFechaLimitePago}
+                  minDate={new Date()}
+                />
+              )}
+
               {/* Selector de quién pagó - Solo en viajes compartidos y si el estado es pagado o parcial */}
               {viaje?.isShared && members.length > 0 && (formData.estadoPago === 'paid' || formData.estadoPago === 'partial') && (
                 <>
@@ -850,6 +918,35 @@ export default function EditReservationScreen({ route, navigation }: Props) {
           </ScrollView>
         </KeyboardAvoidingView>
       </ScreenContainer>
+
+      <CustomModal
+        visible={permissionModal}
+        type="error"
+        title="Permiso denegado"
+        message="Se necesita acceso a la galería para seleccionar imágenes"
+        onClose={() => setPermissionModal(false)}
+        primaryButton={{
+          text: 'OK',
+          onPress: () => {},
+        }}
+      />
+
+      <CustomModal
+        visible={deleteDocModal.visible}
+        type="warning"
+        title="Eliminar documento"
+        message="¿Deseas eliminar el documento asociado? Se eliminará al guardar los cambios."
+        onClose={() => setDeleteDocModal({ visible: false, documentoId: null })}
+        primaryButton={{
+          text: 'Eliminar',
+          onPress: confirmDeleteDocument,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {},
+        }}
+      />
     </View>
   );
 }
@@ -1025,5 +1122,30 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: theme.colors.text,
     marginBottom: theme.spacing.xs,
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  checkboxSelected: {
+    backgroundColor: theme.colors.accent,
+    borderColor: theme.colors.accent,
+  },
+  checkboxLabel: {
+    fontSize: 15,
+    color: theme.colors.text,
+    fontWeight: '500',
   },
 });

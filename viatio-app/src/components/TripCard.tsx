@@ -86,21 +86,24 @@ export function TripCard({
           {viaje.destino}
         </Text>
 
-        {/* Fechas */}
-        <Text style={styles.fechas}>{fechasFormateadas}</Text>
+        {/* Fila de fechas y badge */}
+        <View style={styles.fechasRow}>
+          {/* Fechas */}
+          <Text style={styles.fechas}>{fechasFormateadas}</Text>
 
-        {/* Badge de días restantes (solo si es futuro) */}
-        {esFuturo && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>
-              {diasRestantes === 0
-                ? '¡Hoy!'
-                : diasRestantes === 1
-                ? 'Mañana'
-                : `En ${diasRestantes} días`}
-            </Text>
-          </View>
-        )}
+          {/* Badge de días restantes (solo si es futuro) */}
+          {esFuturo && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {diasRestantes === 0
+                  ? '¡Hoy!'
+                  : diasRestantes === 1
+                  ? 'Mañana'
+                  : `En ${diasRestantes} días`}
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
     </Card>
   );
@@ -132,11 +135,11 @@ const styles = StyleSheet.create({
   },
   image: {
     width: '100%',
-    height: 160,
+    height: 200,
   },
   imagePlaceholder: {
     width: '100%',
-    height: 160,
+    height: 200,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -147,15 +150,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#111827',
-    marginBottom: 4,
+    marginBottom: 8,
+  },
+  fechasRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   fechas: {
     fontSize: 14,
     color: theme.colors.textSecondary,
-    marginBottom: 8,
   },
   badge: {
-    alignSelf: 'flex-start',
     backgroundColor: theme.colors.primaryLight,
     paddingHorizontal: 12,
     paddingVertical: 4,

@@ -16,14 +16,19 @@ import { db, auth } from '@/config/firebase';
 import { Settlement, SettlementStatus, TripMember } from '@/types/shared';
 import { generateId } from '@/database';
 import { logError } from '@/utils/errorHandler';
+import { convertAmount } from '@/services/currencyService';
 
 interface SettlementDoc {
   fromUid: string;
   fromName: string;
   toUid: string;
   toName: string;
-  amount: number;
-  currency: string;
+  amount: number; // SIEMPRE en moneda del viaje (normalizado)
+  currency: string; // Moneda del viaje
+  originalAmount: number | null; // Monto original si fue en otra moneda
+  originalCurrency: string | null; // Moneda original
+  exchangeRate: number | null; // Tasa de cambio usada (originalCurrency → currency)
+  exchangeRateDate: string | null; // Fecha de la tasa de cambio (ISO)
   date: string;
   notes: string | null;
   status: SettlementStatus;
@@ -34,6 +39,7 @@ interface SettlementDoc {
 
 /**
  * Crear una liquidación
+ * IMPORTANTE: Normaliza el monto a la moneda del viaje para mantener coherencia
  */
 export async function createSettlement(
   tripId: string,
@@ -45,7 +51,8 @@ export async function createSettlement(
     date: string;
     notes?: string;
   },
-  members: TripMember[]
+  members: TripMember[],
+  tripCurrency: string // Moneda del viaje para normalización
 ): Promise<Settlement | null> {
   try {
     const user = auth.currentUser;
@@ -59,13 +66,43 @@ export async function createSettlement(
     const settlementId = generateId();
     const settlementRef = doc(db, 'trips', tripId, 'settlements', settlementId);
 
+    // NORMALIZACIÓN DE MONEDA: Convertir a moneda del viaje si es necesario
+    let normalizedAmount = input.amount;
+    let originalAmount: number | null = null;
+    let originalCurrency: string | null = null;
+    let exchangeRate: number | null = null;
+    let exchangeRateDate: string | null = null;
+
+    if (input.currency !== tripCurrency) {
+      console.log(`[createSettlement] Convirtiendo ${input.amount / 100} ${input.currency} → ${tripCurrency}`);
+
+      const amountInUnits = input.amount / 100;
+      const conversion = await convertAmount(amountInUnits, input.currency, tripCurrency);
+
+      if (!conversion) {
+        throw new Error(`No se pudo convertir de ${input.currency} a ${tripCurrency}. Verifica tu conexión.`);
+      }
+
+      originalAmount = input.amount;
+      originalCurrency = input.currency;
+      exchangeRate = conversion.rate;
+      exchangeRateDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      normalizedAmount = Math.round(conversion.converted * 100);
+
+      console.log(`[createSettlement] Resultado: ${normalizedAmount / 100} ${tripCurrency} (tasa: ${conversion.rate})`);
+    }
+
     const settlementData: SettlementDoc = {
       fromUid: input.fromUid,
       fromName: from.displayName,
       toUid: input.toUid,
       toName: to.displayName,
-      amount: input.amount,
-      currency: input.currency,
+      amount: normalizedAmount, // Monto normalizado
+      currency: tripCurrency, // Moneda del viaje
+      originalAmount, // null si no hubo conversión
+      originalCurrency, // null si no hubo conversión
+      exchangeRate, // null si no hubo conversión
+      exchangeRateDate, // null si no hubo conversión
       date: input.date,
       notes: input.notes || null,
       status: 'pending',
@@ -80,6 +117,10 @@ export async function createSettlement(
       id: settlementId,
       tripId,
       ...settlementData,
+      originalAmount: originalAmount ?? undefined,
+      originalCurrency: originalCurrency ?? undefined,
+      exchangeRate: exchangeRate ?? undefined,
+      exchangeRateDate: exchangeRateDate ?? undefined,
       createdAt: new Date(),
       completedAt: null,
     };
@@ -110,6 +151,10 @@ export async function getTripSettlements(tripId: string): Promise<Settlement[]> 
         toName: data.toName,
         amount: data.amount,
         currency: data.currency,
+        originalAmount: data.originalAmount ?? undefined,
+        originalCurrency: data.originalCurrency ?? undefined,
+        exchangeRate: data.exchangeRate ?? undefined,
+        exchangeRateDate: data.exchangeRateDate ?? undefined,
         date: data.date,
         notes: data.notes,
         status: data.status,
@@ -206,6 +251,10 @@ export function subscribeToSettlements(
             toName: data.toName,
             amount: data.amount,
             currency: data.currency,
+            originalAmount: data.originalAmount ?? undefined,
+            originalCurrency: data.originalCurrency ?? undefined,
+            exchangeRate: data.exchangeRate ?? undefined,
+            exchangeRateDate: data.exchangeRateDate ?? undefined,
             date: data.date,
             notes: data.notes,
             status: data.status,

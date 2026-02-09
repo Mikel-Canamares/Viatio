@@ -181,10 +181,12 @@ export async function migrateTrip(
           // Gasto no tiene campo 'notas', solo descripcion
         };
 
+        const tripCurrency = sharedTrip.currency || 'EUR';
         const expense = await createExpense(
           sharedTrip.id,
           expenseInput,
-          [currentMember]
+          [currentMember],
+          tripCurrency
         );
 
         if (expense) {

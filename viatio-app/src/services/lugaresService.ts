@@ -380,9 +380,13 @@ export async function deleteLugar(id: string): Promise<boolean> {
 
     // Sincronizar eliminación con Firestore si es viaje compartido
     if (lugar?.firestoreId) {
-      syncDeleteIfShared(lugar.viajeId, 'places', lugar.firestoreId).catch((error) => {
-        console.warn('[deleteLugar] Error al sincronizar eliminación:', error);
-      });
+      try {
+        await syncDeleteIfShared(lugar.viajeId, 'places', lugar.firestoreId);
+        console.log('[deleteLugar] Eliminación sincronizada con Firestore');
+      } catch (error) {
+        console.warn('[deleteLugar] Error al sincronizar eliminación con Firestore:', error);
+        // Continuar con la eliminación local aunque falle la sincronización
+      }
     }
 
     await db.runAsync('DELETE FROM lugares WHERE id = ?', [id]);

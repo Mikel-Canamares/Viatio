@@ -10,6 +10,7 @@ import {
   Pressable,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer, PageHeader, PrimaryButton, Card, Dropdown, DropdownOption, ParticipantCheckboxList } from '@/components';
 import { ReservationCurrencyPicker } from '@/components/ReservationCurrencyPicker';
@@ -42,17 +43,18 @@ export default function AddSharedExpenseScreen() {
   const { tripId, expenseId } = route.params;
   const { user } = useAuth();
   const isEditing = !!expenseId;
+  const insets = useSafeAreaInsets();
 
   const { currentTrip, members, fetchMembers, selectTrip } = useSharedTripsStore();
   const { addExpense, editExpense, getExpenseById } = useExpensesV2Store();
-  const { loadRates } = useCurrencyStore();
+  const { loadRates, convert } = useCurrencyStore();
   const { config } = useConfiguracionStore();
 
   // Estado del formulario
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState('EUR');
-  const [category, setCategory] = useState<CategoriaGasto>('comida');
+  const [category, setCategory] = useState<CategoriaGasto | undefined>(undefined);
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [paidByUid, setPaidByUid] = useState<string>(user?.uid || '');
   const [splitMethod, setSplitMethod] = useState<SplitMethod>('equal');
@@ -92,11 +94,27 @@ export default function AddSharedExpenseScreen() {
 
   // Cargar divisa del viaje y tasas de cambio
   useEffect(() => {
-    if (currentTrip?.currency) {
+    if (currentTrip?.currency && !isEditing) {
       setCurrency(currentTrip.currency);
       loadRates(currentTrip.currency);
     }
   }, [currentTrip]);
+
+  // Convertir amount cuando cambia la divisa
+  useEffect(() => {
+    const convertCurrency = async () => {
+      if (!currency || !currentTrip?.currency) return;
+
+      // No convertir si no hay amount o es la primera carga
+      const currentAmount = parseFloat(amount.replace(',', '.'));
+      if (!amount || isNaN(currentAmount) || currentAmount <= 0) return;
+
+      // Cargar tasas para la nueva divisa
+      await loadRates(currency);
+    };
+
+    convertCurrency();
+  }, [currency]);
 
   // Cargar gasto existente si es edición
   useEffect(() => {
@@ -113,8 +131,11 @@ export default function AddSharedExpenseScreen() {
 
     if (expense) {
       setDescription(expense.description);
-      setAmount((expense.amount / 100).toFixed(2));
-      setCurrency(expense.currency);
+      // Usar monto y moneda original si existe, sino usar el normalizado
+      const displayAmount = expense.originalAmount ?? expense.amount;
+      const displayCurrency = expense.originalCurrency ?? expense.currency;
+      setAmount((displayAmount / 100).toFixed(2));
+      setCurrency(displayCurrency);
       setCategory(expense.category as CategoriaGasto);
       setDate(expense.date);
       setPaidByUid(expense.paidByUid);
@@ -212,6 +233,10 @@ export default function AddSharedExpenseScreen() {
       newErrors.amount = 'Introduce un importe válido';
     }
 
+    if (!category) {
+      newErrors.category = 'Selecciona una categoría';
+    }
+
     if (!paidByUid) {
       newErrors.paidBy = 'Selecciona quién pagó';
     }
@@ -236,6 +261,9 @@ export default function AddSharedExpenseScreen() {
   const handleSubmit = async () => {
     if (!validate()) return;
 
+    // Guard: category debe estar definida después de la validación
+    if (!category) return;
+
     setLoading(true);
 
     try {
@@ -256,10 +284,12 @@ export default function AddSharedExpenseScreen() {
 
       let success = false;
 
+      const tripCurrency = currentTrip?.currency || 'EUR';
+
       if (isEditing && expenseId) {
-        success = await editExpense(tripId, expenseId, input, activeMembers);
+        success = await editExpense(tripId, expenseId, input, activeMembers, tripCurrency);
       } else {
-        const expense = await addExpense(tripId, input, activeMembers);
+        const expense = await addExpense(tripId, input, activeMembers, tripCurrency);
         success = !!expense;
       }
 
@@ -300,7 +330,13 @@ export default function AddSharedExpenseScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: Math.max(insets.bottom, 16) + 80 } // 80px para el botón + espacio
+          ]}
+        >
           {/* Descripción e importe */}
           <Card style={styles.card}>
             <Text style={styles.sectionTitle}>¿Qué pagaste?</Text>
@@ -330,12 +366,12 @@ export default function AddSharedExpenseScreen() {
             {errors.amount && <Text style={styles.errorText}>{errors.amount}</Text>}
 
             {/* Conversión en tiempo real */}
-            {amount && parseFloat(amount) > 0 && currency !== currentTrip?.currency && currentTrip?.currency && (
+            {amount && parseFloat(amount) > 0 && currency !== config.monedaDefault && config.monedaDefault && (
               <View style={styles.conversionContainer}>
                 <ConvertedAmount
                   amount={parseFloat(amount.replace(',', '.'))}
                   currency={currency}
-                  targetCurrency={currentTrip.currency}
+                  targetCurrency={config.monedaDefault}
                   showOriginal={false}
                 />
               </View>
@@ -384,6 +420,9 @@ export default function AddSharedExpenseScreen() {
                 )}
               </View>
             </ScrollView>
+            {errors.category && (
+              <Text style={styles.errorText}>{errors.category}</Text>
+            )}
           </Card>
 
           {/* Pagado por + Cuando (misma fila) */}
@@ -423,7 +462,8 @@ export default function AddSharedExpenseScreen() {
               onToggle={handleToggleParticipant}
               showAmounts={true}
               amounts={calculateAmounts()}
-              currency={currentTrip?.currency}
+              currency={currency}
+              userCurrency={config.monedaDefault}
               editable={splitMethod === 'exact'}
               onAmountChange={handleAmountChange}
             />
@@ -440,11 +480,11 @@ export default function AddSharedExpenseScreen() {
                   styles.validationValue,
                   shares.reduce((sum, s) => sum + s.value, 0) !== amountInCents && styles.validationValueError
                 ]}>
-                  {(shares.reduce((sum, s) => sum + s.value, 0) / 100).toFixed(2)} {currentTrip?.currency || 'EUR'}
+                  {(shares.reduce((sum, s) => sum + s.value, 0) / 100).toFixed(2)} {currency}
                 </Text>
                 {shares.reduce((sum, s) => sum + s.value, 0) !== amountInCents && (
                   <Text style={styles.validationHint}>
-                    (debe ser {(amountInCents / 100).toFixed(2)} {currentTrip?.currency || 'EUR'})
+                    (debe ser {(amountInCents / 100).toFixed(2)} {currency})
                   </Text>
                 )}
               </View>
@@ -459,7 +499,7 @@ export default function AddSharedExpenseScreen() {
                 totalAmount={amountInCents}
                 shares={shares}
                 onChange={setShares}
-                currency={currentTrip?.currency}
+                currency={currency}
               />
             )}
             {errors.shares && <Text style={styles.errorText}>{errors.shares}</Text>}
@@ -499,7 +539,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 32,
   },
   card: {
     marginBottom: 16,

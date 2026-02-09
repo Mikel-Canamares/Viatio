@@ -381,10 +381,10 @@ export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
   const eventosDelDiaSeleccionado = selectedDate ? getEventosDelDia(selectedDate) : [];
 
   return (
-    <ScreenContainer>
+    <View style={styles.container}>
       <PageHeader title="Calendario" />
-
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScreenContainer>
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
           {/* Calendar Card */}
           <Card>
@@ -465,11 +465,15 @@ export default function TripCalendarScreen({ }: TripCalendarScreenProps) {
           )}
         </View>
       </ScrollView>
-    </ScreenContainer>
+      </ScreenContainer>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   scrollView: {
     flex: 1,
   },

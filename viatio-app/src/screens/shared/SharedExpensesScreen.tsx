@@ -13,8 +13,10 @@ import { ScreenContainer, PageHeader, FloatingActionButton } from '@/components'
 import { ExpenseCard, BalancesList, SettlementSuggestions } from '@/components/shared';
 import { useSharedTripsStore } from '@/store/sharedTripsStore';
 import { useExpensesV2Store } from '@/store/expensesV2Store';
+import { useConfiguracionStore } from '@/store/useConfiguracionStore';
+import { useCurrencyStore } from '@/store/currencyStore';
 import { useAuth } from '@/context/AuthContext';
-import { SharedExpense, centsToDisplay, SettlementSuggestion, hasPermission } from '@/types/shared';
+import { SharedExpense, centsToDisplay, SettlementSuggestion, MemberBalance, hasPermission } from '@/types/shared';
 import { theme } from '@/theme';
 
 type RouteParams = {
@@ -43,18 +45,122 @@ export default function SharedExpensesScreen() {
 
   const [activeTab, setActiveTab] = useState<TabType>('expenses');
   const [refreshing, setRefreshing] = useState(false);
+  const [convertedSuggestions, setConvertedSuggestions] = useState<SettlementSuggestion[]>([]);
+  const [convertedBalances, setConvertedBalances] = useState<MemberBalance[]>([]);
+  const [convertedTotalAmount, setConvertedTotalAmount] = useState(0);
+
+  const { config } = useConfiguracionStore();
+  const { convert } = useCurrencyStore();
+  const userCurrency = config.monedaDefault || 'EUR';
 
   const canCreateExpense = hasPermission(currentTrip?.currentUserRole, 'canCreateExpense');
 
   useEffect(() => {
     if (members.length > 0) {
-      subscribeExpenses(tripId, members);
+      subscribeExpenses(tripId, members, currentTrip?.currency);
     }
 
     return () => {
       unsubscribeExpenses();
     };
-  }, [tripId, members]);
+  }, [tripId, members, currentTrip?.currency]);
+
+  // Convertir sugerencias de liquidación de moneda del viaje a moneda del perfil
+  useEffect(() => {
+    const convertSuggestions = async () => {
+      if (!currentTrip || settlementSuggestions.length === 0) {
+        setConvertedSuggestions([]);
+        return;
+      }
+
+      const tripCurrency = currentTrip.currency || 'EUR';
+
+      if (tripCurrency === userCurrency) {
+        setConvertedSuggestions(settlementSuggestions);
+        return;
+      }
+
+      const converted = await Promise.all(
+        settlementSuggestions.map(async (suggestion) => {
+          const amountInUnits = suggestion.amount / 100;
+          const convertedAmount = await convert(amountInUnits, tripCurrency, userCurrency);
+
+          return {
+            ...suggestion,
+            amount: convertedAmount ? Math.round(convertedAmount.converted * 100) : suggestion.amount,
+          };
+        })
+      );
+
+      setConvertedSuggestions(converted);
+    };
+
+    convertSuggestions();
+  }, [settlementSuggestions, currentTrip, userCurrency]);
+
+  // Convertir balances de moneda del viaje a moneda del perfil
+  useEffect(() => {
+    const convertBalancesData = async () => {
+      if (!currentTrip || balances.length === 0) {
+        setConvertedBalances([]);
+        return;
+      }
+
+      const tripCurrency = currentTrip.currency || 'EUR';
+
+      if (tripCurrency === userCurrency) {
+        setConvertedBalances(balances);
+        return;
+      }
+
+      const converted = await Promise.all(
+        balances.map(async (balance) => {
+          const totalPaidInUnits = balance.totalPaid / 100;
+          const totalOwedInUnits = balance.totalOwed / 100;
+          const netBalanceInUnits = balance.netBalance / 100;
+
+          const convertedPaid = await convert(totalPaidInUnits, tripCurrency, userCurrency);
+          const convertedOwed = await convert(totalOwedInUnits, tripCurrency, userCurrency);
+          const convertedNet = await convert(netBalanceInUnits, tripCurrency, userCurrency);
+
+          return {
+            ...balance,
+            totalPaid: convertedPaid ? Math.round(convertedPaid.converted * 100) : balance.totalPaid,
+            totalOwed: convertedOwed ? Math.round(convertedOwed.converted * 100) : balance.totalOwed,
+            netBalance: convertedNet ? Math.round(convertedNet.converted * 100) : balance.netBalance,
+          };
+        })
+      );
+
+      setConvertedBalances(converted);
+    };
+
+    convertBalancesData();
+  }, [balances, currentTrip, userCurrency]);
+
+  // Convertir total amount del resumen
+  useEffect(() => {
+    const convertTotalAmount = async () => {
+      if (!currentTrip || !summary) {
+        setConvertedTotalAmount(0);
+        return;
+      }
+
+      const tripCurrency = currentTrip.currency || 'EUR';
+
+      if (tripCurrency === userCurrency) {
+        setConvertedTotalAmount(summary.totalAmount);
+        return;
+      }
+
+      const totalInUnits = summary.totalAmount / 100;
+      const converted = await convert(totalInUnits, tripCurrency, userCurrency);
+
+      setConvertedTotalAmount(converted ? Math.round(converted.converted * 100) : summary.totalAmount);
+    };
+
+    convertTotalAmount();
+  }, [summary, currentTrip, userCurrency]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -85,7 +191,7 @@ export default function SharedExpensesScreen() {
       <View style={styles.summaryCard}>
         <Text style={styles.summaryLabel}>Gasto total del viaje</Text>
         <Text style={styles.summaryAmount}>
-          {centsToDisplay(summary?.totalAmount || 0, currentTrip?.currency)}
+          {centsToDisplay(convertedTotalAmount, userCurrency)}
         </Text>
         <Text style={styles.summarySubtext}>
           {summary?.expenseCount || 0} gastos · {members.length} personas
@@ -133,6 +239,7 @@ export default function SharedExpensesScreen() {
         <ExpenseCard
           expense={item}
           currentUserId={user?.uid}
+          userCurrency={userCurrency}
           onPress={() => handleExpensePress(item)}
         />
       )}
@@ -164,15 +271,15 @@ export default function SharedExpensesScreen() {
           <View style={styles.balancesContent}>
             <Text style={styles.sectionTitle}>Balances por persona</Text>
             <BalancesList
-              balances={balances}
-              currency={currentTrip?.currency}
+              balances={convertedBalances}
+              currency={userCurrency}
               currentUserId={user?.uid}
             />
 
             <View style={styles.settlementSection}>
               <SettlementSuggestions
-                suggestions={settlementSuggestions}
-                currency={currentTrip?.currency}
+                suggestions={convertedSuggestions}
+                currency={userCurrency}
                 currentUserId={user?.uid}
                 onSettlePress={handleSettlePress}
               />

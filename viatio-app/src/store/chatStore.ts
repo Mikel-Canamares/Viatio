@@ -29,6 +29,9 @@ interface ChatState {
   conversacionId: string | null;
   historial: ConversacionGuardada[];
   currentScreen: CopilotScreen;
+  streamingEnabled: boolean;
+  isStreaming: boolean;
+  streamingMessageId: string | null;
 }
 
 interface ChatActions {
@@ -36,6 +39,8 @@ interface ChatActions {
   setContexto: (contexto: ContextoViaje | null) => void;
   setCurrentScreen: (screen: CopilotScreen) => void;
   sendMessage: (content: string) => Promise<void>;
+  sendMessageStream: (content: string) => Promise<void>;
+  setStreamingEnabled: (enabled: boolean) => void;
   clearChat: () => void;
   clearError: () => void;
   startNewConversation: () => void;
@@ -85,6 +90,9 @@ const initialState: ChatState = {
   conversacionId: null,
   historial: [],
   currentScreen: 'standalone_chat',
+  streamingEnabled: true, // Activar streaming por defecto
+  isStreaming: false,
+  streamingMessageId: null,
 };
 
 // ============================================
@@ -115,7 +123,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const trimmedContent = content.trim();
     if (!trimmedContent) return;
 
-    const { mensajes, contexto, currentScreen } = get();
+    const { mensajes, contexto, currentScreen, streamingEnabled } = get();
+
+    // Si streaming está habilitado, usar sendMessageStream
+    if (streamingEnabled) {
+      return get().sendMessageStream(content);
+    }
 
     // Crear mensaje del usuario
     const userMessage: MensajeChatConAcciones = {
@@ -168,6 +181,114 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         error: error instanceof Error ? error.message : 'Error al enviar mensaje',
       });
     }
+  },
+
+  /**
+   * Envía un mensaje con streaming de respuestas
+   */
+  sendMessageStream: async (content: string) => {
+    const trimmedContent = content.trim();
+    if (!trimmedContent) return;
+
+    const { mensajes, contexto, currentScreen } = get();
+
+    // Crear mensaje del usuario
+    const userMessage: MensajeChatConAcciones = {
+      id: generateId(),
+      role: 'user',
+      content: trimmedContent,
+      timestamp: getCurrentTimestamp(),
+    };
+
+    // Crear mensaje del asistente vacío (se llenará con streaming)
+    const assistantMessageId = generateId();
+    const assistantMessage: MensajeChatConAcciones = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      timestamp: getCurrentTimestamp(),
+      actions: [],
+    };
+
+    // Añadir ambos mensajes
+    set((state) => ({
+      mensajes: [...state.mensajes, userMessage, assistantMessage],
+      loading: false,
+      isStreaming: true,
+      streamingMessageId: assistantMessageId,
+      error: null,
+    }));
+
+    try {
+      // Preparar historial para la API
+      const historyForAPI = toAPIFormat(mensajes);
+
+      // Enviar con streaming
+      await copilotService.sendMessageToCopilotStream(
+        trimmedContent,
+        {
+          currentScreen,
+          tripId: contexto?.viajeId,
+          conversationHistory: historyForAPI,
+        },
+        {
+          onStart: () => {
+            console.log('[ChatStore] Streaming iniciado');
+          },
+          onToken: (token: string) => {
+            // Añadir token al mensaje del asistente
+            set((state) => ({
+              mensajes: state.mensajes.map(msg =>
+                msg.id === assistantMessageId
+                  ? { ...msg, content: msg.content + token }
+                  : msg
+              ),
+            }));
+          },
+          onComplete: (response) => {
+            // Actualizar con respuesta completa y acciones
+            set((state) => ({
+              mensajes: state.mensajes.map(msg =>
+                msg.id === assistantMessageId
+                  ? {
+                      ...msg,
+                      content: response.message,
+                      actions: response.actions,
+                    }
+                  : msg
+              ),
+              isStreaming: false,
+              streamingMessageId: null,
+            }));
+
+            // Guardar conversación
+            get().saveConversacion();
+          },
+          onError: (error) => {
+            console.error('[ChatStore] Error en streaming:', error);
+            set({
+              isStreaming: false,
+              streamingMessageId: null,
+              error: error.message,
+            });
+          },
+        }
+      );
+    } catch (error) {
+      console.error('[ChatStore] Error enviando mensaje con streaming:', error);
+      set({
+        isStreaming: false,
+        streamingMessageId: null,
+        error: error instanceof Error ? error.message : 'Error al enviar mensaje',
+      });
+    }
+  },
+
+  /**
+   * Activa/desactiva el modo streaming
+   */
+  setStreamingEnabled: (enabled: boolean) => {
+    set({ streamingEnabled: enabled });
   },
 
   /**

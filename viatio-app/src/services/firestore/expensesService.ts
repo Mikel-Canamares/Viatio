@@ -27,6 +27,7 @@ import {
 import { TripMember } from '@/types/shared';
 import { generateId } from '@/database';
 import { logError } from '@/utils/errorHandler';
+import { convertAmount } from '@/services/currencyService';
 
 // ============================================
 // TIPOS INTERNOS
@@ -34,8 +35,12 @@ import { logError } from '@/utils/errorHandler';
 
 interface ExpenseDoc {
   description: string;
-  amount: number;
-  currency: string;
+  amount: number; // SIEMPRE en moneda del viaje (normalizado)
+  currency: string; // Moneda del viaje
+  originalAmount: number | null; // Monto original si fue en otra moneda
+  originalCurrency: string | null; // Moneda original del ticket
+  exchangeRate: number | null; // Tasa de cambio usada (originalCurrency → currency)
+  exchangeRateDate: string | null; // Fecha de la tasa de cambio (ISO)
   category: string;
   date: string;
   paidByUid: string;
@@ -142,11 +147,13 @@ export function calculateShares(
 
 /**
  * Crear un nuevo gasto
+ * IMPORTANTE: Normaliza el monto a la moneda del viaje para mantener coherencia en cálculos
  */
 export async function createExpense(
   tripId: string,
   input: CreateExpenseInput,
-  members: TripMember[]
+  members: TripMember[],
+  tripCurrency: string // Moneda del viaje para normalización
 ): Promise<SharedExpense | null> {
   try {
     const user = auth.currentUser;
@@ -159,17 +166,51 @@ export async function createExpense(
     const payer = members.find(m => m.uid === input.paidByUid);
     if (!payer) throw new Error('Pagador no encontrado');
 
-    // Calcular shares
+    // NORMALIZACIÓN DE MONEDA: Convertir a moneda del viaje si es necesario
+    let normalizedAmount = input.amount;
+    let originalAmount: number | null = null;
+    let originalCurrency: string | null = null;
+    let exchangeRate: number | null = null;
+    let exchangeRateDate: string | null = null;
+
+    if (input.currency !== tripCurrency) {
+      console.log(`[createExpense] Convirtiendo ${input.amount / 100} ${input.currency} → ${tripCurrency}`);
+
+      // Convertir de céntimos a unidades para la conversión
+      const amountInUnits = input.amount / 100;
+      const conversion = await convertAmount(amountInUnits, input.currency, tripCurrency);
+
+      if (!conversion) {
+        throw new Error(`No se pudo convertir de ${input.currency} a ${tripCurrency}. Verifica tu conexión.`);
+      }
+
+      // Guardar valores originales
+      originalAmount = input.amount;
+      originalCurrency = input.currency;
+      exchangeRate = conversion.rate;
+      exchangeRateDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+      // Usar valor convertido (volver a céntimos)
+      normalizedAmount = Math.round(conversion.converted * 100);
+
+      console.log(`[createExpense] Resultado: ${normalizedAmount / 100} ${tripCurrency} (tasa: ${conversion.rate})`);
+    }
+
+    // Calcular shares sobre el monto NORMALIZADO
     const calculatedShares = calculateShares(
-      input.amount,
+      normalizedAmount,
       input.splitMethod,
       input.shares
     );
 
     const expenseData: ExpenseDoc = {
       description: input.description,
-      amount: input.amount,
-      currency: input.currency,
+      amount: normalizedAmount, // Monto normalizado en moneda del viaje
+      currency: tripCurrency, // Moneda del viaje (normalizada)
+      originalAmount, // null si no hubo conversión
+      originalCurrency, // null si no hubo conversión
+      exchangeRate, // null si no hubo conversión
+      exchangeRateDate, // null si no hubo conversión
       category: input.category,
       date: input.date,
       paidByUid: input.paidByUid,
@@ -192,6 +233,10 @@ export async function createExpense(
       id: expenseId,
       tripId,
       ...expenseData,
+      originalAmount: originalAmount ?? undefined,
+      originalCurrency: originalCurrency ?? undefined,
+      exchangeRate: exchangeRate ?? undefined,
+      exchangeRateDate: exchangeRateDate ?? undefined,
       createdAt: new Date(),
       updatedAt: new Date(),
       deletedAt: null,
@@ -223,6 +268,10 @@ export async function getExpense(
       description: data.description,
       amount: data.amount,
       currency: data.currency,
+      originalAmount: data.originalAmount ?? undefined,
+      originalCurrency: data.originalCurrency ?? undefined,
+      exchangeRate: data.exchangeRate ?? undefined,
+      exchangeRateDate: data.exchangeRateDate ?? undefined,
       category: data.category,
       date: data.date,
       paidByUid: data.paidByUid,
@@ -267,6 +316,10 @@ export async function getTripExpenses(tripId: string): Promise<SharedExpense[]> 
         description: data.description,
         amount: data.amount,
         currency: data.currency,
+        originalAmount: data.originalAmount ?? undefined,
+        originalCurrency: data.originalCurrency ?? undefined,
+        exchangeRate: data.exchangeRate ?? undefined,
+        exchangeRateDate: data.exchangeRateDate ?? undefined,
         category: data.category,
         date: data.date,
         paidByUid: data.paidByUid,
@@ -291,12 +344,14 @@ export async function getTripExpenses(tripId: string): Promise<SharedExpense[]> 
 
 /**
  * Actualizar un gasto
+ * IMPORTANTE: Si cambia el monto o moneda, normaliza a la moneda del viaje
  */
 export async function updateExpense(
   tripId: string,
   expenseId: string,
   updates: Partial<CreateExpenseInput>,
-  members: TripMember[]
+  members: TripMember[],
+  tripCurrency: string // Moneda del viaje para normalización
 ): Promise<SharedExpense | null> {
   try {
     const user = auth.currentUser;
@@ -314,7 +369,6 @@ export async function updateExpense(
 
     // Actualizar campos simples
     if (updates.description !== undefined) updateData.description = updates.description;
-    if (updates.currency !== undefined) updateData.currency = updates.currency;
     if (updates.category !== undefined) updateData.category = updates.category;
     if (updates.date !== undefined) updateData.date = updates.date;
     if (updates.notes !== undefined) updateData.notes = updates.notes;
@@ -329,12 +383,40 @@ export async function updateExpense(
     }
 
     // Si cambia el importe o el reparto, recalcular
-    if (updates.amount !== undefined || updates.shares !== undefined || updates.splitMethod !== undefined) {
-      const newAmount = updates.amount ?? current.amount;
+    if (updates.amount !== undefined || updates.currency !== undefined || updates.shares !== undefined || updates.splitMethod !== undefined) {
+      let newAmount = updates.amount ?? current.amount;
+      const newCurrency = updates.currency ?? current.originalCurrency ?? current.currency;
       const newSplitMethod = updates.splitMethod ?? current.splitMethod;
       const newShares = updates.shares ?? current.shares;
 
+      // NORMALIZACIÓN: Si la moneda es diferente a la del viaje, convertir
+      if (newCurrency !== tripCurrency) {
+        console.log(`[updateExpense] Convirtiendo ${newAmount / 100} ${newCurrency} → ${tripCurrency}`);
+
+        const amountInUnits = newAmount / 100;
+        const conversion = await convertAmount(amountInUnits, newCurrency, tripCurrency);
+
+        if (!conversion) {
+          throw new Error(`No se pudo convertir de ${newCurrency} a ${tripCurrency}`);
+        }
+
+        updateData.originalAmount = newAmount;
+        updateData.originalCurrency = newCurrency;
+        updateData.exchangeRate = conversion.rate;
+        updateData.exchangeRateDate = new Date().toISOString().split('T')[0];
+        newAmount = Math.round(conversion.converted * 100);
+
+        console.log(`[updateExpense] Resultado: ${newAmount / 100} ${tripCurrency}`);
+      } else {
+        // Si es la misma moneda, limpiar campos originales
+        updateData.originalAmount = null;
+        updateData.originalCurrency = null;
+        updateData.exchangeRate = null;
+        updateData.exchangeRateDate = null;
+      }
+
       updateData.amount = newAmount;
+      updateData.currency = tripCurrency; // Siempre en moneda del viaje
       updateData.splitMethod = newSplitMethod;
       updateData.participantUids = updates.participantUids ?? current.participantUids;
       updateData.shares = calculateShares(newAmount, newSplitMethod, newShares);
@@ -381,12 +463,22 @@ export async function deleteExpense(
 
 /**
  * Calcular balances de todos los miembros
- * Considera tanto gastos como settlements completados
+ *
+ * IMPORTANTE: Esta función asume que TODOS los gastos y settlements están en la MISMA MONEDA
+ * (la moneda del viaje). Los servicios createExpense y createSettlement ya normalizan
+ * automáticamente a la moneda del viaje antes de guardar.
+ *
+ * @param expenses - Gastos del viaje (ya normalizados a moneda del viaje)
+ * @param members - Miembros del viaje
+ * @param settlements - Settlements del viaje (ya normalizados a moneda del viaje)
+ * @param tripCurrency - Moneda del viaje (para validación)
+ * @returns Balances en moneda del viaje
  */
 export function calculateBalances(
   expenses: SharedExpense[],
   members: TripMember[],
-  settlements: Settlement[] = []
+  settlements: Settlement[] = [],
+  tripCurrency?: string // Opcional para validación
 ): MemberBalance[] {
   // Inicializar balances
   const balances: Map<string, MemberBalance> = new Map();
@@ -401,6 +493,27 @@ export function calculateBalances(
       netBalance: 0,
     });
   });
+
+  // VALIDACIÓN: Verificar que todos los gastos están en la misma moneda
+  if (tripCurrency) {
+    expenses.forEach(expense => {
+      if (expense.currency !== tripCurrency) {
+        console.warn(
+          `[calculateBalances] WARNING: Gasto ${expense.id} tiene moneda ${expense.currency}, ` +
+          `esperaba ${tripCurrency}. Puede haber una inconsistencia en los datos.`
+        );
+      }
+    });
+
+    settlements.forEach(settlement => {
+      if (settlement.currency !== tripCurrency) {
+        console.warn(
+          `[calculateBalances] WARNING: Settlement ${settlement.id} tiene moneda ${settlement.currency}, ` +
+          `esperaba ${tripCurrency}. Puede haber una inconsistencia en los datos.`
+        );
+      }
+    });
+  }
 
   // Procesar cada gasto
   expenses.forEach(expense => {
@@ -460,29 +573,39 @@ export function calculateSettlementSuggestions(
 ): SettlementSuggestion[] {
   const suggestions: SettlementSuggestion[] = [];
 
-  // DEBUG: Loguear settlements completados
+  // Threshold: Considerar balances menores a 10 céntimos como 0
+  // Aumentado de 1 a 10 para evitar sugerencias casi vacías
+  const BALANCE_THRESHOLD = 10; // 10 céntimos
+
+  // Filtrar settlements por estado
   const completedSettlements = settlements.filter(s => s.status === 'completed');
-  console.log('[DEBUG calculateSettlementSuggestions] Completed settlements:', completedSettlements.map(s => ({
-    fromName: s.fromName,
-    toName: s.toName,
-    amount: s.amount,
-  })));
-  console.log('[DEBUG calculateSettlementSuggestions] Balances received:', balances.map(b => ({
-    name: b.displayName,
-    netBalance: b.netBalance,
-  })));
+  const pendingSettlements = settlements.filter(s => s.status === 'pending');
 
   // Los balances ya vienen ajustados por settlements completados desde calculateBalances
   // No necesitamos re-ajustar aquí
 
+  // Ajustar balances por settlements PENDIENTES para evitar sugerencias duplicadas
+  const adjustedBalances = balances.map(b => ({ ...b }));
+  pendingSettlements.forEach(settlement => {
+    const fromBalance = adjustedBalances.find(b => b.uid === settlement.fromUid);
+    const toBalance = adjustedBalances.find(b => b.uid === settlement.toUid);
+
+    if (fromBalance && toBalance) {
+      // El settlement pendiente ya "cubre" esta deuda
+      fromBalance.netBalance += settlement.amount;
+      toBalance.netBalance -= settlement.amount;
+    }
+  });
+
   // Separar en deudores (balance negativo) y acreedores (balance positivo)
-  const debtors = balances
-    .filter(b => b.netBalance < 0)
+  // Aplicar threshold para evitar diferencias por redondeo
+  const debtors = adjustedBalances
+    .filter(b => b.netBalance < -BALANCE_THRESHOLD)
     .map(b => ({ ...b, remaining: Math.abs(b.netBalance) }))
     .sort((a, b) => b.remaining - a.remaining);
 
-  const creditors = balances
-    .filter(b => b.netBalance > 0)
+  const creditors = adjustedBalances
+    .filter(b => b.netBalance > BALANCE_THRESHOLD)
     .map(b => ({ ...b, remaining: b.netBalance }))
     .sort((a, b) => b.remaining - a.remaining);
 
@@ -496,21 +619,22 @@ export function calculateSettlementSuggestions(
 
     const amount = Math.min(debtor.remaining, creditor.remaining);
 
-    if (amount > 0) {
+    // Solo agregar sugerencias si el monto es significativo (> threshold)
+    if (amount > BALANCE_THRESHOLD) {
       suggestions.push({
         fromUid: debtor.uid,
         fromName: debtor.displayName,
         toUid: creditor.uid,
         toName: creditor.displayName,
-        amount,
+        amount: Math.round(amount), // Redondear para evitar fracciones de céntimo
       });
 
       debtor.remaining -= amount;
       creditor.remaining -= amount;
     }
 
-    if (debtor.remaining === 0) debtorIndex++;
-    if (creditor.remaining === 0) creditorIndex++;
+    if (debtor.remaining <= BALANCE_THRESHOLD) debtorIndex++;
+    if (creditor.remaining <= BALANCE_THRESHOLD) creditorIndex++;
   }
 
   return suggestions;
@@ -587,6 +711,10 @@ export function subscribeToExpenses(
           description: data.description,
           amount: data.amount,
           currency: data.currency,
+          originalAmount: data.originalAmount ?? undefined,
+          originalCurrency: data.originalCurrency ?? undefined,
+          exchangeRate: data.exchangeRate ?? undefined,
+          exchangeRateDate: data.exchangeRateDate ?? undefined,
           category: data.category,
           date: data.date,
           paidByUid: data.paidByUid,

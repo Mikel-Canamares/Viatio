@@ -5,11 +5,11 @@
  * Permite desarchivar o eliminar permanentemente los viajes.
  */
 
-import { useEffect } from 'react';
-import { View, FlatList, StyleSheet, ActivityIndicator, Text, Alert } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, FlatList, StyleSheet, ActivityIndicator, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { PageHeader, TripCard } from '@/components';
+import { PageHeader, TripCard, CustomModal } from '@/components';
 import { useViajesStore } from '@/store';
 import { useAuth } from '@/context';
 import { theme } from '@/config';
@@ -22,6 +22,16 @@ export default function ArchivedTripsScreen({ navigation }: Props) {
   const { viajes, loading, fetchArchivedViajes, unarchiveViaje, deleteViajeCompletely } =
     useViajesStore();
   const { user } = useAuth();
+  const [errorModal, setErrorModal] = useState<{
+    visible: boolean;
+    message: string;
+  }>({ visible: false, message: '' });
+  const [deleteModal, setDeleteModal] = useState<{
+    visible: boolean;
+    viajeId: string | null;
+    destino: string;
+    message: string;
+  }>({ visible: false, viajeId: null, destino: '', message: '' });
 
   useEffect(() => {
     if (user?.uid) {
@@ -41,7 +51,10 @@ export default function ArchivedTripsScreen({ navigation }: Props) {
         await fetchArchivedViajes(user.uid);
       }
     } catch (error) {
-      Alert.alert('Error', 'No se pudo desarchivar el viaje');
+      setErrorModal({
+        visible: true,
+        message: 'No se pudo desarchivar el viaje',
+      });
     }
   };
 
@@ -57,29 +70,32 @@ export default function ArchivedTripsScreen({ navigation }: Props) {
           ? `Se eliminarán:\n• ${counts.reservas} reserva(s)\n• ${counts.lugares} lugar(es)\n• ${counts.documentos} documento(s)\n• ${counts.gastos} gasto(s)\n\nEsta acción no se puede deshacer.`
           : 'Esta acción no se puede deshacer.';
 
-      Alert.alert(
-        '¿Eliminar viaje?',
-        `Vas a eliminar permanentemente "${destino}".\n\n${message}`,
-        [
-          {
-            text: 'Cancelar',
-            style: 'cancel',
-          },
-          {
-            text: 'Eliminar',
-            style: 'destructive',
-            onPress: async () => {
-              try {
-                await deleteViajeCompletely(viajeId);
-              } catch (error) {
-                Alert.alert('Error', 'No se pudo eliminar el viaje');
-              }
-            },
-          },
-        ]
-      );
+      setDeleteModal({
+        visible: true,
+        viajeId,
+        destino,
+        message: `Vas a eliminar permanentemente "${destino}".\n\n${message}`,
+      });
     } catch (error) {
-      Alert.alert('Error', 'No se pudo obtener información del viaje');
+      setErrorModal({
+        visible: true,
+        message: 'No se pudo obtener información del viaje',
+      });
+    }
+  };
+
+  const confirmDeleteTrip = async () => {
+    if (deleteModal.viajeId) {
+      try {
+        await deleteViajeCompletely(deleteModal.viajeId);
+        setDeleteModal({ visible: false, viajeId: null, destino: '', message: '' });
+      } catch (error) {
+        setDeleteModal({ visible: false, viajeId: null, destino: '', message: '' });
+        setErrorModal({
+          visible: true,
+          message: 'No se pudo eliminar el viaje',
+        });
+      }
     }
   };
 
@@ -146,6 +162,35 @@ export default function ArchivedTripsScreen({ navigation }: Props) {
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         style={styles.list}
+      />
+
+      <CustomModal
+        visible={errorModal.visible}
+        type="error"
+        title="Error"
+        message={errorModal.message}
+        onClose={() => setErrorModal({ visible: false, message: '' })}
+        primaryButton={{
+          text: 'OK',
+          onPress: () => {},
+        }}
+      />
+
+      <CustomModal
+        visible={deleteModal.visible}
+        type="warning"
+        title="¿Eliminar viaje?"
+        message={deleteModal.message}
+        onClose={() => setDeleteModal({ visible: false, viajeId: null, destino: '', message: '' })}
+        primaryButton={{
+          text: 'Eliminar',
+          onPress: confirmDeleteTrip,
+          destructive: true,
+        }}
+        secondaryButton={{
+          text: 'Cancelar',
+          onPress: () => {},
+        }}
       />
     </View>
   );

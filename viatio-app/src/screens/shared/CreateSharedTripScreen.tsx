@@ -7,10 +7,10 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { ScreenContainer, PageHeader, PrimaryButton, Card, DateInput } from '@/components';
+import { CustomModal } from '@/components/CustomModal';
 import { CurrencyPicker } from '@/components/CurrencyPicker';
 import { useSharedTripsStore } from '@/store/sharedTripsStore';
 import { theme } from '@/config';
@@ -31,6 +31,8 @@ export default function CreateSharedTripScreen() {
   const [currency, setCurrency] = useState('EUR');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [createdTripId, setCreatedTripId] = useState<string | null>(null);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -75,8 +77,8 @@ export default function CreateSharedTripScreen() {
       });
 
       if (trip) {
-        Alert.alert('Viaje creado', name);
-        navigation.replace('SharedTripDetail', { tripId: trip.id });
+        setCreatedTripId(trip.id);
+        setShowSuccessModal(true);
       } else {
         showToast.error('Error', 'No se pudo crear el viaje');
       }
@@ -168,6 +170,27 @@ export default function CreateSharedTripScreen() {
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <CustomModal
+        visible={showSuccessModal}
+        type="success"
+        title="Viaje creado"
+        message={name}
+        onClose={() => {
+          setShowSuccessModal(false);
+          if (createdTripId) {
+            navigation.replace('SharedTripDetail', { tripId: createdTripId });
+          }
+        }}
+        primaryButton={{
+          text: 'Ir al viaje',
+          onPress: () => {
+            if (createdTripId) {
+              navigation.replace('SharedTripDetail', { tripId: createdTripId });
+            }
+          },
+        }}
+      />
     </ScreenContainer>
   );
 }

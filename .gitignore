@@ -1,0 +1,34 @@
+# Firebase
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+ui-debug.log
+.runtimeconfig.json
+google-services.json
+GoogleService-Info.plist
+functions/service-account.json
+functions/test-*.js
+
+# Node modules
+node_modules/
+
+# Build outputs
+dist/
+build/
+lib/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

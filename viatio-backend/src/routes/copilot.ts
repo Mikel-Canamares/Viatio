@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import { config } from '../config/env';
 import type { CopilotRequest, CopilotResponse, CopilotAction } from '../types';
+import * as conversationSummary from '../services/conversationSummaryService';
 
 const router = Router();
 const genAI = new GoogleGenerativeAI(config.geminiApiKey);
@@ -55,25 +56,29 @@ const copilotFunctions = [
   },
   {
     name: 'search_places',
-    description: 'Busca lugares usando Google Places API según criterios',
+    description: 'Busca lugares verificados usando Google Places API. Úsalo para encontrar restaurantes, atracciones, hoteles, etc. SIEMPRE usa este tool para recomendaciones de lugares concretos. Devuelve información real verificada (nombre, dirección, rating, si está abierto ahora). Si no hay datos de horario/precio/web, dirás "No disponible" sin inventar.',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
         query: {
           type: SchemaType.STRING,
-          description: 'Texto de búsqueda (ej: "restaurantes italianos", "museos")',
+          description: 'Texto de búsqueda específico. Ejemplos: "restaurantes vegetarianos", "museos de arte", "farmacias", "cafeterías con wifi".',
         },
         nearLat: {
           type: SchemaType.NUMBER,
-          description: 'Latitud del punto de referencia',
+          description: 'Latitud del punto de referencia (hotel, lugar actual, POI del día). OBLIGATORIO para búsquedas "cerca de".',
         },
         nearLng: {
           type: SchemaType.NUMBER,
-          description: 'Longitud del punto de referencia',
+          description: 'Longitud del punto de referencia. OBLIGATORIO para búsquedas "cerca de".',
         },
         radiusMeters: {
           type: SchemaType.NUMBER,
-          description: 'Radio de búsqueda en metros (default: 2000)',
+          description: 'Radio de búsqueda en metros. Default: 2000 (2km). Usa 500 para "muy cerca", 1000 para "cerca", 5000 para "en la zona".',
+        },
+        type: {
+          type: SchemaType.STRING,
+          description: 'Tipo específico de Google Places para filtrar. Ejemplos: "restaurant", "tourist_attraction", "museum", "cafe", "pharmacy", "atm". Opcional pero mejora precisión.',
         },
       },
       required: ['query'],
@@ -302,23 +307,44 @@ Cuando el usuario pida algo, EJECUTA las herramientas apropiadas inmediatamente.
 NO des solo texto. USA las herramientas para hacer cosas útiles.
 
 ═══════════════════════════════════════════════════
+⛔ RESTRICCIONES CRÍTICAS - BÚSQUEDA WEB PROHIBIDA ⛔
+═══════════════════════════════════════════════════
+🚫 PROHIBIDO: Web scraping, búsquedas en internet, Serper, Tavily, grounding web
+🚫 NUNCA inventes datos: horarios, precios, reviews, números de teléfono, websites
+🚫 Si no tienes un dato → Di "No disponible en Google Places" o "No consta"
+
+✅ PERMITIDO: SOLO Google Places API (search_places tool)
+✅ Para recomendar lugares → SIEMPRE llama a search_places
+✅ Respuestas basadas SOLO en resultados verificados de Places
+✅ Si falta info (horario/precio/web) → Mostrar "No disponible"
+✅ Añade timestamp: "Consultado el [fecha actual]"
+
+═══════════════════════════════════════════════════
 HERRAMIENTA: search_places + show_on_map (COMBO OBLIGATORIO)
 ═══════════════════════════════════════════════════
-Cuando el usuario pregunte por lugares (restaurantes, museos, tiendas, etc.):
+Para recomendar lugares concretos (restaurantes, museos, hoteles, etc.):
 
-1. SIEMPRE ejecuta search_places con las coordenadas del contexto
-2. SIEMPRE añade show_on_map para que el usuario vea los resultados en el mapa
-3. Opcionalmente añade add_place_to_saved para guardar los mejores
+1. SIEMPRE ejecuta search_places con coordenadas de contexto
+2. SIEMPRE añade show_on_map para visualización en mapa
+3. NUNCA inventes datos si no vienen en resultados de Places
+4. Si falta horario/precio/teléfono → di "No disponible"
+5. Añade "Consultado en Google Places el [fecha]"
 
 EJEMPLO - Usuario: "Busca restaurantes cerca del hotel"
 → Ejecutas:
-  - search_places({ query: "restaurantes", nearLat: [coords destino], nearLng: [coords destino], radiusMeters: 1000 })
-  - show_on_map({ lat: [coords destino], lng: [coords destino], title: "Restaurantes cerca del hotel" })
+  - search_places({ query: "restaurantes", nearLat: [coords hotel/destino], nearLng: [coords hotel/destino], radiusMeters: 1000 })
+  - show_on_map({ lat: [coords], lng: [coords], title: "Restaurantes cerca del hotel" })
+→ Respuesta: Basada SOLO en resultados de Places (nombre, rating, distancia, openNow)
 
-EJEMPLO - Usuario: "¿Qué museos hay por la zona?"
+EJEMPLO - Usuario: "Alternativas para hoy"
 → Ejecutas:
-  - search_places({ query: "museos", nearLat: [coords destino], nearLng: [coords destino], radiusMeters: 2000 })
-  - show_on_map({ lat: [coords destino], lng: [coords destino], title: "Museos en la zona" })
+  - search_places({ query: "[tipo POI del día]", nearLat: [coords POI principal del día], nearLng: [coords POI], radiusMeters: 1500 })
+  - show_on_map({ lat: [coords], lng: [coords], title: "Alternativas cerca" })
+
+EJEMPLO - Usuario: "Cafeterías con wifi cerca de aquí"
+→ Ejecutas:
+  - search_places({ query: "cafeterías wifi", nearLat: [coords destino], nearLng: [coords destino], radiusMeters: 500, type: "cafe" })
+  - show_on_map({ lat: [coords], lng: [coords], title: "Cafeterías con wifi" })
 
 ═══════════════════════════════════════════════════
 HERRAMIENTA: create_agenda_item
@@ -381,6 +407,52 @@ COMPORTAMIENTO POR PANTALLA
     default:
       prompt += `Chat general. Ayuda al usuario con cualquier aspecto del viaje.`;
   }
+
+  // Few-shot examples: ejemplos de interacciones ideales
+  prompt += `
+
+═══════════════════════════════════════════════════
+EJEMPLOS DE INTERACCIONES IDEALES
+═══════════════════════════════════════════════════
+
+Usuario: "Busca restaurantes vegetarianos cerca del hotel"
+Asistente: "¡Claro! Voy a buscar opciones vegetarianas cerca de tu alojamiento en ${trip?.destination || '[destino]'}."
+Acciones ejecutadas:
+- search_places({ query: "restaurantes vegetarianos ${trip?.destination || ''}", nearLat: [coords hotel], nearLng: [coords hotel], radiusMeters: 1000 })
+- show_on_map({ lat: [coords], lng: [coords], title: "Restaurantes vegetarianos cerca" })
+Respuesta: Lista nombre, distancia, rating, openNow. Si falta horario → "Horario no disponible"
+
+Usuario: "Alternativas para hoy en el museo"
+Asistente: "Voy a buscar museos y atracciones culturales cerca de [POI del día]."
+Acciones ejecutadas:
+- search_places({ query: "museos atracciones culturales", nearLat: [coords POI día], nearLng: [coords POI día], radiusMeters: 1500, type: "museum" })
+- show_on_map({ lat: [coords], lng: [coords], title: "Alternativas culturales cerca" })
+Respuesta: SOLO datos de Places. "Consultado en Google Places el [hoy]"
+
+Usuario: "Añade el Museo del Prado mañana por la mañana"
+Asistente: "Perfecto, he añadido la visita al Museo del Prado en tu agenda para mañana a las 10:00."
+Acciones ejecutadas:
+- create_agenda_item({ tripId: "...", date: "[fecha]", title: "Museo del Prado", type: "culture", start: "10:00" })
+
+Usuario: "¿Cuánto dinero me queda del presupuesto?"
+Asistente: "Has gastado ${contextPack.budget?.spent || 0}€ de tu presupuesto de ${contextPack.budget?.total || 'no definido'}. Te quedan ${contextPack.budget?.remaining || 'no calculado'}€ disponibles."
+Acciones: Ninguna (respuesta informativa)
+
+Usuario: "Busca algo como X cerca de Y"
+Asistente: "Buscando lugares tipo X cerca de Y usando Google Places."
+Acciones ejecutadas:
+- search_places({ query: "X", nearLat: [coords Y], nearLng: [coords Y], radiusMeters: 2000 })
+- show_on_map({ lat: [coords], lng: [coords], title: "Resultados: X cerca de Y" })
+Respuesta: Máximo 8 resultados ordenados por distancia + rating + openNow
+
+Usuario: "Muéstrame los lugares que tengo guardados en el mapa"
+Asistente: "Tienes ${contextPack.places?.totalSaved || 0} lugares guardados. Te los muestro en el mapa."
+Acciones ejecutadas:
+- show_on_map({ lat: [coords destino], lng: [coords destino], title: "Tus lugares guardados" })
+
+⚠️ Si el usuario pregunta por clima, horarios de atracciones, eventos actuales:
+→ Responde: "No puedo buscar en internet, pero puedo recomendarte lugares verificados con Google Places. ¿Qué tipo de lugar buscas?"
+`;
 
   return prompt;
 }
@@ -468,18 +540,36 @@ router.post(
         tools: [{ functionDeclarations: copilotFunctions as any }],
       });
 
-      // Construir historial
-      const history =
+      // Construir historial y gestionarlo automáticamente
+      let rawHistory =
         conversationHistory?.map((m) => ({
           role: m.role,
-          parts: [{ text: m.content }],
+          content: m.content,
         })) || [];
+
+      // Gestionar historial (resumir si es necesario)
+      const managedHistory = await conversationSummary.manageConversationHistory(rawHistory);
+
+      // Convertir a formato de Gemini
+      const history = managedHistory.map((m) => ({
+        role: m.role,
+        parts: [{ text: m.content }],
+      }));
+
+      // Log de estadísticas de historial
+      const historyStats = conversationSummary.getHistoryStats(rawHistory);
+      console.log('[Copilot] Historial:', {
+        messages: historyStats.messageCount,
+        estimatedTokens: historyStats.estimatedTokens,
+        percentOfLimit: `${historyStats.percentOfLimit}%`,
+        summarized: rawHistory.length !== managedHistory.length,
+      });
 
       const chat = model.startChat({
         history,
         generationConfig: {
           maxOutputTokens: 1500,
-          temperature: 0.7,
+          temperature: 1.0, // Recomendación oficial para Gemini 2.0+
         },
       });
 
@@ -529,6 +619,151 @@ router.post(
         success: false,
         error: error instanceof Error ? error.message : 'Error al comunicarse con el Copilot',
       });
+    }
+  }
+);
+
+// ============================================
+// ENDPOINT CON STREAMING (SSE)
+// ============================================
+
+/**
+ * POST /api/copilot/stream
+ * Chat con streaming de respuestas usando Server-Sent Events
+ */
+router.post(
+  '/stream',
+  async (req: Request<{}, {}, CopilotRequest>, res: Response): Promise<void> => {
+    const startTime = Date.now();
+
+    try {
+      const { message, contextPack, conversationHistory } = req.body;
+
+      // Validaciones
+      if (!message || typeof message !== 'string' || message.trim().length === 0) {
+        res.status(400).json({
+          success: false,
+          error: 'Campo "message" requerido y no puede estar vacío',
+        });
+        return;
+      }
+
+      if (!contextPack) {
+        res.status(400).json({
+          success: false,
+          error: 'Campo "contextPack" requerido',
+        });
+        return;
+      }
+
+      // Configurar SSE
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no'); // Deshabilitar buffering en nginx
+
+      // Función helper para enviar eventos SSE
+      const sendSSE = (event: string, data: any) => {
+        res.write(`event: ${event}\n`);
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+      };
+
+      // Construir prompt dinámico
+      const systemPrompt = buildCopilotPrompt(contextPack);
+
+      // Crear modelo con function calling
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-2.0-flash-exp',
+        systemInstruction: systemPrompt,
+        tools: [{ functionDeclarations: copilotFunctions as any }],
+      });
+
+      // Construir historial y gestionarlo automáticamente
+      let rawHistory =
+        conversationHistory?.map((m) => ({
+          role: m.role,
+          content: m.content,
+        })) || [];
+
+      // Gestionar historial (resumir si es necesario)
+      const managedHistory = await conversationSummary.manageConversationHistory(rawHistory);
+
+      // Convertir a formato de Gemini
+      const history = managedHistory.map((m) => ({
+        role: m.role,
+        parts: [{ text: m.content }],
+      }));
+
+      // Log de estadísticas de historial
+      const historyStats = conversationSummary.getHistoryStats(rawHistory);
+      console.log('[Copilot/Stream] Historial:', {
+        messages: historyStats.messageCount,
+        estimatedTokens: historyStats.estimatedTokens,
+        percentOfLimit: `${historyStats.percentOfLimit}%`,
+        summarized: rawHistory.length !== managedHistory.length,
+      });
+
+      const chat = model.startChat({
+        history,
+        generationConfig: {
+          maxOutputTokens: 1500,
+          temperature: 1.0,
+        },
+      });
+
+      // Enviar evento de inicio
+      sendSSE('start', { message: 'Iniciando respuesta...' });
+
+      // Enviar mensaje con streaming
+      const result = await chat.sendMessageStream(message);
+
+      let responseText = '';
+      const functionCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
+
+      // Procesar chunks de streaming
+      for await (const chunk of result.stream) {
+        for (const candidate of chunk.candidates || []) {
+          for (const part of candidate.content?.parts || []) {
+            if (part.text) {
+              responseText += part.text;
+              // Enviar cada chunk de texto al cliente
+              sendSSE('token', { text: part.text });
+            }
+            if (part.functionCall) {
+              functionCalls.push({
+                name: part.functionCall.name,
+                args: part.functionCall.args as Record<string, unknown>,
+              });
+            }
+          }
+        }
+      }
+
+      // Convertir function calls a acciones
+      const actions = parseFunctionCallsToActions(functionCalls);
+
+      const processingTimeMs = Date.now() - startTime;
+
+      // Enviar evento de finalización con metadata y acciones
+      sendSSE('complete', {
+        message: responseText || 'No pude generar una respuesta.',
+        actions,
+        metadata: {
+          confidence: actions.length > 0 ? 0.9 : 0.7,
+          sourcesUsed: ['trip_context', ...(actions.some((a) => a.type === 'search_places') ? ['google_places'] : [])],
+          processingTimeMs,
+        },
+      });
+
+      // Cerrar conexión
+      res.end();
+    } catch (error) {
+      console.error('Error en /copilot/stream:', error);
+
+      // Enviar evento de error
+      res.write(`event: error\n`);
+      res.write(`data: ${JSON.stringify({ error: error instanceof Error ? error.message : 'Error desconocido' })}\n\n`);
+      res.end();
     }
   }
 );
