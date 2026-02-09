@@ -53,7 +53,7 @@ export function ChecklistItemCard({
         <Ionicons
           name={item.completado ? 'checkbox' : 'square-outline'}
           size={22}
-          color={item.completado ? theme.colors.accent : '#D1D5DB'}
+          color={item.completado ? theme.colors.primary : '#D1D5DB'}
         />
       </Pressable>
 

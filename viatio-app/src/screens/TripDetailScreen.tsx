@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ScreenContainer, Card, CopilotFAB, MembersSection, ShareTripModal, DualTimeDisplay } from '@/components';
+import { ScreenContainer, Card, MembersSection, ShareTripModal, DualTimeDisplay } from '@/components';
 import { getViajeById } from '@/services'; // getViajeStats temporalmente desactivado
 import type { Viaje } from '@/types/viaje'; // ViajeStats temporalmente desactivado
 import { theme } from '@/config';
@@ -362,6 +362,20 @@ export default function TripDetailScreen({ navigation, route }: Props) {
                 <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
               </View>
             </Card>
+
+            {/* Asistente */}
+            <Card onPress={() => navigation.navigate('Assistant', { viajeId })} style={styles.menuCard}>
+              <View style={styles.menuRow}>
+                <View style={[styles.iconContainer, styles.iconAsistente]}>
+                  <Ionicons name="sparkles" size={24} color="#6366F1" />
+                </View>
+                <View style={styles.menuTextContainer}>
+                  <Text style={styles.menuTitle}>Asistente</Text>
+                  <Text style={styles.menuDescription}>Tu copiloto de viaje IA</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+              </View>
+            </Card>
           </View>
 
           {/* Sección de miembros / compartir viaje */}
@@ -373,12 +387,6 @@ export default function TripDetailScreen({ navigation, route }: Props) {
           />
         </View>
       </ScrollView>
-
-      {/* COPILOT TEMPORALMENTE DESACTIVADO - Mantener implementación pero ocultar acceso
-      <CopilotFAB
-        onPress={() => navigation.navigate('Assistant', { viajeId })}
-      />
-      */}
 
       {/* Modal de compartir viaje */}
       <ShareTripModal
@@ -518,6 +526,9 @@ const styles = StyleSheet.create({
   },
   iconChecklist: {
     backgroundColor: 'rgba(16, 185, 129, 0.1)', // Verde checklist
+  },
+  iconAsistente: {
+    backgroundColor: 'rgba(99, 102, 241, 0.1)', // Índigo
   },
   menuTextContainer: {
     flex: 1,

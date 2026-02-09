@@ -197,7 +197,13 @@ export interface CopilotRequest {
       total: number;
       byCategory: Record<string, number>;
     };
-    // NOTA: expenses eliminado - el módulo de gastos es independiente del Copilot
+    budget?: {
+      total?: number;
+      spent: number;
+      remaining?: number;
+      currency: string;
+      byCategory: Record<string, number>;
+    };
     capabilities: {
       availableActions: string[];
       canWriteData: boolean;

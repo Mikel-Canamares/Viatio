@@ -33,9 +33,9 @@ export const SwipeableCard: React.FC<SwipeableCardProps> = ({
   const startX = useSharedValue(0);
 
   // Configuración del gesto con spring suave usando Gesture API
-  // Solución robusta: combinar activeOffsetX solo para izquierda + failOffsetY más amplio
+  // Permite swipe izquierda desde cerrado, y ambas direcciones cuando está abierto
   const panGesture = Gesture.Pan()
-    .activeOffsetX([-15, 999999]) // Activar solo swipe izquierda (>=15px), ignorar derecha
+    .activeOffsetX([-15, 15]) // Activar con movimiento horizontal >=15px en cualquier dirección
     .failOffsetY([-15, 15]) // Fallar si movimiento vertical >= 15px (da prioridad a scroll)
     .onStart(() => {
       startX.value = translateX.value;
@@ -43,10 +43,13 @@ export const SwipeableCard: React.FC<SwipeableCardProps> = ({
     .onUpdate((event) => {
       const newTranslateX = startX.value + event.translationX;
 
-      // Permitir solo swipe hacia la izquierda (valores negativos)
-      // Límite: no más allá del ancho de las acciones
+      // Permitir movimiento hacia la izquierda desde cualquier posición
+      // Y hacia la derecha solo si ya está abierto (translateX < 0)
       if (newTranslateX <= 0 && newTranslateX >= -ACTION_WIDTH) {
         translateX.value = newTranslateX;
+      } else if (newTranslateX > 0 && startX.value < 0) {
+        // Si intenta ir más allá de 0 hacia la derecha, limitar a 0
+        translateX.value = 0;
       }
     })
     .onEnd(() => {

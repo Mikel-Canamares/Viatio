@@ -35,7 +35,9 @@
       "Bash(npm run start:clear:*)",
       "Bash(dir:*)",
       "Bash(npm start)",
-      "WebFetch(domain:docs.expo.dev)"
+      "WebFetch(domain:docs.expo.dev)",
+      "WebFetch(domain:ai.google.dev)",
+      "WebFetch(domain:firebase.google.com)"
     ]
   }
 }
